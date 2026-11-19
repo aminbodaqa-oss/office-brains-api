@@ -17,6 +17,7 @@ header p{margin:2px 0 0;color:var(--mut);font-size:14px}
 .header-actions{display:flex;align-items:center;gap:8px;float:left}
 .notification-trigger{position:relative;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:11px;padding:7px 11px;font:inherit;cursor:pointer}
 .notification-count{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;margin-right:5px;border-radius:99px;background:#d94343;color:#fff;font-size:11px;font-weight:800}
+.notification-count[hidden]{display:none}
 #notificationPanel{position:fixed;z-index:15;top:72px;left:14px;width:min(440px,calc(100vw - 28px));max-height:min(75vh,680px);display:none;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:17px;box-shadow:0 18px 55px #0003;overflow:hidden}
 #notificationPanel.open{display:flex}
 .notification-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 15px;border-bottom:1px solid var(--line)}
@@ -310,6 +311,13 @@ document.getElementById("markAllNotifications").addEventListener("click",async()
   loadNotifications();
 });
 if(ownerToken)startNotificationUpdates();
+async function notifyOfficeEvent(event_type,title,message,details){
+ try{
+  const base=(window.OFFICE_API_URL||"").replace(/\/$/,"");
+  await fetch(base+"/api/notifications/event",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+ownerToken},body:JSON.stringify({event_type,title,message,details})});
+  loadNotifications();
+ }catch(e){}
+}
 const CTX="الشركة: Vindora، منصة مصرية بتجمع منتجات الموردين بالمسوّقين (دروب شيبينج/أفلييت). المسوّق بيروّج للمنتجات برابط تتبع وبياخد عمولة ثابتة 40 جنيه على كل طلب ناجح، والمورّد بيعرض منتجاته ويحدد سعر الجملة ويدفع عند البيع بس. السحب من 250 جنيه (فودافون كاش/إنستاباي/محافظ). التفعيل خلال 24-48 ساعة. الشحن وخدمة العملاء علينا. الموقع vindora.whf.bz. ";
 const RULES="قواعد التمثيل: انت موظف حقيقي في المكتب وليك شخصية وخبرة وأسلوب (واتساب). اتكلم بالعامية المصرية الطبيعية، رسايل قصيرة (1-3 جمل) وافصل بين كل رسالة والتانية بسطر فاضي، وممكن تبعت 2-3 رسايل ورا بعض. ما تكتبش مقالات ولا عناوين ولا تنسيق ماركداون. عندك رأي: لو الفكرة ضعيفة اعترض بأدب واشرح السبب، ولو ناقصك معلومة اسأل سؤال واحد بس. لو الموضوع مش تخصصك رشّح زميل بالاسم. ما تخترعش أرقام أو بيانات مش معاك. المستخدم هو صاحب الشركة (الريّس). لو سألك بجدية إنت إنسان ولا ذكاء اصطناعي، قول الحقيقة: إنك موظف افتراضي بالذكاء الاصطناعي. ";
 const PERS={"ابراهيم":"٤٥ سنة، خبرة ٢٠ سنة في التجارة. هادي وحازم، بيحب الأرقام قبل القرارات، وبيقول 'خلّينا نمشي بالترتيب'.","ليلى":"٣٣ سنة، دافية ومنظمة، بتهتم بالناس قبل الورق، وبتقول 'بصراحة كده'.","نور":"٢٨ سنة، حماسية وبتشرح بأمثلة بسيطة، وبتقول 'تعالى نجرّب'.","كريم":"٣٠ سنة، عملي وسريع، شايف كل حاجة أرقام. بيقول 'نختبر الأول وبعدين نكبّر' وبيعترض على أي ميزانية كبيرة قبل الاختبار.","اسلام":"٣٥ سنة، تحليلي، أول سؤاله دايمًا 'مين العميل؟'، وبيرفض المنتجات اللي هامشها ضعيف.","طلعت":"٢٩ سنة، مرِح وخفيف الدم، بيحب الجمل القصيرة، وبيتضايق لو حد غيّر كلامه من غير سبب.","محمد":"٥٠ سنة، دقيق وحذر وقليل الكلام، بيقول 'الورق الأول'، ومتحفظ جدًا في المصاريف.","ثابت":"٣٢ سنة، هادي، بيقول 'الأرقام مش بتكدب بس لازم نسألها صح'، وبيطلب بيانات قبل ما يدّي رأي.","تهامي":"٢٧ سنة، فنان وبيسهر، بيستخدم مصطلحات مونتاج، وبيقول 'خلّينا نحسّها'.","سلمى":"٣١ سنة، سريعة ومرتبة جدًا، بتقول 'تمام حاضر' وبتأكد على كل ميعاد بالتاريخ والساعة.","عمرو":"٤٠ سنة، صبور ومفاوض، بيقول 'خلّينا نتفق على الشروط قبل أول أوردر'.","هدى":"٣٤ سنة، نشيطة ومتحمسة، بتقول 'الناس بتتحفز بالنتايج'، وبتتابع كل مسوّق باسمه.","ياسر":"٣٨ سنة، هادي وصبور جدًا، بيقول 'العميل ليه حق لحد ما نتأكد'، وبيهتم بالتفاصيل."};
@@ -413,9 +421,9 @@ const saveM=()=>{try{localStorage.setItem('vo_meet',JSON.stringify(mh.slice(-60)
 function mchips(){$('mchips').textContent='';T.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.e+' '+x.n;b.className=mOn.has(x.n)?'on':'';b.onclick=()=>{mOn.has(x.n)?mOn.delete(x.n):mOn.add(x.n);b.className=mOn.has(x.n)?'on':''};$('mchips').append(b)})}
 function mdraw(){const box=$('mmsgs');box.textContent='';if(!mh.length){const d=document.createElement('div');d.className='note';d.textContent='اختار الحاضرين فوق، واكتب موضوع الاجتماع. كل واحد هيرد بالدور ويعلّق على زمايله.';box.append(d)}
 mh.forEach(m=>{const d=document.createElement('div');d.className='m '+(m.u?'u':'b');if(!m.u){const w=document.createElement('b');w.textContent=m.e+' '+m.w;w.style.display='block';w.style.fontSize='12px';d.append(w)}d.append(document.createTextNode(m.c==='...'?'بيكتب…':m.c));box.append(d)});box.scrollTop=1e9}
-$('meetBtn').onclick=()=>{$('meet').classList.add('on');mchips();mdraw()};
+$('meetBtn').onclick=()=>{$('meet').classList.add('on');mchips();mdraw();notifyOfficeEvent("meeting","بدأت جلسة اجتماع","تم فتح غرفة الاجتماعات وبدء جلسة جديدة.","المشاركون المحددون: "+Array.from(mOn).join("، "))};
 $('mback').onclick=()=>$('meet').classList.remove('on');
-$('mclr').onclick=()=>{if(busy)return;mh=[];saveM();mdraw()};
+$('mclr').onclick=()=>{if(busy)return;mh=[];saveM();mdraw();notifyOfficeEvent("meeting","تم بدء اجتماع جديد","تم مسح محادثة الاجتماع السابقة وفتح جلسة جديدة.","")};
 async function speak(x,instr,bot){
  const now=new Date().toLocaleString("ar-EG",{dateStyle:"full",timeStyle:"short",timeZone:"Africa/Cairo"});
  const tr=mh.filter(m=>m!==bot&&m.c!=="...").slice(-30).map(m=>(m.u?"الريّس":m.w)+": "+m.c).join("\n");
@@ -433,7 +441,7 @@ async function mSend(){
  finally{mh=mh.filter(m=>m.c!=='...');busy=false;$('ms').disabled=false;saveM();mdraw()}}
 $('mmin').onclick=async()=>{if(busy||!mh.length)return;busy=true;const x=T.find(t=>t.n==='سلمى');const bot={w:x.n,e:x.e,c:'...'};mh.push(bot);mdraw();
  try{await speak(x,'اكتبي محضر الاجتماع: القرارات، المهام (مين/إيه/إمتى)، والنقاط المفتوحة. نص عادي بدون ماركداون، نقاط بشرطة، وكوني مختصرة.',bot)}catch(e){bot.c='حصلت مشكلة، جرّب تاني.'}
- finally{mh=mh.filter(m=>m.c!=='...');busy=false;saveM();mdraw()}};
+ finally{mh=mh.filter(m=>m.c!=='...');busy=false;saveM();mdraw();notifyOfficeEvent("meeting_minutes","تم إعداد محضر الاجتماع","سلمى أعدّت محضرًا بناءً على محتوى الجلسة.",mh.map(m=>(m.w||"المالك")+": "+m.c).join("\n\n"))}};
 $('mf').onsubmit=e=>{e.preventDefault();mSend()};
 $('mt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();mSend()}};
 </script>
