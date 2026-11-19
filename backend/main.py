@@ -35,6 +35,7 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     employee_id: str
     role: str = ""
+    employee_prompt: str = ""
     messages: list[Message] = Field(min_length=1, max_length=30)
 
 class MeetingRequest(BaseModel):
@@ -70,7 +71,7 @@ async def chat(body: ChatRequest):
     if body.employee_id not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     memories = get_memories(body.employee_id, 12)
-    system = "أنت موظف افتراضي متخصص داخل مكتب. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. "
+    system = "أنت موظف افتراضي متخصص داخل مكتب. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
     if memories:
         system += "\nذكريات محفوظة لهذا الموظف:\n" + "\n".join("- " + m["content"] for m in reversed(memories))
     try:
