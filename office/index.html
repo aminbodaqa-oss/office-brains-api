@@ -15,13 +15,30 @@ header{padding:18px 16px 6px}
 h1{margin:0;font-size:22px}
 header p{margin:2px 0 0;color:var(--mut);font-size:14px}
 .logout{float:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:7px 11px;font:inherit;font-size:13px;cursor:pointer}
-#authGate{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
+#authGate{position:fixed;inset:0;z-index:20;overflow-y:auto;background:radial-gradient(circle at 15% 15%,#7047f544 0,transparent 30%),radial-gradient(circle at 88% 82%,#7047f52b 0,transparent 28%),linear-gradient(135deg,#0b1024 0%,#11172e 55%,#1b1740 100%);display:flex;align-items:center;justify-content:center;padding:24px}
+#authGate:before,#authGate:after{content:"";position:fixed;border:1px solid #ffffff12;border-radius:50%;pointer-events:none}
+#authGate:before{width:420px;height:420px;top:-230px;right:-120px}
+#authGate:after{width:560px;height:560px;bottom:-390px;left:-170px}
 #authGate.hidden{display:none}
-.auth-card{width:min(100%,390px);background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 18px 60px #0002}
-.auth-card h2{margin:0 0 6px;font-size:22px}.auth-card p{margin:0 0 18px;color:var(--mut);font-size:14px}
-.auth-card label{display:block;font-size:13px;margin:12px 0 5px}.auth-card input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;background:var(--bg);color:var(--ink)}
-.auth-card button{width:100%;border:0;border-radius:12px;padding:12px;margin-top:16px;background:var(--acc);color:var(--accink);font:inherit;font-weight:700;cursor:pointer}
-#authError{color:#c0392b;font-size:13px;min-height:20px;margin-top:10px}
+.auth-card{position:relative;z-index:1;width:min(100%,430px);background:linear-gradient(155deg,#ffffff 0%,#f7f6ff 100%);border:1px solid #ffffff70;border-radius:26px;padding:clamp(25px,6vw,38px);box-shadow:0 28px 90px #05081799;text-align:right}
+.auth-brand{display:flex;align-items:center;gap:12px;margin-bottom:30px}
+.auth-logo{width:48px;height:48px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(145deg,#805cff,#5830d5);color:#fff;font-size:27px;font-weight:900;box-shadow:0 9px 22px #7047f54d}
+.auth-brand strong{display:block;color:#11172e;font-size:18px;letter-spacing:.2px}
+.auth-brand small{display:block;color:#77748c;font-size:11px;letter-spacing:1.5px;text-transform:uppercase}
+.auth-kicker{display:inline-flex;align-items:center;gap:7px;color:#7047f5;background:#7047f512;border:1px solid #7047f526;border-radius:999px;padding:6px 11px;font-size:11px;font-weight:800;margin-bottom:13px}
+.auth-kicker:before{content:"";width:6px;height:6px;border-radius:50%;background:#7047f5;box-shadow:0 0 0 4px #7047f51c}
+.auth-card h2{margin:0 0 7px;color:#11172e;font-size:27px;font-weight:850;letter-spacing:-.5px}
+.auth-card p{margin:0 0 25px;color:#77758a;font-size:13px}
+.auth-card label{display:block;color:#27243b;font-size:12px;font-weight:750;margin:15px 0 7px}
+.auth-card input{width:100%;border:1px solid #e5e2f0;border-radius:13px;padding:13px 14px;font:inherit;font-size:14px;background:#fff;color:#17152b;outline:none;transition:border-color .2s,box-shadow .2s}
+.auth-card input:focus{border-color:#7047f5;box-shadow:0 0 0 4px #7047f51a}
+.auth-card button{width:100%;border:0;border-radius:13px;padding:13px;margin-top:22px;background:linear-gradient(110deg,#7047f5,#5630d4);color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 10px 22px #7047f540;transition:transform .2s,box-shadow .2s}
+.auth-card button:hover{transform:translateY(-1px);box-shadow:0 13px 26px #7047f552}
+.auth-card button:disabled{opacity:.7;cursor:wait;transform:none}
+#authError{color:#c03950;font-size:12px;min-height:20px;margin-top:10px}
+.auth-foot{display:flex;align-items:center;justify-content:center;gap:7px;border-top:1px solid #ece9f5;margin-top:20px;padding-top:16px;color:#89869a;font-size:11px}
+.auth-foot:before{content:"";width:7px;height:7px;border-radius:50%;background:#26a269}
+@media(max-width:480px){#authGate{padding:18px}.auth-card{border-radius:22px}.auth-brand{margin-bottom:25px}.auth-card h2{font-size:24px}}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:12px 16px 28px;max-width:760px;margin:0 auto}
 @media(min-width:640px){.grid{grid-template-columns:repeat(3,1fr)}}
 .desk{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 10px;text-align:center;cursor:pointer;font:inherit;color:inherit;transition:transform .15s}
@@ -53,7 +70,7 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
 </style>
 </head>
 <body>
-<div id="authGate"><form class="auth-card" id="loginForm"><h2>تسجيل الدخول</h2><p>مساحة خاصة بصاحب الحساب فقط</p><label for="ownerUsername">اسم المستخدم</label><input id="ownerUsername" name="username" autocomplete="username" required><label for="ownerPassword">كلمة المرور</label><input id="ownerPassword" name="password" type="password" autocomplete="current-password" required><button id="loginSubmit" type="submit">دخول آمن</button><div id="authError" role="alert"></div></form></div>
+<div id="authGate"><form class="auth-card" id="loginForm"><div class="auth-brand"><div class="auth-logo">V</div><div><strong>OFFICE BRAINS</strong><small>VINDORA WORKSPACE</small></div></div><div class="auth-kicker">مساحة عمل خاصة</div><h2>أهلاً بعودتك</h2><p>سجّل الدخول للوصول إلى مكتبك الافتراضي.</p><label for="ownerUsername">اسم المستخدم</label><input id="ownerUsername" name="username" autocomplete="username" placeholder="اكتب اسم المستخدم" required><label for="ownerPassword">كلمة المرور</label><input id="ownerPassword" name="password" type="password" autocomplete="current-password" placeholder="اكتب كلمة المرور" required><button id="loginSubmit" type="submit">دخول إلى المكتب <span aria-hidden="true">←</span></button><div id="authError" role="alert"></div><div class="auth-foot">اتصال آمن · الدخول لصاحب الحساب فقط</div></form></div>
 <header><button class="logout" id="logoutBtn" type="button">تسجيل الخروج</button><h1>🏢 مكتب Vindora الافتراضي</h1><p>اضغط على أي موظف وابدأ كلمه</p></header>
 <div class="grid" id="grid"></div>
 <div id="meet"><div class="top"><button id="mback" aria-label="رجوع">→</button><div class="av" style="background:#1f6f5c33">🪑</div><div><b>غرفة الاجتماعات</b><small>اختار الحاضرين واكتب موضوع الاجتماع</small></div></div><div class="chips" id="mchips" style="padding-top:8px"></div><div id="mmsgs"></div><div class="chips" id="mact"><button type="button" id="mmin">📝 محضر الاجتماع</button><button type="button" id="mclr">🧹 اجتماع جديد</button></div><form id="mf"><textarea id="mt" rows="1" placeholder="اكتب موضوع الاجتماع أو سؤالك للفريق..."></textarea><button class="send" id="ms">إرسال</button></form></div>
