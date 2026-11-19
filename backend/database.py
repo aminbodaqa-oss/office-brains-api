@@ -31,6 +31,11 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT, run_date TEXT NOT NULL,
             employee_id TEXT NOT NULL, department TEXT NOT NULL, content TEXT NOT NULL,
             created_at TEXT NOT NULL, UNIQUE(run_date, employee_id))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL,
+            title TEXT NOT NULL, message TEXT NOT NULL, details TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL, is_read INTEGER NOT NULL DEFAULT 0)""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)")
 
 def log_interaction(employee_id: str, interaction_type: str, payload: dict[str, Any]) -> None:
     with _connect() as conn:
@@ -48,3 +53,36 @@ def get_memories(employee_id: str, limit: int = 20) -> list[dict[str, Any]]:
         rows = conn.execute("SELECT id, content, tags, created_at FROM memories WHERE employee_id=? ORDER BY id DESC LIMIT ?",
             (employee_id, max(1, min(limit, 100)))).fetchall()
     return [{"id": r["id"], "content": r["content"], "tags": json.loads(r["tags"]), "created_at": r["created_at"]} for r in rows]
+
+
+def add_notification(event_type: str, title: str, message: str, details: str = "") -> int:
+    with _connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO notifications(event_type,title,message,details,created_at,is_read) VALUES(?,?,?,?,?,0)",
+            (event_type[:40], title[:180], message[:1000], details[:12000],
+             datetime.now(timezone.utc).isoformat()))
+        return int(cur.lastrowid)
+
+def get_notifications(limit: int = 50, unread_only: bool = False) -> dict[str, Any]:
+    limit = max(1, min(int(limit), 100))
+    with _connect() as conn:
+        where = "WHERE is_read=0" if unread_only else ""
+        rows = conn.execute(
+            f"SELECT id,event_type,title,message,details,created_at,is_read FROM notifications {where} ORDER BY id DESC LIMIT ?",
+            (limit,)).fetchall()
+        unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE is_read=0").fetchone()[0]
+    return {"notifications": [dict(r) for r in rows], "unread_count": int(unread)}
+
+def mark_notifications_read(notification_ids: list[int] | None = None, all_read: bool = False) -> int:
+    with _connect() as conn:
+        if all_read:
+            cur = conn.execute("UPDATE notifications SET is_read=1 WHERE is_read=0")
+        elif notification_ids:
+            ids = [int(x) for x in notification_ids[:100] if int(x) > 0]
+            if not ids:
+                return 0
+            marks = ",".join("?" for _ in ids)
+            cur = conn.execute(f"UPDATE notifications SET is_read=1 WHERE id IN ({marks})", ids)
+        else:
+            return 0
+        return int(cur.rowcount)
