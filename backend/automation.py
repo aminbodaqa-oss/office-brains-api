@@ -72,6 +72,12 @@ async def _generate_daily_briefing(run_date: str) -> None:
             )
             answer = await employee_reply(prompt, [{"role": "user", "content": "ابدأ تقريرك اليومي الآن."}])
             _save_report(run_date, employee_id, employee["department"], answer)
+            add_notification(
+                "employee_message",
+                "رسالة من " + employee_id,
+                employee_id + " بدأ يوم العمل وأرسل تحديثه اليومي.",
+                "الإدارة: " + employee["department"] + "\nالتاريخ: " + run_date + "\n\nرسالة الموظف:\n" + answer
+            )
             reports.append(f"تقرير {employee_id} ({employee['department']}):\n{answer}")
         except Exception as exc:
             message = f"{employee_id}: تعذر إعداد التقرير ({str(exc)[:240]})"
@@ -100,9 +106,9 @@ async def _generate_daily_briefing(run_date: str) -> None:
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
     _finish_run(run_date, "completed_with_warnings" if failures else "completed", summary, "\n".join(failures))
-    add_notification("daily_report", "اكتمل تقرير بداية اليوم",
-        "إبراهيم جهّز الملخص الإداري بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
-        "ملخص إبراهيم:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
+    add_notification("employee_message", "رسالة من إبراهيم · المدير العام",
+        "إبراهيم أرسل لك الملخص الإداري اليومي بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
+        "رسالة إبراهيم للمالك:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
 
 async def scheduler_loop() -> None:
     while True:
