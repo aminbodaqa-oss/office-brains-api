@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import os
 import time
 from contextlib import asynccontextmanager
@@ -14,11 +15,23 @@ from employees import EMPLOYEES, EMPLOYEE_IDS
 from brains import BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password
 from vindora_client import VindoraUnavailable, employee_context
+from automation import automation_status, recent_reports, scheduler_loop
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    yield
+    scheduler_task = None
+    if os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
+        scheduler_task = asyncio.create_task(scheduler_loop())
+    try:
+        yield
+    finally:
+        if scheduler_task:
+            scheduler_task.cancel()
+            try:
+                await scheduler_task
+            except asyncio.CancelledError:
+                pass
 
 app = FastAPI(title="Office Brains API", version="0.2.0", lifespan=lifespan)
 origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "https://aminbodaqa-oss.github.io").split(",") if x.strip()]
@@ -93,6 +106,14 @@ async def health():
 @app.get("/api/employees")
 async def employees(_: str = Depends(require_owner)):
     return {"employees": EMPLOYEES}
+
+@app.get("/api/automation/status")
+async def get_automation_status(_: str = Depends(require_owner)):
+    return automation_status()
+
+@app.get("/api/automation/reports")
+async def get_automation_reports(limit: int = 30, _: str = Depends(require_owner)):
+    return {"reports": recent_reports(limit)}
 
 @app.post("/api/chat")
 async def chat(body: ChatRequest, _: str = Depends(require_owner)):
