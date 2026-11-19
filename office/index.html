@@ -40,6 +40,15 @@ header p{margin:2px 0 0;color:var(--mut);font-size:14px}
 .auth-foot:before{content:"";width:7px;height:7px;border-radius:50%;background:#26a269}
 @media(max-width:480px){#authGate{padding:18px}.auth-card{border-radius:22px}.auth-brand{margin-bottom:25px}.auth-card h2{font-size:24px}}
 
+/* Password visibility control */
+#authGate #loginForm .password-wrap{position:relative;width:100%;display:block}
+#authGate #loginForm .password-wrap input{padding-left:54px}
+#authGate #loginForm .password-toggle{position:absolute;left:7px;top:50%;transform:translateY(-50%);width:40px;height:40px;margin:0;padding:9px;border:0;border-radius:9px;background:transparent;color:#77758d;box-shadow:none;display:grid;place-items:center;cursor:pointer}
+#authGate #loginForm .password-toggle:hover{background:#7047f510;box-shadow:none;transform:translateY(-50%)}
+#authGate #loginForm .password-toggle svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#authGate #loginForm .password-toggle .eye-closed{display:none}
+#authGate #loginForm .password-toggle[aria-pressed="true"] .eye-open{display:none}
+#authGate #loginForm .password-toggle[aria-pressed="true"] .eye-closed{display:block}
 /* Keep the sign-in form isolated from the chat composer global form styles */
 #authGate #loginForm{
  display:block;
@@ -168,7 +177,7 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
       <label for="ownerUsername">اسم المستخدم</label>
       <input id="ownerUsername" name="username" autocomplete="username" placeholder="اكتب اسم المستخدم" required>
       <label for="ownerPassword">كلمة المرور</label>
-      <input id="ownerPassword" name="password" type="password" autocomplete="current-password" placeholder="اكتب كلمة المرور" required>
+      <div class="password-wrap"><input id="ownerPassword" name="password" type="password" autocomplete="current-password" placeholder="اكتب كلمة المرور" required><button class="password-toggle" id="passwordToggle" type="button" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a16 16 0 0 1-3.2 3.9M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4-.8"/></svg></button></div>
       <button id="loginSubmit" type="submit">دخول إلى المكتب <span aria-hidden="true">←</span></button>
       <div id="authError" role="alert"></div>
       <div class="auth-foot">اتصال آمن · الدخول لصاحب الحساب فقط</div>
@@ -205,6 +214,14 @@ loginForm.addEventListener("submit", async (event) => {
     document.getElementById("ownerPassword").value = "";
   } catch (err) { error.textContent = err.message || "تعذر الاتصال بالسيرفر."; }
   finally { button.disabled = false; button.textContent = "دخول آمن"; }
+});
+const passwordToggle = document.getElementById("passwordToggle");
+passwordToggle.addEventListener("click", () => {
+  const password = document.getElementById("ownerPassword");
+  const visible = password.type === "password";
+  password.type = visible ? "text" : "password";
+  passwordToggle.setAttribute("aria-pressed", String(visible));
+  passwordToggle.setAttribute("aria-label", visible ? "إخفاء كلمة المرور" : "إظهار كلمة المرور");
 });
 document.getElementById("logoutBtn").addEventListener("click", () => {
   ownerToken = null; authGate.classList.remove("hidden");
