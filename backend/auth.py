@@ -1,8 +1,10 @@
 from __future__ import annotations
 import base64, hashlib, hmac, json, os, secrets, time
-from fastapi import Header, HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 TOKEN_TTL_SECONDS = int(os.getenv("OFFICE_TOKEN_TTL_SECONDS", "1800"))
+bearer_scheme = HTTPBearer(auto_error=False)
 
 def _b64e(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
@@ -51,10 +53,10 @@ def verify_token(token: str) -> str | None:
     except (ValueError, TypeError, RuntimeError, json.JSONDecodeError):
         return None
 
-async def require_owner(authorization: str | None = Header(default=None)) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
+async def require_owner(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> str:
+    if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="سجّل الدخول أولًا")
-    username = verify_token(authorization[7:].strip())
+    username = verify_token(credentials.credentials)
     expected = os.getenv("OWNER_USERNAME", "").strip()
     if not username or not expected or not hmac.compare_digest(username, expected):
         raise HTTPException(status_code=401, detail="انتهت جلسة الدخول أو أنها غير صالحة")
