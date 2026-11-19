@@ -94,6 +94,12 @@ class NotificationReadRequest(BaseModel):
     ids: list[int] = Field(default_factory=list, max_length=100)
     all_read: bool = False
 
+class NotificationEventRequest(BaseModel):
+    event_type: str = Field(min_length=1, max_length=40)
+    title: str = Field(min_length=1, max_length=180)
+    message: str = Field(min_length=1, max_length=1000)
+    details: str = Field(default="", max_length=12000)
+
 class MemoryRequest(BaseModel):
     employee_id: str
     content: str = Field(min_length=1, max_length=10000)
@@ -118,6 +124,11 @@ async def list_notifications(limit: int = 50, unread_only: bool = False, _: str 
 @app.post("/api/notifications/read")
 async def read_notifications(body: NotificationReadRequest, _: str = Depends(require_owner)):
     return {"updated": mark_notifications_read(body.ids, body.all_read)}
+
+@app.post("/api/notifications/event")
+async def create_notification_event(body: NotificationEventRequest, _: str = Depends(require_owner)):
+    notification_id = add_notification(body.event_type, body.title, body.message, body.details)
+    return {"id": notification_id, "saved": True}
 
 @app.get("/api/automation/status")
 async def get_automation_status(_: str = Depends(require_owner)):
