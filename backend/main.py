@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction
+from database import add_memory, get_memories, init_db, log_interaction, add_notification, get_notifications, mark_notifications_read
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from brains import BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password
@@ -90,6 +90,10 @@ class MeetingRequest(BaseModel):
     transcript: str = ""
     instruction: str = ""
 
+class NotificationReadRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list, max_length=100)
+    all_read: bool = False
+
 class MemoryRequest(BaseModel):
     employee_id: str
     content: str = Field(min_length=1, max_length=10000)
@@ -106,6 +110,14 @@ async def health():
 @app.get("/api/employees")
 async def employees(_: str = Depends(require_owner)):
     return {"employees": EMPLOYEES}
+
+@app.get("/api/notifications")
+async def list_notifications(limit: int = 50, unread_only: bool = False, _: str = Depends(require_owner)):
+    return get_notifications(limit, unread_only)
+
+@app.post("/api/notifications/read")
+async def read_notifications(body: NotificationReadRequest, _: str = Depends(require_owner)):
+    return {"updated": mark_notifications_read(body.ids, body.all_read)}
 
 @app.get("/api/automation/status")
 async def get_automation_status(_: str = Depends(require_owner)):
@@ -131,6 +143,9 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     except BrainUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
+    last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
+    add_notification("chat", "محادثة جديدة مع " + body.employee_id,
+        "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\n\nرد الموظف:\n" + content)
     return {"employee_id": body.employee_id, "content": content}
 
 @app.post("/api/meeting/respond")
@@ -147,6 +162,8 @@ async def meeting_respond(body: MeetingRequest, _: str = Depends(require_owner))
     except BrainUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "meeting", {"transcript": body.transcript, "instruction": body.instruction, "response": content})
+    add_notification("meeting", "مداخلة من " + body.employee_id,
+        "وصل رد جديد أثناء جلسة الاجتماع.", "التوجيه: " + body.instruction + "\n\nالرد:\n" + content)
     return {"employee_id": body.employee_id, "content": content}
 
 @app.post("/api/memories")
