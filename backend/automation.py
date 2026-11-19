@@ -102,7 +102,7 @@ async def _generate_daily_briefing(run_date: str) -> None:
     _finish_run(run_date, "completed_with_warnings" if failures else "completed", summary, "\n".join(failures))
     add_notification("daily_report", "اكتمل تقرير بداية اليوم",
         "إبراهيم جهّز الملخص الإداري بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
-        "ملخص إبراهيم:\n" + summary + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
+        "ملخص إبراهيم:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
 
 async def scheduler_loop() -> None:
     while True:
