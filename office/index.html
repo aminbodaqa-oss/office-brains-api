@@ -195,8 +195,11 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
 </div>
 <script src="js/config.js"></script>
 <script>
-let ownerToken = null;
+// Keep the owner session across page refreshes in the same browser tab.
+const TOKEN_STORAGE_KEY = "office_owner_token";
+let ownerToken = sessionStorage.getItem(TOKEN_STORAGE_KEY) || null;
 const authGate = document.getElementById("authGate");
+if (ownerToken) authGate.classList.add("hidden");
 const loginForm = document.getElementById("loginForm");
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -210,7 +213,9 @@ loginForm.addEventListener("submit", async (event) => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.access_token) throw new Error(data.detail || "تعذر تسجيل الدخول.");
-    ownerToken = data.access_token; authGate.classList.add("hidden");
+    ownerToken = data.access_token;
+    sessionStorage.setItem(TOKEN_STORAGE_KEY, ownerToken);
+    authGate.classList.add("hidden");
     document.getElementById("ownerPassword").value = "";
   } catch (err) { error.textContent = err.message || "تعذر الاتصال بالسيرفر."; }
   finally { button.disabled = false; button.textContent = "دخول آمن"; }
@@ -224,7 +229,9 @@ passwordToggle.addEventListener("click", () => {
   passwordToggle.setAttribute("aria-label", visible ? "إخفاء كلمة المرور" : "إظهار كلمة المرور");
 });
 document.getElementById("logoutBtn").addEventListener("click", () => {
-  ownerToken = null; authGate.classList.remove("hidden");
+  ownerToken = null;
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  authGate.classList.remove("hidden");
   document.getElementById("ownerPassword").value = "";
 });
 const CTX="الشركة: Vindora، منصة مصرية بتجمع منتجات الموردين بالمسوّقين (دروب شيبينج/أفلييت). المسوّق بيروّج للمنتجات برابط تتبع وبياخد عمولة ثابتة 40 جنيه على كل طلب ناجح، والمورّد بيعرض منتجاته ويحدد سعر الجملة ويدفع عند البيع بس. السحب من 250 جنيه (فودافون كاش/إنستاباي/محافظ). التفعيل خلال 24-48 ساعة. الشحن وخدمة العملاء علينا. الموقع vindora.whf.bz. ";
@@ -297,7 +304,11 @@ async function apiRequest(path,body){
  const headers={"Content-Type":"application/json","Authorization":"Bearer "+ownerToken};
  const response=await fetch(base+path,{method:"POST",headers,body:JSON.stringify(body)});
  const data=await response.json().catch(()=>({}));
- if(response.status===401){ownerToken=null;authGate.classList.remove("hidden");}
+ if(response.status===401){
+   ownerToken=null;
+   sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+   authGate.classList.remove("hidden");
+  }
  if(!response.ok)throw new Error(data.detail||("HTTP "+response.status));
  return data;
 }
