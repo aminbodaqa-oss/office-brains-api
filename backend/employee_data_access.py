@@ -5,7 +5,7 @@ EMPLOYEE_DATASETS = {
     "محمد": ("finance", "sales"),
     "ثابت": ("overview", "sales", "products", "finance", "marketers"),
     "كريم": (),  # لا يوجد مصدر حملات إعلانية في قاعدة Vindora الحالية.
-    "ياسر": ("support", "sales"),
+    "ياسر": ("overview", "support", "sales"),
     "عمرو": ("suppliers", "products"),
     "هدى": ("marketers", "finance", "sales"),
 }
