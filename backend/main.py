@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, add_notification, get_notifications, mark_notifications_read
+from database import add_memory, get_memories, init_db, log_interaction, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from brains import BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password
@@ -100,6 +100,9 @@ class NotificationEventRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1000)
     details: str = Field(default="", max_length=12000)
 
+class ChatDeleteRequest(BaseModel):
+    employee_id: str = Field(min_length=1, max_length=120)
+
 class MemoryRequest(BaseModel):
     employee_id: str
     content: str = Field(min_length=1, max_length=10000)
@@ -137,6 +140,13 @@ async def get_automation_status(_: str = Depends(require_owner)):
 @app.get("/api/automation/reports")
 async def get_automation_reports(limit: int = 30, _: str = Depends(require_owner)):
     return {"reports": recent_reports(limit)}
+
+@app.post("/api/chat/delete")
+async def delete_chat(body: ChatDeleteRequest, _: str = Depends(require_owner)):
+    if body.employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    deleted = delete_chat_interactions(body.employee_id)
+    return {"employee_id": body.employee_id, "deleted": deleted}
 
 @app.post("/api/chat")
 async def chat(body: ChatRequest, _: str = Depends(require_owner)):
