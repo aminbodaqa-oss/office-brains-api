@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from datetime import datetime, time as clock_time
 from zoneinfo import ZoneInfo
@@ -51,6 +52,125 @@ def _finish_run(run_date: str, status: str, summary: str = "", error: str = "") 
     with _connect() as conn:
         conn.execute("UPDATE autonomous_runs SET status=?,finished_at=?,summary=?,error=? WHERE run_date=?",
             (status, datetime.now(CAIRO).isoformat(), summary, error[:1000], run_date))
+
+
+async def _run_autonomous_meeting(run_date: str, reason: str, agenda: list[str], attendees: list[dict]) -> str:
+    agenda_text = "\\n".join("- " + item for item in agenda)
+    attendee_names = [item["id"] for item in attendees]
+    add_notification(
+        "meeting_invite",
+        "إبراهيم دعا لاجتماع تلقائي",
+        "إبراهيم قرر عقد اجتماع لمناقشة أولويات العمل، وحدد المشاركين وجدول الأعمال.",
+        "التاريخ: " + run_date + "\\nسبب الاجتماع: " + reason + "\\nالمشاركون: " + "، ".join(attendee_names) + "\\nجدول الأعمال:\\n" + agenda_text
+    )
+    transcript = [
+        "دعوة الاجتماع: " + reason,
+        "المشاركون: " + "، ".join(attendee_names),
+        "جدول الأعمال:\\n" + agenda_text,
+    ]
+    for employee in attendees:
+        employee_id = employee["id"]
+        try:
+            context = await employee_context(employee_id, days=30)
+            prompt = (
+                "أنت مشارك في اجتماع داخلي حقيقي لفريق Vindora. تحدث بالعربية المصرية المهنية وباختصار. "
+                "ناقش جدول الأعمال من تخصصك، استند فقط إلى البيانات المتاحة، وميّز الحقائق عن المقترحات. "
+                "لا تدّعِ تنفيذ مهام. اذكر قرارًا أو خطوة عملية ومسؤولًا وموعدًا مقترحًا عند توفر أساس لذلك.\\n"
+                f"اسمك: {employee_id}\\nوظيفتك: {employee['role']}\\nإدارتك: {employee['department']}\\n"
+                f"بيانات الإدارة المجمعة: {context or 'لا توجد بيانات إضافية متاحة.'}"
+            )
+            response = await employee_reply(
+                prompt,
+                [{"role": "user", "content": "شارك في الاجتماع بناءً على السبب وجدول الأعمال التاليين:\\n" + reason + "\\n" + agenda_text + "\\nعلّق أيضًا على مداخلات الزملاء السابقة:\\n" + "\\n\\n".join(transcript[-4:])}]
+            )
+            transcript.append(employee_id + ": " + response)
+            add_notification(
+                "meeting_message",
+                "مداخلة من " + employee_id + " في الاجتماع",
+                employee_id + " شارك في الاجتماع التلقائي.",
+                response
+            )
+        except Exception as exc:
+            transcript.append(employee_id + ": تعذر الحصول على مداخلته: " + str(exc)[:220])
+
+    discussion = "\\n\\n".join(transcript)
+    manager = next(item for item in EMPLOYEES if item["id"] == "ابراهيم")
+    manager_context = await employee_context("ابراهيم", days=30)
+    manager_result = await employee_reply(
+        "أنت إبراهيم المدير العام لـ Vindora. راجع نقاش الاجتماع، واكتب خلاصة قرارات وتوصيات واضحة. "
+        "افصل القرارات المتفق عليها عن المقترحات، وحدد المسؤول والموعد فقط إذا ورد أساس لهما. لا تخترع تنفيذًا.",
+        [{"role": "user", "content": "بيانات الإدارة: " + manager_context + "\\n\\nنقاش الاجتماع:\\n" + discussion}]
+    )
+    secretary = next(item for item in EMPLOYEES if item["id"] == "سلمى")
+    minutes = await employee_reply(
+        "أنت سلمى، السكرتيرة العامة. أعد محضر اجتماع منظمًا بالعربية يتضمن التاريخ، الحضور، جدول الأعمال، "
+        "ملخص المناقشات، القرارات، المهام والمسؤول والموعد إن ذُكر، والنقاط المفتوحة. لا تضيفي معلومات غير موجودة.",
+        [{"role": "user", "content": "التاريخ: " + run_date + "\\nالحضور: " + "، ".join(attendee_names + ["ابراهيم"]) + "\\nسبب الاجتماع: " + reason + "\\nجدول الأعمال:\\n" + agenda_text + "\\nالنقاش:\\n" + discussion + "\\nخلاصة المدير:\\n" + manager_result}]
+    )
+    report = "سبب الاجتماع: " + reason + "\\nالمشاركون: " + "، ".join(attendee_names) + "\\nجدول الأعمال:\\n" + agenda_text + "\\n\\nخلاصة إبراهيم:\\n" + manager_result + "\\n\\nمحضر سلمى:\\n" + minutes
+    _save_report(run_date, "محضر الاجتماع التلقائي", "الإدارة العامة", report)
+    add_notification(
+        "meeting_minutes",
+        "محضر الاجتماع التلقائي جاهز",
+        "انتهى نقاش الفريق وأعدّت سلمى المحضر، وراجعه إبراهيم.",
+        report + "\\n\\nالنقاش بالتفصيل:\\n" + discussion
+    )
+    return report
+
+async def _manager_meeting_decision(run_date: str, summary: str, reports: list[str], failures: list[str]) -> None:
+    prompt = (
+        "أنت إبراهيم المدير العام. اتخذ قرارًا تشغيليًا: هل تستدعي التقارير اجتماعًا اليوم؟ "
+        "أخرج JSON صالحًا فقط دون Markdown أو أي نص خارجه، وبالمفاتيح التالية حرفيًا: "
+        '{"needs_meeting":true,"reason":"سبب محدد","attendees":["اسم موظف"],"agenda":["بند"]}. '
+        "إذا لا توجد حاجة حقيقية لاجتماع، اجعل needs_meeting=false واجعل attendees وagenda فارغتين. "
+        "اختر من الموظفين المتاحين فقط، بحد أقصى 3 مشاركين، ولا تختَر نفسك أو سلمى كمشارك؛ سلمى تكتب المحضر. "
+        "لا تخترع مشكلات أو بيانات.\\nالتاريخ: " + run_date +
+        "\\nتقريرك اليومي:\\n" + summary +
+        "\\n\\nتقارير الإدارات:\\n" + "\\n\\n".join(reports) +
+        ("\\n\\nتعثرات التقارير:\\n" + "\\n".join(failures) if failures else "")
+    )
+    raw = await employee_reply(
+        "أنت إبراهيم. مهمتك إصدار قرار اجتماع آلي قابل للقراءة البرمجية. أعد JSON فقط.",
+        [{"role": "user", "content": prompt}]
+    )
+    start, end = raw.find("{"), raw.rfind("}")
+    if start < 0 or end <= start:
+        add_notification("meeting_decision", "تعذر قراءة قرار الاجتماع",
+            "إبراهيم أرسل قرارًا بصيغة غير واضحة؛ لم يتم إنشاء اجتماع تلقائي.",
+            "الرد المستلم:\\n" + raw[:5000])
+        return
+    try:
+        decision = json.loads(raw[start:end + 1])
+    except json.JSONDecodeError:
+        add_notification("meeting_decision", "تعذر قراءة قرار الاجتماع",
+            "إبراهيم أرسل قرارًا غير صالح؛ لم يتم إنشاء اجتماع تلقائي.",
+            "الرد المستلم:\\n" + raw[:5000])
+        return
+    if decision.get("needs_meeting") is not True:
+        add_notification("meeting_decision", "إبراهيم: لا حاجة لاجتماع اليوم",
+            "راجع إبراهيم تقارير الفريق وقرر أن المتابعة لا تحتاج اجتماعًا اليوم.",
+            str(decision.get("reason") or "لا توجد مشكلة تستدعي اجتماعًا.")[:3000])
+        return
+    allowed = {item["id"]: item for item in EMPLOYEES if item["id"] not in {"ابراهيم", "سلمى"}}
+    names = decision.get("attendees", [])
+    attendees = []
+    if isinstance(names, list):
+        for name in names:
+            if isinstance(name, str) and name in allowed and allowed[name] not in attendees:
+                attendees.append(allowed[name])
+            if len(attendees) == 3:
+                break
+    agenda = decision.get("agenda", [])
+    if not isinstance(agenda, list):
+        agenda = []
+    agenda = [str(item).strip()[:240] for item in agenda if str(item).strip()][:4]
+    reason = str(decision.get("reason") or "مراجعة أولويات العمل")[:700]
+    if not attendees or not agenda:
+        add_notification("meeting_decision", "قرار الاجتماع يحتاج مراجعة",
+            "إبراهيم رأى ضرورة اجتماع، لكن لم يحدد مشاركين وجدول أعمال صالحين؛ لم يبدأ الاجتماع.",
+            "السبب: " + reason + "\\nالمشاركون المقترحون: " + str(names) + "\\nجدول الأعمال: " + str(decision.get("agenda")))
+        return
+    await _run_autonomous_meeting(run_date, reason, agenda, attendees)
 
 async def _generate_daily_briefing(run_date: str) -> None:
     reports = []
@@ -105,10 +225,17 @@ async def _generate_daily_briefing(run_date: str) -> None:
         [{"role": "user", "content": manager_prompt}],
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
-    _finish_run(run_date, "completed_with_warnings" if failures else "completed", summary, "\n".join(failures))
     add_notification("employee_message", "رسالة من إبراهيم · المدير العام",
         "إبراهيم أرسل لك الملخص الإداري اليومي بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
-        "رسالة إبراهيم للمالك:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
+        "رسالة إبراهيم للمالك:\\n" + summary + "\\n\\nتقارير الفريق بالتفصيل:\\n" + "\\n\\n".join(reports) + ("\\n\\nملاحظات التشغيل:\\n" + "\\n".join(failures) if failures else ""))
+    try:
+        await _manager_meeting_decision(run_date, summary, reports, failures)
+    except Exception as exc:
+        failures.append("قرار/تنفيذ الاجتماع: " + str(exc)[:300])
+        add_notification("meeting_error", "تعذر إكمال الاجتماع التلقائي",
+            "اكتمل التقرير اليومي، لكن تعذر إكمال مرحلة قرار الاجتماع أو المحضر.",
+            str(exc)[:5000])
+    _finish_run(run_date, "completed_with_warnings" if failures else "completed", summary, "\\n".join(failures))
 
 async def scheduler_loop() -> None:
     while True:
