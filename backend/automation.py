@@ -6,7 +6,7 @@ from datetime import datetime, time as clock_time
 from zoneinfo import ZoneInfo
 
 from brains import PROVIDER, BrainUnavailable, employee_reply
-from database import _connect
+from database import _connect, add_notification
 from employee_data_access import EMPLOYEE_DATASETS
 from employees import EMPLOYEES
 from vindora_client import VindoraUnavailable, employee_context
@@ -100,6 +100,9 @@ async def _generate_daily_briefing(run_date: str) -> None:
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
     _finish_run(run_date, "completed_with_warnings" if failures else "completed", summary, "\n".join(failures))
+    add_notification("daily_report", "اكتمل تقرير بداية اليوم",
+        "إبراهيم جهّز الملخص الإداري بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
+        "ملخص إبراهيم:\n" + summary + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
 
 async def scheduler_loop() -> None:
     while True:
@@ -107,10 +110,14 @@ async def scheduler_loop() -> None:
         if now.weekday() in WORK_DAYS and now.time().replace(tzinfo=None) >= START_TIME:
             run_date = now.date().isoformat()
             if PROVIDER != "demo" and _claim_run(run_date):
+                add_notification("automation", "بدأ التشغيل التلقائي",
+                    "بدأ إعداد تقارير الفريق اليومية.", "التاريخ: " + run_date + "\nموعد التشغيل: 09:00 بتوقيت القاهرة.")
                 try:
                     await _generate_daily_briefing(run_date)
                 except Exception as exc:
                     _finish_run(run_date, "failed", error=str(exc))
+                    add_notification("error", "تعذر إكمال التشغيل التلقائي",
+                        "حدث خطأ أثناء إعداد التقارير اليومية.", str(exc))
         await asyncio.sleep(30)
 
 def automation_status() -> dict:
