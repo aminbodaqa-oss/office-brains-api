@@ -23,6 +23,14 @@ def init_db() -> None:
         conn.execute("""CREATE TABLE IF NOT EXISTS memories (
             id INTEGER PRIMARY KEY AUTOINCREMENT, employee_id TEXT NOT NULL,
             content TEXT NOT NULL, tags TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL)""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS autonomous_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, run_date TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+            summary TEXT NOT NULL DEFAULT '', error TEXT NOT NULL DEFAULT '')""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS autonomous_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, run_date TEXT NOT NULL,
+            employee_id TEXT NOT NULL, department TEXT NOT NULL, content TEXT NOT NULL,
+            created_at TEXT NOT NULL, UNIQUE(run_date, employee_id))""")
 
 def log_interaction(employee_id: str, interaction_type: str, payload: dict[str, Any]) -> None:
     with _connect() as conn:
