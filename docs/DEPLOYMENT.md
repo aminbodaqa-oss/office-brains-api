@@ -2,8 +2,8 @@
 
 ## GitHub Pages
 1. افتح Settings ثم Pages.
-2. اختر GitHub Actions للنشر من مجلد `الواجهة/`.
-3. اضبط `OFFICE_API_URL` في `الواجهة/js/config.js` على رابط الخدمة بعد نشر الـBackend.
+2. اختر GitHub Actions للنشر من مجلد `office/`.
+3. اضبط `OFFICE_API_URL` في `office/js/config.js` على رابط الخدمة بعد نشر الـBackend.
 4. لا تضع أسرارًا أو مفاتيح خاصة في ملفات JavaScript العامة.
 
 ## Bot-Hosting
