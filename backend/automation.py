@@ -20,10 +20,24 @@ def _enabled() -> bool:
     return os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 def _claim_run(run_date: str) -> bool:
-    now = datetime.now(CAIRO).isoformat()
+    now_dt = datetime.now(CAIRO)
+    now = now_dt.isoformat()
     with _connect() as conn:
-        cur = conn.execute("INSERT OR IGNORE INTO autonomous_runs(run_date,status,started_at) VALUES(?,?,?)", (run_date, "running", now))
-        return cur.rowcount == 1
+        row = conn.execute("SELECT status,started_at FROM autonomous_runs WHERE run_date=?", (run_date,)).fetchone()
+        if row is None:
+            conn.execute("INSERT INTO autonomous_runs(run_date,status,started_at) VALUES(?,?,?)", (run_date, "running", now))
+            return True
+        if row["status"] == "completed" or row["status"] == "completed_with_warnings":
+            return False
+        try:
+            started = datetime.fromisoformat(row["started_at"])
+            stale = (now_dt - started).total_seconds() > 1800
+        except (TypeError, ValueError):
+            stale = True
+        if row["status"] == "failed" or (row["status"] == "running" and stale):
+            conn.execute("UPDATE autonomous_runs SET status='running',started_at=?,finished_at=NULL,error='' WHERE run_date=?", (now, run_date))
+            return True
+        return False
 
 def _save_report(run_date: str, employee_id: str, department: str, content: str) -> None:
     now = datetime.now(CAIRO).isoformat()
