@@ -37,6 +37,14 @@ def init_db() -> None:
             created_at TEXT NOT NULL, is_read INTEGER NOT NULL DEFAULT 0)""")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)")
 
+def delete_chat_interactions(employee_id: str) -> int:
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM interactions WHERE employee_id=? AND interaction_type='chat'",
+            (employee_id,))
+        return int(cur.rowcount)
+
+
 def log_interaction(employee_id: str, interaction_type: str, payload: dict[str, Any]) -> None:
     with _connect() as conn:
         conn.execute("INSERT INTO interactions(employee_id, interaction_type, payload, created_at) VALUES(?,?,?,?)",
