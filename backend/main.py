@@ -230,7 +230,8 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     log_activity(body.employee_id, "employee_chat_reply", "chat", None, body.employee_id + " رد على رسالة الريّس", content)
     last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
     add_notification("chat", "محادثة جديدة مع " + body.employee_id,
-        "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\n\nرد الموظف:\n" + content)
+        "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\n\nرد الموظف:\n" + content,
+        employee_id=body.employee_id)
     return {"employee_id": body.employee_id, "content": content}
 
 @app.post("/api/meeting/respond")
