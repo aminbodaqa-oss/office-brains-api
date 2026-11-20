@@ -15,6 +15,20 @@ def _connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     return conn
 
+def get_owner_password_hash(fallback: str = "") -> str:
+    with _connect() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS owner_credentials (id INTEGER PRIMARY KEY CHECK(id=1), password_hash TEXT NOT NULL, updated_at TEXT NOT NULL)")
+        row = conn.execute("SELECT password_hash FROM owner_credentials WHERE id=1").fetchone()
+    return str(row["password_hash"]) if row else fallback
+
+
+def set_owner_password_hash(password_hash: str) -> None:
+    with _connect() as conn:
+        conn.execute("CREATE TABLE IF NOT EXISTS owner_credentials (id INTEGER PRIMARY KEY CHECK(id=1), password_hash TEXT NOT NULL, updated_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO owner_credentials(id,password_hash,updated_at) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET password_hash=excluded.password_hash, updated_at=excluded.updated_at",
+                     (password_hash, datetime.now(timezone.utc).isoformat()))
+
+
 def init_db() -> None:
     with _connect() as conn:
         conn.execute("""CREATE TABLE IF NOT EXISTS interactions (
