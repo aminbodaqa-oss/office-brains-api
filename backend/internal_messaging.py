@@ -118,4 +118,4 @@ def detect_send_request(value: str) -> dict[str, str] | None:
 
 def has_send_intent(value: str) -> bool:
     normalized, _ = _normalize_with_positions(value)
-    return bool(re.search(r"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|تبعتي|تبعت|تبعثي|تبعث|بلغي|بلغ|راسلي|راسل|كلمي|كلم)", normalized))
+    return bool(re.search(r"(?:^|\\s)(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|تبعتي|تبعت|تبعثي|تبعث|بلغي|بلغ|راسلي|راسل|كلمي|كلم)\\s+", normalized))
