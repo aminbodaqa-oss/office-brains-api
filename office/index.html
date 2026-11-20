@@ -203,7 +203,21 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
     </form>
   </section>
 </div>
-<header><div class="header-actions"><button class="notification-trigger" id="notificationBtn" type="button">🔔 الإشعارات <span class="notification-count" id="notificationCount" hidden>0</span></button><button class="notification-trigger" id="automationStatusBtn" type="button">⚙️ حالة التشغيل</button><button class="logout" id="logoutBtn" type="button">تسجيل الخروج</button></div><h1>🏢 مكتب Vindora الافتراضي</h1><p>اضغط على أي موظف وابدأ كلمه</p></header>
+<header><div class="header-actions"><button class="notification-trigger" id="notificationBtn" type="button">🔔 الإشعارات <span class="notification-count" id="notificationCount" hidden>0</span></button><button class="notification-trigger" id="automationStatusBtn" type="button">⚙️ حالة التشغيل</button><button class="notification-trigger" id="settingsBtn" type="button">⚙️ الإعدادات</button><button class="logout" id="logoutBtn" type="button">تسجيل الخروج</button></div><h1>🏢 مكتب Vindora الافتراضي</h1><p>اضغط على أي موظف وابدأ كلمه</p></header>
+
+<section id="settingsPanel" aria-label="إعدادات الحساب" style="display:none;position:fixed;z-index:18;inset:0;background:#090d1c99;align-items:center;justify-content:center;padding:18px">
+ <div style="width:min(100%,440px);background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 20px 60px #0004">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><b style="font-size:17px">إعدادات الحساب</b><button id="closeSettings" type="button" style="border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;padding:5px 10px;font:inherit">إغلاق</button></div>
+  <p style="color:var(--mut);font-size:13px;margin:8px 0 14px">تغيير كلمة مرور دخول المكتب الافتراضي.</p>
+  <form id="changePasswordForm" style="display:flex;flex-direction:column;gap:9px;padding:0;border:0;background:transparent">
+   <label for="currentPassword">كلمة المرور الحالية</label><input id="currentPassword" type="password" autocomplete="current-password" required minlength="1" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit">
+   <label for="newPassword">كلمة المرور الجديدة</label><input id="newPassword" type="password" autocomplete="new-password" required minlength="8" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit">
+   <label for="confirmNewPassword">تأكيد كلمة المرور الجديدة</label><input id="confirmNewPassword" type="password" autocomplete="new-password" required minlength="8" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit">
+   <div id="passwordChangeMessage" role="status" style="min-height:20px;font-size:12px;color:var(--mut)"></div>
+   <button id="savePasswordBtn" class="send" type="submit" style="padding:11px 16px">حفظ كلمة المرور</button>
+  </form>
+ </div>
+</section>
 <section id="automationStatusPanel" aria-label="حالة التشغيل التلقائي" style="display:none;position:fixed;z-index:15;top:72px;right:14px;width:min(440px,calc(100vw - 28px));padding:15px;background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:0 18px 55px #0003;white-space:pre-wrap;font-size:13px"><b>حالة التشغيل التلقائي</b><div id="automationStatusText" style="margin-top:8px;color:var(--mut)">اضغط تحديث لعرض الحالة.</div><button id="refreshAutomationStatus" type="button" style="margin-top:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;padding:7px 10px;font:inherit">تحديث الحالة</button></section>
 <section id="notificationPanel" aria-label="مركز الإشعارات">
   <div class="notification-head"><b>مركز الإشعارات</b><button id="markAllNotifications" type="button">تحديد الكل كمقروء</button></div>
@@ -504,6 +518,22 @@ $('mmin').onclick=async()=>{if(busy||!mh.length)return;busy=true;const x=T.find(
 $('mf').onsubmit=e=>{e.preventDefault();mSend()};
 $('mt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();mSend()}};
 </script>
-<script src="js/workspace.js"></script>
+<script src="js/workspace.js">
+// Owner account settings: change password through the authenticated API.
+const settingsPanel=document.getElementById("settingsPanel");
+document.getElementById("settingsBtn").addEventListener("click",()=>{settingsPanel.style.display="flex";document.getElementById("passwordChangeMessage").textContent="";});
+document.getElementById("closeSettings").addEventListener("click",()=>{settingsPanel.style.display="none";document.getElementById("changePasswordForm").reset();});
+settingsPanel.addEventListener("click",e=>{if(e.target===settingsPanel){settingsPanel.style.display="none";document.getElementById("changePasswordForm").reset();}});
+document.getElementById("changePasswordForm").addEventListener("submit",async e=>{
+ e.preventDefault();const current=document.getElementById("currentPassword").value;const next=document.getElementById("newPassword").value;const confirmNext=document.getElementById("confirmNewPassword").value;const msg=document.getElementById("passwordChangeMessage");const btn=document.getElementById("savePasswordBtn");
+ if(next.length<8){msg.textContent="كلمة المرور الجديدة لازم تكون 8 أحرف على الأقل.";return;}
+ if(next!==confirmNext){msg.textContent="تأكيد كلمة المرور غير مطابق.";return;}
+ if(current===next){msg.textContent="اختار كلمة مرور مختلفة عن الحالية.";return;}
+ btn.disabled=true;msg.textContent="جارٍ تحديث كلمة المرور...";
+ try{await apiRequest("/api/auth/change-password",{current_password:current,new_password:next});document.getElementById("changePasswordForm").reset();msg.textContent="تم تغيير كلمة المرور بنجاح.";msg.style.color="#16834a";}
+ catch(err){msg.style.color="#c03950";msg.textContent=err.message||"تعذر تغيير كلمة المرور.";}
+ finally{btn.disabled=false;}
+});
+</script>
 </body>
 </html>
