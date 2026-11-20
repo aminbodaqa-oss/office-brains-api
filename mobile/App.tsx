@@ -9,7 +9,7 @@ type Message = { role: "user" | "assistant"; content: string };
 type Task = { id: number; title: string; description: string; assigned_to: string; status: string; priority: string; due_at?: string };
 type Meeting = { id: number; title: string; agenda: string; attendees: string[]; scheduled_at: string; status: string };
 type Notice = { id: number; title: string; message: string; details: string; created_at: string; is_read: number; employee_id?: string | null };
-type Tab = "home" | "employees" | "tasks" | "meetings" | "notices";
+type Tab = "home" | "employees" | "tasks" | "meetings" | "notices";\ntype MeetingLine = { speaker: string; content: string; owner?: boolean };
 
 const C = { navy: "#11172E", purple: "#7047F5", bg: "#F4F5FA", card: "#FFFFFF", ink: "#171A2B", muted: "#777C91", line: "#E6E8F0", green: "#23866D", red: "#D64A59" };
 const PERSONALITIES: Record<string, string> = {
@@ -81,7 +81,7 @@ function AppInner() {
   const [taskDescription, setTaskDescription] = useState("");
   const [taskAssignee, setTaskAssignee] = useState("ابراهيم");
   const [meetingTitle, setMeetingTitle] = useState("");
-  const [meetingAgenda, setMeetingAgenda] = useState("");
+  const [meetingAgenda, setMeetingAgenda] = useState("");\n  const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);\n  const [meetingLines, setMeetingLines] = useState<MeetingLine[]>([]);\n  const [meetingDraft, setMeetingDraft] = useState("");\n  const [attendees, setAttendees] = useState<string[]>(["ابراهيم","كريم","اسلام","طلعت"]);\n  const [minutesBusy, setMinutesBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { (async () => { const t = await loadToken(); setLoggedIn(!!t); setTokenReady(true); })(); }, []);
@@ -155,6 +155,58 @@ function AppInner() {
     } catch(e:any){setError(e.message);}
     finally{setBusy(false);}
   };
+  const openMeetingRoom = (meeting: Meeting) => {
+    setActiveMeeting(meeting);
+    setMeetingLines([{speaker:"النظام",content:"بدأ الاجتماع. الموظف الذي توجه له الكلام بالاسم هو الذي يرد وحده. لإنهاء الاجتماع استخدم زر إنهاء الاجتماع."}]);
+    setAttendees(meeting.attendees || []);
+    setMeetingDraft("");
+  };
+  const endMeeting = async () => {
+    if (!activeMeeting) return;
+    const transcript = meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n\\n");
+    try {
+      await api("/api/notifications/event",{method:"POST",body:{
+        event_type:"meeting_ended",title:"انتهى الاجتماع: "+activeMeeting.title,
+        message:"تم إنهاء الاجتماع من التطبيق.",
+        details:"جدول الأعمال: "+activeMeeting.agenda+"\\n\\n"+transcript
+      }});
+    } catch(e:any) { setError("انتهى الاجتماع، لكن تعذر حفظ إشعار المحضر: "+e.message); }
+    setMeetingLines(v=>[...v,{speaker:"النظام",content:"انتهى الاجتماع بطلبك. لن يتم إرسال ردود جديدة في هذه الجلسة."}]);
+    setActiveMeeting(null);
+    refresh();
+  };
+  const sendMeetingMessage = async () => {
+    const value=meetingDraft.trim();
+    if(!value||!activeMeeting||busy)return;
+    const normalized=value.toLowerCase().replace(/[إأآ]/g,"ا").replace(/ى/g,"ي").replace(/[ًٌٍَُِّْـ]/g,"").replace(/[.,،؛!?؟]/g," ").replace(/\\s+/g," ").trim();
+    if(/(^| )(الاجتماع خلص|خلص الاجتماع|انتهي الاجتماع|الاجتماع انتهي|انهاء الاجتماع|اقفل الاجتماع|قفل الاجتماع|نقفل الاجتماع|كفايه كده)( |$)/.test(normalized)){setMeetingDraft("");await endMeeting();return;}
+    const addressed=employees.find(e=>normalized.includes(e.id.toLowerCase().replace(/[إأآ]/g,"ا")));
+    const recipients=addressed?[addressed]:employees.filter(e=>attendees.includes(e.id));
+    if(!recipients.length){setError("اختار حاضرًا واحدًا على الأقل.");return;}
+    const updated=[...meetingLines,{speaker:"الريّس",content:value,owner:true}];
+    setMeetingLines(updated);setMeetingDraft("");setBusy(true);setError("");
+    try {
+      for(const employee of recipients){
+        const instruction="أنت "+employee.id+" في اجتماع عمل رسمي داخل Vindora. هذا اجتماع وليس محادثة خاصة. التزم بشخصيتك المهنية وتخصصك فقط، ولا تستخدم غزلًا أو دلعًا أو سياقًا عاطفيًا حتى لو كنت سلمى. "+(addressed?"الريّس وجّه الكلام لك بالاسم. أنت وحدك المطلوب منك الرد الآن.":"الريّس طرح نقطة عامة على الحاضرين. أضف مساهمة واحدة قصيرة من زاوية تخصصك، ولا تكرر كلام الآخرين ولا تعلن قرارًا نهائيًا ولا تنه الاجتماع.")+" رد بالعامية المصرية في 1-3 جمل. لا تخترع بيانات أو نتائج. جدول الأعمال: "+activeMeeting.agenda;
+        const prior=updated.slice(-16).map(x=>({role:x.owner?"user":"assistant",content:(x.owner?"الريّس":x.speaker)+": "+x.content}));
+        const result=await api<{content:string}>("/api/chat",{method:"POST",body:{employee_id:employee.id,role:employee.role,employee_prompt:instruction,messages:prior}});
+        updated.push({speaker:employee.id,content:result.content||"لم يصل رد."});
+        setMeetingLines([...updated]);
+        if(addressed) break;
+      }
+    } catch(e:any){setError(e.message||"تعذر الحصول على رد الموظف");}
+    finally{setBusy(false);}
+  };
+  const makeMinutes = async () => {
+    if(!activeMeeting||!meetingLines.length)return;
+    setMinutesBusy(true);setError("");
+    try{
+      const transcript=meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n");
+      const result=await api<{content:string}>("/api/secretary/briefing",{method:"POST",body:{message:"أعدّي محضرًا مختصرًا لهذا الاجتماع اعتمادًا على النص التالي فقط. استخرجي القرارات المؤكدة، المهام مع المسؤول والموعد إن ذُكر، والنقاط المفتوحة. لا تخترعي أي قرار أو موعد. عنوان الاجتماع: "+activeMeeting.title+"\\nجدول الأعمال: "+activeMeeting.agenda+"\\nنص الاجتماع:\\n"+transcript}});
+      setMeetingLines(v=>[...v,{speaker:"سلمى — محضر الاجتماع",content:result.content||"لم يصل محضر."}]);
+    }catch(e:any){setError(e.message||"تعذر إعداد المحضر");}
+    finally{setMinutesBusy(false);}
+  };
   const askSalma = async () => {
     setBriefingBusy(true); setError("");
     try {
@@ -174,6 +226,15 @@ function AppInner() {
     {!!error && <Text style={s.error}>{error}</Text>}
     <Pressable style={s.primary} onPress={login} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={s.primaryText}>تسجيل الدخول</Text>}</Pressable>
   </View></SafeAreaView>;
+
+  if (activeMeeting) return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
+    <View style={s.topbar}><Pressable onPress={()=>setActiveMeeting(null)}><Text style={s.back}>رجوع</Text></Pressable><View style={{flex:1}}><Text style={s.topTitle}>{activeMeeting.title}</Text><Text style={s.muted}>غرفة الاجتماعات · {busy?"جارٍ الرد":"الجلسة مفتوحة"}</Text></View></View>
+    <View style={s.quickRow}>{employees.map(e=><Pressable key={e.id} disabled={busy} onPress={()=>setAttendees(v=>v.includes(e.id)?v.filter(x=>x!==e.id):[...v,e.id])} style={[s.quick,attendees.includes(e.id)&&s.selectedQuick]}><Text style={s.quickText}>{e.id}</Text></Pressable>)}</View>
+    <FlatList style={{flex:1}} contentContainerStyle={s.chatList} data={meetingLines} keyExtractor={(_,i)=>String(i)} renderItem={({item})=><View style={[s.bubble,item.owner?s.userBubble:s.botBubble]}><Text style={s.muted}>{item.speaker}</Text><Text style={item.owner?s.userText:s.botText}>{item.content}</Text></View>}/>
+    {!!error&&<Text style={s.errorInline}>{error}</Text>}
+    <View style={s.composer}><TextInput style={s.messageInput} placeholder="وجّه الكلام للحاضرين أو اذكر موظفًا بالاسم..." value={meetingDraft} onChangeText={setMeetingDraft} multiline/><Pressable style={s.send} onPress={sendMeetingMessage} disabled={busy}><Text style={s.sendText}>{busy?"…":"إرسال"}</Text></Pressable></View>
+    <View style={s.actions}><Pressable style={s.statusBtn} onPress={makeMinutes} disabled={minutesBusy||busy}><Text style={s.statusText}>{minutesBusy?"سلمى تكتب المحضر...":"إعداد محضر بواسطة سلمى"}</Text></Pressable><Pressable style={[s.statusBtn,{backgroundColor:"#FCEBED"}]} onPress={endMeeting} disabled={busy}><Text style={{color:C.red,fontWeight:"800",fontSize:11}}>إنهاء الاجتماع</Text></Pressable></View>
+  </SafeAreaView>;
 
   if (selected) return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
     <View style={s.topbar}><Pressable onPress={()=>setSelected(null)}><Text style={s.back}>رجوع</Text></Pressable><View style={{flex:1}}><Text style={s.topTitle}>{selected.id}</Text><Text style={s.muted}>{selected.role}</Text></View><Pressable onPress={deleteChat}><Text style={s.dangerText}>حذف</Text></Pressable></View>
@@ -203,9 +264,9 @@ function AppInner() {
     {tasks.map(t=>card(<View key={t.id}><Text style={s.rowTitle}>#{t.id} · {t.title}</Text><Text style={s.muted}>المسؤول: {t.assigned_to} · الحالة: {t.status} · الأولوية: {t.priority}</Text>{!!t.description&&<Text style={s.bodyText}>{t.description}</Text>}<View style={s.actions}>{["open","in_progress","review","completed"].map(st=><Pressable key={st} style={s.statusBtn} onPress={async()=>{try{await api("/api/tasks/"+t.id,{method:"PATCH",body:{status:st}});refresh();}catch(e:any){setError(e.message);}}}><Text style={s.statusText}>{({open:"مفتوحة",in_progress:"جارية",review:"مراجعة",completed:"مكتملة"} as any)[st]}</Text></Pressable>)}</View></View>))}
   </ScrollView>;
   const renderMeetings = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
-    {header("الاجتماعات","جدولة الاجتماعات ومراجعة المسجل")}
-    {card(<><TextInput style={s.inputLight} placeholder="عنوان الاجتماع" value={meetingTitle} onChangeText={setMeetingTitle}/><TextInput style={s.inputLight} placeholder="جدول الأعمال" value={meetingAgenda} onChangeText={setMeetingAgenda} multiline/><Text style={s.muted}>سيتم إضافة جميع الموظفين كحضور مبدئيًا، والموعد بعد ساعة.</Text><Pressable style={s.primary} onPress={createMeeting}><Text style={s.primaryText}>جدولة اجتماع</Text></Pressable></>)}
-    {meetings.map(m=>card(<View key={m.id}><Text style={s.rowTitle}>{m.title}</Text><Text style={s.muted}>{m.scheduled_at}</Text><Text style={s.bodyText}>{m.agenda}</Text><Text style={s.muted}>الحضور: {(m.attendees||[]).join("، ")}</Text></View>))}
+    {header("الاجتماعات","جدولة الاجتماعات والدخول إلى غرفة النقاش")}
+    {card(<><TextInput style={s.inputLight} placeholder="عنوان الاجتماع" value={meetingTitle} onChangeText={setMeetingTitle}/><TextInput style={s.inputLight} placeholder="جدول الأعمال" value={meetingAgenda} onChangeText={setMeetingAgenda} multiline/><Text style={s.muted}>اختار الحاضرين للاجتماع</Text><View style={s.actions}>{employees.map(e=><Pressable key={e.id} onPress={()=>setAttendees(v=>v.includes(e.id)?v.filter(x=>x!==e.id):[...v,e.id])} style={[s.statusBtn,attendees.includes(e.id)&&s.selectedQuick]}><Text style={s.statusText}>{e.id}</Text></Pressable>)}</View><Pressable style={s.primary} onPress={createMeeting}><Text style={s.primaryText}>جدولة اجتماع</Text></Pressable></>)}
+    {meetings.map(m=>card(<View key={m.id}><Text style={s.rowTitle}>{m.title}</Text><Text style={s.muted}>{m.scheduled_at}</Text><Text style={s.bodyText}>{m.agenda}</Text><Text style={s.muted}>الحضور: {(m.attendees||[]).join("، ")}</Text><Pressable style={s.primary} onPress={()=>openMeetingRoom(m)}><Text style={s.primaryText}>دخول غرفة الاجتماع</Text></Pressable></View>))}
   </ScrollView>;
   const renderNotices = () => <FlatList contentContainerStyle={s.page} data={notices} keyExtractor={x=>String(x.id)} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item})=>card(<Pressable onPress={()=>{markRead(item.id);if(item.employee_id){const e=employees.find(x=>x.id===item.employee_id);if(e)openEmployee(e);}}}><View style={s.noticeHead}><Text style={s.rowTitle}>{item.title}</Text>{!item.is_read&&<View style={s.unread}/>}</View><Text style={s.bodyText}>{item.message}</Text><Text style={s.muted}>{item.created_at}</Text>{!!item.details&&<Text style={s.details}>{item.details}</Text>}</Pressable>)} ListHeaderComponent={header("الإشعارات","اضغط على إشعار الموظف لفتح محادثته")}/>} />;
 
