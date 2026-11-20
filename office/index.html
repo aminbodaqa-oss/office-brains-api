@@ -210,7 +210,7 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
   <div id="notificationList"><div class="notification-empty">جاري تحميل الإشعارات...</div></div>
 </section>
 <div class="grid" id="grid"></div>
-<div id="meet"><div class="top"><button id="mback" aria-label="رجوع">→</button><div class="av" style="background:#1f6f5c33">🪑</div><div><b>غرفة الاجتماعات</b><small>اختار الحاضرين واكتب موضوع الاجتماع</small></div></div><div class="chips" id="mchips" style="padding-top:8px"></div><div id="mmsgs"></div><div class="chips" id="mact"><button type="button" id="mmin">📝 محضر الاجتماع</button><button type="button" id="mclr">🧹 اجتماع جديد</button></div><form id="mf"><textarea id="mt" rows="1" placeholder="اكتب موضوع الاجتماع أو سؤالك للفريق..."></textarea><button class="send" id="ms">إرسال</button></form></div>
+<div id="meet"><div class="top"><button id="mback" aria-label="رجوع">→</button><div class="av" style="background:#1f6f5c33">🪑</div><div><b>غرفة الاجتماعات</b><small id="mstatus">كلم موظف بالاسم أو وجّه كلامك للحاضرين</small></div></div><div class="chips" id="mchips" style="padding-top:8px"></div><div id="mmsgs"></div><div class="chips" id="mact"><button type="button" id="mmin">📝 محضر الاجتماع</button><button type="button" id="mEnd">إنهاء الاجتماع</button><button type="button" id="mclr">🧹 اجتماع جديد</button></div><form id="mf"><textarea id="mt" rows="1" placeholder="اكتب موضوع الاجتماع أو سؤالك للفريق..."></textarea><button class="send" id="ms">إرسال</button></form></div>
 <div id="chat">
   <div class="top"><button id="back" aria-label="رجوع">→</button><div class="av" id="cav"></div><div><b id="cname"></b><small id="crole"></small></div><button id="deleteChat" class="delete-chat" type="button" title="حذف المحادثة">🗑️ حذف المحادثة</button></div>
   <div id="msgs"></div>
@@ -461,29 +461,43 @@ async function send(){
 }
 $('grid').insertAdjacentHTML('afterbegin','<button class="desk gm" id="meetBtn"><div class="av" style="background:#1f6f5c33">🪑</div><b>غرفة الاجتماعات</b><span>اجمع الفريق في نقاش واحد</span></button>');
 let mh=[];try{mh=JSON.parse(localStorage.getItem('vo_meet')||'[]')}catch(e){}
+let meetingClosed=localStorage.getItem('vo_meet_closed')==='1';
 const mOn=new Set(['ابراهيم','كريم','اسلام','طلعت']);
-const saveM=()=>{try{localStorage.setItem('vo_meet',JSON.stringify(mh.slice(-60)))}catch(e){}};
+const saveM=()=>{try{localStorage.setItem('vo_meet',JSON.stringify(mh.slice(-60)));localStorage.setItem('vo_meet_closed',meetingClosed?'1':'0')}catch(e){}};
+const normalizeMeetingText=s=>String(s||'').toLowerCase().replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/[ًٌٍَُِّْـ]/g,'').replace(/[.,،؛!?؟]/g,' ').replace(/\s+/g,' ').trim();
+const isMeetingEndCommand=s=>/^(الاجتماع خلص|خلص الاجتماع|انتهي الاجتماع|الاجتماع انتهي|انهاء الاجتماع|اقفل الاجتماع|قفل الاجتماع|نقفل الاجتماع|كده الاجتماع خلص|كفايه كده)$/.test(normalizeMeetingText(s));
+function setMeetingClosed(closed){meetingClosed=closed;saveM();$('mt').disabled=closed;$('ms').disabled=closed||busy;$('mEnd').disabled=closed;$('mstatus').textContent=closed?'انتهى الاجتماع بطلبك. ابدأ اجتماعًا جديدًا عند الحاجة.':'الجلسة مفتوحة · وجّه كلامك لموظف بالاسم ليرد هو.';mchips();}
 function mchips(){$('mchips').textContent='';T.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.e+' '+x.n;b.className=mOn.has(x.n)?'on':'';b.onclick=()=>{mOn.has(x.n)?mOn.delete(x.n):mOn.add(x.n);b.className=mOn.has(x.n)?'on':''};$('mchips').append(b)})}
-function mdraw(){const box=$('mmsgs');box.textContent='';if(!mh.length){const d=document.createElement('div');d.className='note';d.textContent='اختار الحاضرين فوق، واكتب موضوع الاجتماع. كل واحد هيرد بالدور ويعلّق على زمايله.';box.append(d)}
+function mdraw(){const box=$('mmsgs');box.textContent='';if(!mh.length){const d=document.createElement('div');d.className='note';d.textContent='اختار الحاضرين. لو ناديت موظف باسمه هيرد هو فقط، والكلام العام يفتح النقاش للحاضرين.';box.append(d)}
 mh.forEach(m=>{const d=document.createElement('div');d.className='m '+(m.u?'u':'b');if(!m.u){const w=document.createElement('b');w.textContent=m.e+' '+m.w;w.style.display='block';w.style.fontSize='12px';d.append(w)}d.append(document.createTextNode(m.c==='...'?'بيكتب…':m.c));box.append(d)});box.scrollTop=1e9}
-$('meetBtn').onclick=()=>{$('meet').classList.add('on');mchips();mdraw();notifyOfficeEvent("meeting","بدأت جلسة اجتماع","تم فتح غرفة الاجتماعات وبدء جلسة جديدة.","المشاركون المحددون: "+Array.from(mOn).join("، "))};
+$('meetBtn').onclick=()=>{$('meet').classList.add('on');setMeetingClosed(meetingClosed);mdraw();notifyOfficeEvent("meeting","تم فتح غرفة الاجتماعات",meetingClosed?'الاجتماع السابق منتهٍ. ابدأ اجتماعًا جديدًا للمتابعة.':'غرفة الاجتماعات مفتوحة.',"المشاركون المحددون: "+Array.from(mOn).join("، "))};
 $('mback').onclick=()=>$('meet').classList.remove('on');
-$('mclr').onclick=()=>{if(busy)return;mh=[];saveM();mdraw();notifyOfficeEvent("meeting","تم بدء اجتماع جديد","تم مسح محادثة الاجتماع السابقة وفتح جلسة جديدة.","")};
+$('mclr').onclick=()=>{if(busy)return;mh=[];meetingClosed=false;saveM();setMeetingClosed(false);mdraw();notifyOfficeEvent("meeting","تم بدء اجتماع جديد","تم فتح جلسة جديدة، ولن ينهيها أي موظف تلقائيًا.","")};
 async function speak(x,instr,bot){
  const now=new Date().toLocaleString("ar-EG",{dateStyle:"full",timeStyle:"short",timeZone:"Africa/Cairo"});
  const tr=mh.filter(m=>m!==bot&&m.c!=="...").slice(-30).map(m=>(m.u?"الريّس":m.w)+": "+m.c).join("\n");
  const result=await apiRequest("/api/meeting/respond",{employee_id:x.n,role:x.r,employee_prompt:x.p,personality:PERS[x.n],company_context:CTX,rules:RULES,time:now,transcript:tr,instruction:instr});
  bot.c=(result.content||"وصل رد فارغ من السيرفر.").trim();return true;
 }
+function finishMeeting(){if(meetingClosed)return;if(busy){alert('استنى لما الموظف يخلص رده الأول.');return}mh.push({w:'النظام',e:'حالة الاجتماع',c:'تم إنهاء الاجتماع بطلب الريّس. لن يرسل أي موظف ردودًا جديدة في هذه الجلسة.'});setMeetingClosed(true);mdraw();notifyOfficeEvent('meeting_ended','انتهى الاجتماع','الريّس أنهى الاجتماع. تم إغلاق الجلسة ومنع أي ردود جديدة.',mh.map(m=>(m.u?'الريّس':m.w)+': '+m.c).join('\n\n'));}
+$('mEnd').onclick=finishMeeting;
 async function mSend(){
- const txt=$('mt').value.trim();if(!txt||busy)return;
+ const txt=$('mt').value.trim();if(!txt||busy||meetingClosed)return;
+ $('mt').value='';mh.push({u:1,c:txt});
+ if(isMeetingEndCommand(txt)){finishMeeting();saveM();mdraw();return}
  const att=T.filter(x=>mOn.has(x.n));if(!att.length){$('mt').placeholder='اختار حاضر واحد على الأقل';return}
- $('mt').value='';mh.push({u:1,c:txt});busy=true;$('ms').disabled=true;
- let fine=true;try{for(const x of att){const bot={w:x.n,e:x.e,c:'...'};mh.push(bot);mdraw();
-  const ok=await speak(x,'انت في اجتماع مع الريّس وزمايلك ('+att.map(a=>a.n).join('، ')+'). دورك: ردّ على آخر كلام الريّس وعلى اللي اتكلموا قبلك من زاوية تخصصك ('+x.r+') في رسالة واحدة (1-3 جمل). علّق على زميل بالاسم لو في داعي: اتفق أو اعترض. ما تكررش اللي اتقال. اكتب كلامك بس بدون اسمك.',bot);if(!ok){fine=false;break}}
-  if(fine&&att.length>1){const g=T[0],b2={w:g.n+' · القرار',e:g.e,c:'...'};mh.push(b2);mdraw();await speak(g,'انت المدير العام وبتختم الاجتماع دلوقتي. لخّص في رسالة واحدة (2-4 جمل): القرار النهائي، ومين هيعمل إيه، وأول خطوة. اعتمد على اللي اتقال بس وما تضيفش أرقام من عندك.',b2)}}
+ const normalized=normalizeMeetingText(txt);
+ const addressed=att.find(x=>normalized.includes(normalizeMeetingText(x.n)));
+ const recipients=addressed?[addressed]:att;
+ busy=true;$('ms').disabled=true;
+ try{for(const x of recipients){const bot={w:x.n,e:x.e,c:'...'};mh.push(bot);mdraw();
+  const instruction=addressed
+   ?'الريّس وجّه الكلام لك بالاسم. أنت وحدك المطلوب منك الرد الآن. أجب مباشرة على سؤاله من زاوية تخصصك ('+x.r+'). لا تجعل إبراهيم ينهي الاجتماع أو يتحدث نيابة عنك. رد في 1-3 جمل وبالعامية المصرية.'
+   :'الريّس يطرح نقطة عامة على الحاضرين. أضف مساهمة واحدة قصيرة من زاوية تخصصك ('+x.r+'). لا تكرر كلام الآخرين، ولا تعلن قرارًا نهائيًا، ولا تنه الاجتماع.';
+  await speak(x,instruction,bot);
+ }}
  catch(err){const l=mh[mh.length-1];if(l&&l.c==='...')l.c=err&&err.code==='rate_limited'?'استنى شوية وجرّب تاني.':'حصلت مشكلة، جرّب تاني.'}
- finally{mh=mh.filter(m=>m.c!=='...');busy=false;$('ms').disabled=false;saveM();mdraw()}}
+ finally{mh=mh.filter(m=>m.c!=='...');busy=false;$('ms').disabled=meetingClosed;saveM();mdraw()}}
 $('mmin').onclick=async()=>{if(busy||!mh.length)return;busy=true;const x=T.find(t=>t.n==='سلمى');const bot={w:x.n,e:x.e,c:'...'};mh.push(bot);mdraw();
  try{await speak(x,'اكتبي محضر الاجتماع: القرارات، المهام (مين/إيه/إمتى)، والنقاط المفتوحة. نص عادي بدون ماركداون، نقاط بشرطة، وكوني مختصرة.',bot)}catch(e){bot.c='حصلت مشكلة، جرّب تاني.'}
  finally{mh=mh.filter(m=>m.c!=='...');busy=false;saveM();mdraw();notifyOfficeEvent("meeting_minutes","تم إعداد محضر الاجتماع","سلمى أعدّت محضرًا بناءً على محتوى الجلسة.",mh.map(m=>(m.w||"المالك")+": "+m.c).join("\n\n"))}};
