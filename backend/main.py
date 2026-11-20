@@ -12,20 +12,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash
+from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
 from employees import EMPLOYEES, EMPLOYEE_IDS
+from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
+from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
-from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db)
+from push import push_delivery_loop
+from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     init_workflow_db()
+    init_internal_messaging_db()
+    init_whatsapp_db()
     scheduler_task = None
     proactive_task = None
+    push_task = asyncio.create_task(push_delivery_loop())
     if os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
         scheduler_task = asyncio.create_task(scheduler_loop())
         if PROVIDER != "demo":
@@ -34,7 +40,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        for task in (scheduler_task, proactive_task):
+        for task in (scheduler_task, proactive_task, push_task):
             if task:
                 task.cancel()
                 try:
@@ -137,12 +143,25 @@ class MeetingCreateRequest(BaseModel):
     attendees: list[str] = Field(default_factory=list, max_length=20)
     scheduled_at: str = Field(min_length=10, max_length=80)
 
+class MeetingUpdateRequest(BaseModel):
+    status: Literal["scheduled", "completed", "cancelled"] | None = None
+    minutes: str | None = Field(default=None, max_length=20000)
+
 class SecretaryRequest(BaseModel):
     message: str = Field(default="نظمي لي يومي ووريني أهم المهام والمواعيد اللي محتاجة متابعة.", max_length=6000)
+
+class PushDeviceRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=255)
+    platform: Literal["android"] = "android"
+    device_id: str = Field(default="", max_length=128)
 
 class NotificationReadRequest(BaseModel):
     ids: list[int] = Field(default_factory=list, max_length=100)
     all_read: bool = False
+
+class NotificationDeleteRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list, max_length=100)
+    all_items: bool = False
 
 class NotificationEventRequest(BaseModel):
     event_type: str = Field(min_length=1, max_length=40)
@@ -152,6 +171,11 @@ class NotificationEventRequest(BaseModel):
 
 class ChatDeleteRequest(BaseModel):
     employee_id: str = Field(min_length=1, max_length=120)
+
+class OfficeWhatsAppSendRequest(BaseModel):
+    sender_id: str = Field(min_length=1, max_length=120)
+    recipient_id: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=6000)
 
 class MemoryRequest(BaseModel):
     employee_id: str
@@ -170,6 +194,37 @@ async def health():
 async def employees(_: str = Depends(require_owner)):
     return {"employees": EMPLOYEES}
 
+@app.get("/api/whatsapp/contacts")
+async def get_whatsapp_contacts(_: str = Depends(require_owner)):
+    return {"contacts": whatsapp_contacts()}
+
+@app.get("/api/whatsapp/inbox")
+async def get_whatsapp_inbox(employee_id: str, limit: int = 30, _: str = Depends(require_owner)):
+    if employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    return {"employee_id": employee_id, "virtual_number": virtual_number(employee_id),
+            "messages": list_whatsapp_inbox(employee_id, limit)}
+
+@app.get("/api/whatsapp/messages")
+async def get_whatsapp_thread(employee_id: str, peer_id: str, limit: int = 100, _: str = Depends(require_owner)):
+    try:
+        return {"employee_id": employee_id, "peer_id": peer_id,
+                "messages": list_whatsapp_messages(employee_id, peer_id, limit)}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+@app.post("/api/whatsapp/send")
+async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depends(require_owner)):
+    try:
+        saved = send_whatsapp_message(body.sender_id, body.recipient_id, body.content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_activity(body.sender_id, "office_whatsapp_sent", "office_whatsapp_message", saved["id"],
+                 f"{body.sender_id} أرسل رسالة واتساب داخلية إلى {body.recipient_id}", body.content)
+    add_notification("office_whatsapp", f"رسالة واتساب داخلية من {body.sender_id}",
+                     f"وصلتك رسالة جديدة من {body.sender_id}.", body.content, employee_id=body.recipient_id)
+    return {"sent": True, "message": saved}
+
 @app.get("/api/notifications")
 async def list_notifications(limit: int = 50, unread_only: bool = False, _: str = Depends(require_owner)):
     return get_notifications(limit, unread_only)
@@ -178,10 +233,26 @@ async def list_notifications(limit: int = 50, unread_only: bool = False, _: str 
 async def read_notifications(body: NotificationReadRequest, _: str = Depends(require_owner)):
     return {"updated": mark_notifications_read(body.ids, body.all_read)}
 
+@app.post("/api/notifications/delete")
+async def delete_notification_items(body: NotificationDeleteRequest, _: str = Depends(require_owner)):
+    return {"deleted": delete_notifications(body.ids, body.all_items)}
+
 @app.post("/api/notifications/event")
 async def create_notification_event(body: NotificationEventRequest, _: str = Depends(require_owner)):
     notification_id = add_notification(body.event_type, body.title, body.message, body.details)
     return {"id": notification_id, "saved": True}
+
+@app.post("/api/push/register")
+async def register_push(body: PushDeviceRequest, _: str = Depends(require_owner)):
+    if not body.token.startswith(("ExponentPushToken[", "ExpoPushToken[")):
+        raise HTTPException(status_code=400, detail="رمز إشعارات Expo غير صالح.")
+    register_push_device(body.token, body.platform, body.device_id)
+    return {"registered": True}
+
+@app.post("/api/push/unregister")
+async def unregister_push(body: PushDeviceRequest, _: str = Depends(require_owner)):
+    unregister_push_device(body.token)
+    return {"registered": False}
 
 @app.get("/api/automation/status")
 async def get_automation_status(_: str = Depends(require_owner)):
@@ -204,14 +275,94 @@ async def chat_history(employee_id: str, _: str = Depends(require_owner)):
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     return {"employee_id": employee_id, "messages": get_chat_history(employee_id)}
 
+@app.get("/api/internal-messages")
+async def get_internal_messages(employee_id: str, folder: Literal["inbox", "sent"] = "inbox", limit: int = 30, _: str = Depends(require_owner)):
+    if employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    return {"employee_id": employee_id, "folder": folder, "messages": list_internal_messages(employee_id, folder, limit)}
+
+@app.post("/api/internal-messages/{message_id}/read")
+async def read_internal_message(message_id: int, employee_id: str, _: str = Depends(require_owner)):
+    if employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    if not mark_internal_message_read(message_id, employee_id):
+        raise HTTPException(status_code=404, detail="الرسالة غير موجودة في صندوق وارد الموظف.")
+    return {"read": True, "message_id": message_id}
+
 
 @app.post("/api/chat")
 async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     if body.employee_id not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
+
+    # Explicit WhatsApp Office commands are saved in their own mailbox.
+    wa_request = detect_whatsapp_send_request(last_user)
+    if wa_request:
+        try:
+            saved_wa = send_whatsapp_message(body.employee_id, wa_request["recipient_id"], wa_request["content"])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        response = f"تم إرسال رسالة WhatsApp Office إلى {wa_request['recipient_id']} وتسجيلها في المحادثة."
+        log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": response, "whatsapp_message_id": saved_wa["id"]})
+        log_activity(body.employee_id, "office_whatsapp_sent", "office_whatsapp_message", saved_wa["id"], f"{body.employee_id} أرسل واتساب داخليًا إلى {wa_request['recipient_id']}", wa_request["content"])
+        add_notification("office_whatsapp", f"رسالة WhatsApp Office من {body.employee_id}", f"وصلتك رسالة جديدة من {body.employee_id}.", wa_request["content"], employee_id=wa_request["recipient_id"])
+        return {"employee_id": body.employee_id, "content": response, "sent": True, "whatsapp": True, "message_id": saved_wa["id"]}
+
+    # Explicit employee-to-employee send requests are persisted before the sender confirms delivery.
+    if has_send_intent(last_user):
+        request = detect_send_request(last_user)
+        if not request:
+            content = "أقدر أوصل الرسالة، بس محتاج تحدد اسم الموظف المستلم بوضوح، وبعدها أرسلها له من خلال صندوق المراسلات الداخلي."
+            log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
+            return {"employee_id": body.employee_id, "content": content, "sent": False, "needs_clarification": True}
+        recipient_id = request["recipient_id"]
+        message_content = request["content"]
+        if recipient_id == body.employee_id:
+            content = "مش هينفع أبعت رسالة للموظف نفسه. اختار زميل تاني وأنا أوصلها له."
+            return {"employee_id": body.employee_id, "content": content, "sent": False, "needs_clarification": True}
+        if not message_content:
+            content = f"تمام، الرسالة هتتبعت لـ{recipient_id}. اكتبلي محتوى الرسالة اللي تحب أوصلهوله."
+            log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
+            return {"employee_id": body.employee_id, "content": content, "sent": False, "needs_clarification": True}
+        try:
+            saved = send_internal_message(body.employee_id, recipient_id, message_content)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        content = f"تم إرسال الرسالة إلى {recipient_id} وتسجيلها في صندوق الوارد الداخلي.\n\nنص الرسالة:\n{message_content}"
+        log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content, "internal_message_id": saved["id"]})
+        log_activity(body.employee_id, "internal_message_sent", "internal_message", saved["id"], f"{body.employee_id} أرسل رسالة إلى {recipient_id}", message_content)
+        add_notification("internal_message", f"رسالة داخلية من {body.employee_id} إلى {recipient_id}", f"تم تسليم رسالة داخلية إلى {recipient_id}.", message_content, employee_id=recipient_id)
+        return {"employee_id": body.employee_id, "content": content, "sent": True, "message_id": saved["id"], "recipient_id": recipient_id}
+
+    # Incoming and outgoing mail are supplied from the real mailbox, never inferred by the model.
+    mark_internal_inbox_read(body.employee_id)
+    inbox = list_internal_messages(body.employee_id, "inbox", 12)
+    sent = list_internal_messages(body.employee_id, "sent", 8)
     memories = get_memories(body.employee_id, 12)
     assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
-    system = "أنت موظف افتراضي متخصص داخل مكتب. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    wa_number = virtual_number(body.employee_id)
+    wa_inbox = list_whatsapp_inbox(body.employee_id, 15)
+    system += f"\nرقم واتساب المكتب الافتراضي الخاص بك هو {wa_number}. هذا رقم داخلي غير قابل للاتصال الهاتفي ولا يمثل رقم واتساب حقيقيًا."
+    if wa_inbox:
+        system += "\n\nآخر محادثات WhatsApp Office المسجلة فعليًا:"
+        for item in wa_inbox:
+            other = item["sender_id"] if item["recipient_id"] == body.employee_id else item["recipient_id"]
+            system += f"\n- محادثة مع {other} | الرسالة: {item['content']} | الوقت: {item['created_at']}"
+        system += "\nإذا سُئلت عما وصلك عبر واتساب المكتب، اعتمد فقط على هذه السجلات ولا تخترع رسائل أو محادثات."
+
+    if inbox:
+        system += "\n\nرسائل واردة مسجلة فعليًا في صندوقك الداخلي (الأحدث أولًا):\n" + "\n".join(
+            f"- رقم الرسالة #{item['id']} | من: {item['sender_id']} | الحالة: {'مقروءة' if item['status'] == 'read' else 'مستلمة'} | التاريخ: {item['created_at']}\nالمحتوى: {item['content']}"
+            for item in inbox
+        ) + "\nلو سألك المالك عما استلمته، ارجع لهذه الرسائل واذكر المرسل والمحتوى بدقة. لا تدّعِ استلام رسالة غير موجودة هنا."
+    if sent:
+        system += "\n\nآخر الرسائل التي أرسلتها فعلًا من صندوقك الداخلي:\n" + "\n".join(
+            f"- إلى: {item['recipient_id']} | الحالة: {item['status']} | التاريخ: {item['created_at']} | المحتوى: {item['content']}"
+            for item in sent
+        )
+    system += "\nإذا طلب منك المالك إرسال رسالة لزميل، لا تقل إنك أرسلتها إلا إذا ظهر تأكيد الإرسال من النظام. الرسائل الداخلية لا تُرسل إلا بعد تسجيلها في صندوق المراسلات."
     if memories:
         system += "\nذكريات محفوظة لهذا الموظف:\n" + "\n".join("- " + m["content"] for m in reversed(memories))
     if assigned_tasks:
@@ -228,7 +379,6 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
     log_activity(body.employee_id, "employee_chat_reply", "chat", None, body.employee_id + " رد على رسالة الريّس", content)
-    last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
     add_notification("chat", "محادثة جديدة مع " + body.employee_id,
         "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\n\nرد الموظف:\n" + content,
         employee_id=body.employee_id)
@@ -358,6 +508,14 @@ async def post_meeting(body: MeetingCreateRequest, _: str = Depends(require_owne
     add_notification("meeting_scheduled", "تمت جدولة اجتماع جديد",
         body.title + " · " + body.scheduled_at,
         "الحضور: " + "، ".join(body.attendees) + "\nجدول الأعمال:\n" + body.agenda)
+    return {"saved": True, "meeting": meeting}
+
+@app.patch("/api/meetings/{meeting_id}")
+async def patch_meeting(meeting_id: int, body: MeetingUpdateRequest, _: str = Depends(require_owner)):
+    updates = body.model_dump(exclude_unset=True)
+    meeting = update_meeting(meeting_id, updates, "الريّس")
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="الاجتماع غير موجود أو لا توجد تغييرات.")
     return {"saved": True, "meeting": meeting}
 
 @app.get("/api/activity")
