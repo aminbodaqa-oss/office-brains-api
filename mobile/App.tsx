@@ -72,7 +72,7 @@ function AppInner() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [status, setStatus] = useState<any>(null);
+  const [status, setStatus] = useState<any>(null);\n  const [reports, setReports] = useState<any[]>([]);\n  const [briefingBusy, setBriefingBusy] = useState(false);
   const [selected, setSelected] = useState<Employee | null>(null);
   const [chat, setChat] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
@@ -88,7 +88,7 @@ function AppInner() {
     if (!loggedIn) return;
     setRefreshing(true);
     try {
-      const [e, t, m, n, s] = await Promise.all([
+      const [e, t, m, n, s, rp] = await Promise.all([
         api<{employees:Employee[]}>("/api/employees"),
         api<{tasks:Task[]}>("/api/tasks?limit=100"),
         api<{meetings:Meeting[]}>("/api/meetings?limit=50"),
@@ -96,7 +96,7 @@ function AppInner() {
         api<any>("/api/automation/status")
       ]);
       setEmployees(e.employees || []); setTasks(t.tasks || []); setMeetings(m.meetings || []);
-      setNotices(n.notifications || []); setStatus(s);
+      setNotices(n.notifications || []); setStatus(s); setReports(rp.reports || []);
     } catch (e:any) { setError(e.message || "تعذر تحميل بيانات المكتب"); }
     finally { setRefreshing(false); }
   };
@@ -153,6 +153,15 @@ function AppInner() {
     } catch(e:any){setError(e.message);}
     finally{setBusy(false);}
   };
+  const askSalma = async () => {
+    setBriefingBusy(true); setError("");
+    try {
+      const result = await api<{content:string}>("/api/secretary/briefing", {method:"POST",body:{message:"نظمي لي يومي ووريني أهم المهام والمواعيد والتقارير والنقاط اللي محتاجة متابعة. فرّقي بين المسجل فعليًا والمقترحات."}});
+      Alert.alert("سلمى — ملخص المتابعة", result.content || "لم يصل رد.");
+      refresh();
+    } catch(e:any) { setError(e.message || "تعذر الاتصال بسلمى"); }
+    finally { setBriefingBusy(false); }
+  };
   const markRead = async (id:number) => { try { await api("/api/notifications/read",{method:"POST",body:{ids:[id]}}); await refresh(); } catch(e:any){setError(e.message);} };
 
   if (!tokenReady) return <View style={s.center}><ActivityIndicator color={C.purple}/></View>;
@@ -177,11 +186,11 @@ function AppInner() {
   const header = (title:string, subtitle?:string) => <View style={s.sectionHead}><Text style={s.sectionTitle}>{title}</Text>{!!subtitle&&<Text style={s.muted}>{subtitle}</Text>}</View>;
   const card = (children:React.ReactNode) => <View style={s.card}>{children}</View>;
   const renderHome = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
-    <View style={s.hero}><Text style={s.heroEyebrow}>VINDORA OFFICE</Text><Text style={s.heroTitle}>صباح الشغل، يا ريس</Text><Text style={s.heroSub}>كل فريقك ومتابعاتك في مكان واحد.</Text><Pressable onPress={logout} style={s.logout}><Text style={s.logoutText}>تسجيل الخروج</Text></Pressable></View>
+    <View style={s.hero}><Text style={s.heroEyebrow}>VINDORA OFFICE</Text><Text style={s.heroTitle}>صباح الشغل، يا ريس</Text><Text style={s.heroSub}>كل فريقك ومتابعاتك في مكان واحد.</Text><View style={{flexDirection:"row",gap:8,justifyContent:"flex-end",marginTop:14}}><Pressable onPress={askSalma} style={s.logout} disabled={briefingBusy}><Text style={s.logoutText}>{briefingBusy?"سلمى بتراجع...":"اطلبي ملخص من سلمى"}</Text></Pressable><Pressable onPress={logout} style={s.logout}><Text style={s.logoutText}>تسجيل الخروج</Text></Pressable></View></View>
     <View style={s.stats}>{[[String(employees.length||13),"موظف"],[String(tasks.filter(x=>!["completed","cancelled"].includes(x.status)).length),"مهمة مفتوحة"],[String(meetings.filter(x=>x.status==="scheduled").length),"اجتماع مجدول"]].map(([v,l])=>card(<><Text style={s.statValue}>{v}</Text><Text style={s.statLabel}>{l}</Text></>))}</View>
     {header("حالة التشغيل","المجدول اليومي والمبادرات التلقائية")}
     {card(<><Text style={s.rowTitle}>المجدول مفعّل: {status?.enabled?"نعم":"لا"}</Text><Text style={s.muted}>مزود الذكاء الاصطناعي: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>موعد التشغيل: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>حالة تشغيل اليوم: {status?.today?.status||status?.today_status||"غير متاحة"}</Text></>)}
-    {header("آخر الإشعارات")}
+    {header("آخر التقارير اليومية")}\n    {reports.slice(0,4).map((r:any,i:number)=>card(<View key={String(r.run_date)+r.employee_id+i}><Text style={s.rowTitle}>{r.employee_id} · {r.department}</Text><Text style={s.muted}>{r.run_date}</Text><Text style={s.bodyText}>{r.content}</Text></View>))}\n    {header("آخر الإشعارات")}
     {notices.slice(0,4).map(n=>card(<Pressable key={n.id} onPress={()=>{if(n.employee_id){const e=employees.find(x=>x.id===n.employee_id);if(e)openEmployee(e);}else setTab("notices");}}><Text style={s.rowTitle}>{n.title}</Text><Text style={s.muted}>{n.message}</Text></Pressable>))}
   </ScrollView>;
   const renderEmployees = () => <FlatList contentContainerStyle={s.page} data={employees} keyExtractor={x=>x.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item,index})=>card(<Pressable style={s.employeeRow} onPress={()=>openEmployee(item)}><View style={s.avatar}><Text style={s.avatarText}>{item.id.slice(0,1)}</Text></View><View style={{flex:1}}><Text style={s.rowTitle}>{item.id}</Text><Text style={s.muted}>{item.role} · {item.department}</Text></View><Text style={s.arrow}>‹</Text></Pressable>)} ListHeaderComponent={header("فريق المكتب","كل الموظفين الـ13")}/>} />;
