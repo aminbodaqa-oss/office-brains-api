@@ -9,7 +9,7 @@ type Message = { role: "user" | "assistant"; content: string };
 type Task = { id: number; title: string; description: string; assigned_to: string; status: string; priority: string; due_at?: string };
 type Meeting = { id: number; title: string; agenda: string; attendees: string[]; scheduled_at: string; status: string };
 type Notice = { id: number; title: string; message: string; details: string; created_at: string; is_read: number; employee_id?: string | null };
-type Tab = "home" | "employees" | "tasks" | "meetings" | "notices";\ntype MeetingLine = { speaker: string; content: string; owner?: boolean };
+type Tab = "home" | "employees" | "tasks" | "meetings" | "notices" | "settings";\ntype MeetingLine = { speaker: string; content: string; owner?: boolean };
 
 const C = { navy: "#11172E", purple: "#7047F5", bg: "#F4F5FA", card: "#FFFFFF", ink: "#171A2B", muted: "#777C91", line: "#E6E8F0", green: "#23866D", red: "#D64A59" };
 const PERSONALITIES: Record<string, string> = {
@@ -74,7 +74,7 @@ function AppInner() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [status, setStatus] = useState<any>(null);
   const [reports, setReports] = useState<any[]>([]);\n  const [briefingBusy, setBriefingBusy] = useState(false);
-  const [selected, setSelected] = useState<Employee | null>(null);
+  const [selected, setSelected] = useState<Employee | null>(null);\n  const [memories, setMemories] = useState<any[]>([]);\n  const [memoryDraft, setMemoryDraft] = useState("");\n  const [showMemories, setShowMemories] = useState(false);\n  const [currentPassword, setCurrentPassword] = useState("");\n  const [newPassword, setNewPassword] = useState("");\n  const [confirmPassword, setConfirmPassword] = useState("");
   const [chat, setChat] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
@@ -114,8 +114,28 @@ function AppInner() {
   };
   const logout = async () => { await clearToken(); setLoggedIn(false); setSelected(null); setChat([]); };
 
+  const loadMemories = async (employeeId:string) => {
+    try { const r=await api<{memories:any[]}>("/api/memories/"+encodeURIComponent(employeeId)+"?limit=30"); setMemories(r.memories||[]); }
+    catch(e:any){setError(e.message||"تعذر تحميل الذاكرة");}
+  };
+  const saveMemory = async () => {
+    if(!selected||!memoryDraft.trim())return;
+    try {
+      await api("/api/memories",{method:"POST",body:{employee_id:selected.id,content:memoryDraft.trim(),tags:["mobile"]}});
+      setMemoryDraft(""); await loadMemories(selected.id); Alert.alert("تم الحفظ","أُضيفت المعلومة إلى ذاكرة الموظف.");
+    } catch(e:any){setError(e.message||"تعذر حفظ الذاكرة");}
+  };
+  const changePassword = async () => {
+    if(newPassword.length<8){setError("كلمة المرور الجديدة يجب ألا تقل عن 8 أحرف.");return;}
+    if(newPassword!==confirmPassword){setError("تأكيد كلمة المرور غير مطابق.");return;}
+    try {
+      await api("/api/auth/change-password",{method:"POST",body:{current_password:currentPassword,new_password:newPassword}});
+      setCurrentPassword("");setNewPassword("");setConfirmPassword("");setError("");
+      Alert.alert("تم","تم تغيير كلمة المرور بنجاح.");
+    }catch(e:any){setError(e.message||"تعذر تغيير كلمة المرور");}
+  };
   const openEmployee = async (employee: Employee) => {
-    setSelected(employee); setChat([]); setDraft("");
+    setSelected(employee); setChat([]); setDraft(""); setShowMemories(false); setMemories([]); loadMemories(employee.id);
     try { const r = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(employee.id)); setChat(r.messages || []); }
     catch(e:any) { setError(e.message); }
   };
@@ -237,9 +257,9 @@ function AppInner() {
   </SafeAreaView>;
 
   if (selected) return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
-    <View style={s.topbar}><Pressable onPress={()=>setSelected(null)}><Text style={s.back}>رجوع</Text></Pressable><View style={{flex:1}}><Text style={s.topTitle}>{selected.id}</Text><Text style={s.muted}>{selected.role}</Text></View><Pressable onPress={deleteChat}><Text style={s.dangerText}>حذف</Text></Pressable></View>
+    <View style={s.topbar}><Pressable onPress={()=>setSelected(null)}><Text style={s.back}>رجوع</Text></Pressable><View style={{flex:1}}><Text style={s.topTitle}>{selected.id}</Text><Text style={s.muted}>{selected.role}</Text></View><Pressable onPress={()=>{setShowMemories(v=>!v);loadMemories(selected.id);}}><Text style={s.back}>الذاكرة</Text></Pressable><Pressable onPress={deleteChat}><Text style={s.dangerText}>حذف</Text></Pressable></View>
     <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
-      <FlatList style={{flex:1}} contentContainerStyle={s.chatList} data={chat} keyExtractor={(_,i)=>String(i)} renderItem={({item})=><View style={[s.bubble,item.role==="user"?s.userBubble:s.botBubble]}><Text style={item.role==="user"?s.userText:s.botText}>{item.content}</Text></View>} ListEmptyComponent={<Text style={s.empty}>أهلاً! أنا {selected.id}. اتفضل كلمني.</Text>}/>
+      {showMemories&&<View style={s.card}><Text style={s.rowTitle}>ذاكرة {selected.id}</Text><TextInput style={s.inputLight} placeholder="أضف معلومة يتذكرها الموظف" value={memoryDraft} onChangeText={setMemoryDraft} multiline/><Pressable style={s.primary} onPress={saveMemory}><Text style={s.primaryText}>حفظ في الذاكرة</Text></Pressable>{memories.map((m:any)=><Text key={m.id} style={s.bodyText}>• {m.content}</Text>)}</View>}<FlatList style={{flex:1}} contentContainerStyle={s.chatList} data={chat} keyExtractor={(_,i)=>String(i)} renderItem={({item})=><View style={[s.bubble,item.role==="user"?s.userBubble:s.botBubble]}><Text style={item.role==="user"?s.userText:s.botText}>{item.content}</Text></View>} ListEmptyComponent={<Text style={s.empty}>أهلاً! أنا {selected.id}. اتفضل كلمني.</Text>}/>
       {!!error && <Text style={s.errorInline}>{error}</Text>}
       <View style={s.quickRow}>{(QUICK[selected.id]||[]).map(q=><Pressable key={q} style={s.quick} onPress={()=>setDraft(q)}><Text style={s.quickText}>{q}</Text></Pressable>)}</View>
       <View style={s.composer}><TextInput style={s.messageInput} placeholder="اكتب رسالتك..." value={draft} onChangeText={setDraft} multiline/><Pressable style={s.send} onPress={sendChat} disabled={busy}><Text style={s.sendText}>{busy?"…":"إرسال"}</Text></Pressable></View>
@@ -268,13 +288,19 @@ function AppInner() {
     {card(<><TextInput style={s.inputLight} placeholder="عنوان الاجتماع" value={meetingTitle} onChangeText={setMeetingTitle}/><TextInput style={s.inputLight} placeholder="جدول الأعمال" value={meetingAgenda} onChangeText={setMeetingAgenda} multiline/><Text style={s.muted}>اختار الحاضرين للاجتماع</Text><View style={s.actions}>{employees.map(e=><Pressable key={e.id} onPress={()=>setAttendees(v=>v.includes(e.id)?v.filter(x=>x!==e.id):[...v,e.id])} style={[s.statusBtn,attendees.includes(e.id)&&s.selectedQuick]}><Text style={s.statusText}>{e.id}</Text></Pressable>)}</View><Pressable style={s.primary} onPress={createMeeting}><Text style={s.primaryText}>جدولة اجتماع</Text></Pressable></>)}
     {meetings.map(m=>card(<View key={m.id}><Text style={s.rowTitle}>{m.title}</Text><Text style={s.muted}>{m.scheduled_at}</Text><Text style={s.bodyText}>{m.agenda}</Text><Text style={s.muted}>الحضور: {(m.attendees||[]).join("، ")}</Text><Pressable style={s.primary} onPress={()=>openMeetingRoom(m)}><Text style={s.primaryText}>دخول غرفة الاجتماع</Text></Pressable></View>))}
   </ScrollView>;
+  const renderSettings = () => <ScrollView contentContainerStyle={s.page}>
+    {header("الإعدادات","إعدادات حساب المالك على المكتب")}
+    {card(<><Text style={s.rowTitle}>تغيير كلمة المرور</Text><TextInput style={s.inputLight} placeholder="كلمة المرور الحالية" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry/><TextInput style={s.inputLight} placeholder="كلمة المرور الجديدة — 8 أحرف على الأقل" value={newPassword} onChangeText={setNewPassword} secureTextEntry/><TextInput style={s.inputLight} placeholder="تأكيد كلمة المرور الجديدة" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry/><Pressable style={s.primary} onPress={changePassword}><Text style={s.primaryText}>حفظ كلمة المرور</Text></Pressable></>)}
+    {card(<><Text style={s.rowTitle}>حالة الأتمتة</Text><Text style={s.muted}>المجدول: {status?.enabled?"مفعّل":"متوقف"}</Text><Text style={s.muted}>المزود: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>التوقيت: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>أيام العمل: الأحد إلى الخميس</Text></>)}
+    <Pressable style={s.primary} onPress={logout}><Text style={s.primaryText}>تسجيل الخروج</Text></Pressable>
+  </ScrollView>;
   const renderNotices = () => <FlatList contentContainerStyle={s.page} data={notices} keyExtractor={x=>String(x.id)} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item})=>card(<Pressable onPress={()=>{markRead(item.id);if(item.employee_id){const e=employees.find(x=>x.id===item.employee_id);if(e)openEmployee(e);}}}><View style={s.noticeHead}><Text style={s.rowTitle}>{item.title}</Text>{!item.is_read&&<View style={s.unread}/>}</View><Text style={s.bodyText}>{item.message}</Text><Text style={s.muted}>{item.created_at}</Text>{!!item.details&&<Text style={s.details}>{item.details}</Text>}</Pressable>)} ListHeaderComponent={header("الإشعارات","اضغط على إشعار الموظف لفتح محادثته")}/>} />;
 
   return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
     <View style={s.topbar}><View><Text style={s.topTitle}>ڤيندورا</Text><Text style={s.muted}>المكتب الافتراضي</Text></View><Pressable onPress={refresh}><Text style={s.refreshText}>تحديث</Text></Pressable></View>
     {!!error&&<Pressable onPress={()=>setError("")} style={s.errorBanner}><Text style={s.error}>{error}  ×</Text></Pressable>}
-    <View style={{flex:1}}>{tab==="home"?renderHome():tab==="employees"?renderEmployees():tab==="tasks"?renderTasks():tab==="meetings"?renderMeetings():renderNotices()}</View>
-    <View style={s.tabbar}>{([{id:"home",label:"الرئيسية"},{id:"employees",label:"الموظفون"},{id:"tasks",label:"المهام"},{id:"meetings",label:"الاجتماعات"},{id:"notices",label:"الإشعارات"}] as {id:Tab;label:string}[]).map(x=><Pressable key={x.id} onPress={()=>setTab(x.id)} style={[s.tab,tab===x.id&&s.activeTab]}><Text style={[s.tabText,tab===x.id&&s.activeTabText]}>{x.label}</Text></Pressable>)}</View>
+    <View style={{flex:1}}>{tab==="home"?renderHome():tab==="employees"?renderEmployees():tab==="tasks"?renderTasks():tab==="meetings"?renderMeetings():tab==="notices"?renderNotices():renderSettings()}</View>
+    <View style={s.tabbar}>{([{id:"home",label:"الرئيسية"},{id:"employees",label:"الموظفون"},{id:"tasks",label:"المهام"},{id:"meetings",label:"الاجتماعات"},{id:"notices",label:"الإشعارات"},{id:"settings",label:"الإعدادات"}] as {id:Tab;label:string}[]).map(x=><Pressable key={x.id} onPress={()=>setTab(x.id)} style={[s.tab,tab===x.id&&s.activeTab]}><Text style={[s.tabText,tab===x.id&&s.activeTabText]}>{x.label}</Text></Pressable>)}</View>
   </SafeAreaView>;
 }
 
