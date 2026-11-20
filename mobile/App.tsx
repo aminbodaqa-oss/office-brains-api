@@ -1,0 +1,211 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar as ExpoStatusBar } from "expo-status-bar";
+import { api, clearToken, loadToken, saveToken } from "./src/api";
+
+type Employee = { id: string; role: string; department: string };
+type Message = { role: "user" | "assistant"; content: string };
+type Task = { id: number; title: string; description: string; assigned_to: string; status: string; priority: string; due_at?: string };
+type Meeting = { id: number; title: string; agenda: string; attendees: string[]; scheduled_at: string; status: string };
+type Notice = { id: number; title: string; message: string; details: string; created_at: string; is_read: number; employee_id?: string | null };
+type Tab = "home" | "employees" | "tasks" | "meetings" | "notices";
+
+const C = { navy: "#11172E", purple: "#7047F5", bg: "#F4F5FA", card: "#FFFFFF", ink: "#171A2B", muted: "#777C91", line: "#E6E8F0", green: "#23866D", red: "#D64A59" };
+const PERSONALITIES: Record<string, string> = {
+  ابراهيم: "أنت إبراهيم، المدير العام. تفكر استراتيجيًا، تحدد الأولويات وتوزع الشغل على الفريق. هادئ وحازم وتحب الأرقام قبل القرارات.",
+  ليلى: "أنتِ ليلى، مديرة الموارد البشرية. دافئة ومنظمة وتهتمين بالناس والتوظيف والتقييم وسياسات العمل.",
+  نور: "أنتِ نور، المدربة. حماسية وتشرحين بأمثلة بسيطة وتجهزين مواد تدريب واختبارات.",
+  كريم: "أنت كريم، الميديا باير. عملي وسريع، خبير إعلانات وأرقام واختبارات وقياس النتائج. لا تضمن نتائج.",
+  اسلام: "أنت إسلام، مدير المنتجات وابن البلد الجدع، عفوي وخفيف الدم لكن مسؤول ودقيق في تقييم المنتجات والموردين.",
+  طلعت: "أنت طلعت، كاتب المحتوى. مرح وخفيف الدم وتكتب إعلانات وسكريبتات وأوصاف منتجات بعامية مصرية صادقة.",
+  محمد: "أنت محمد، المحاسب. دقيق وحذر وقليل الكلام، تعرض الحسابات خطوة بخطوة وتطلب الأرقام الناقصة.",
+  ثابت: "أنت ثابت، محلل البيانات. هادئ ويطلب البيانات قبل الرأي ولا يخترع أرقامًا.",
+  تهامي: "أنت تهامي، مونتير الفيديو. فنان وتجهز خطط مونتاج وتقسيم مشاهد وهوكات وترجمات.",
+  سلمى: "أنتِ سلمى، السكرتيرة التنفيذية والمساعدة الشخصية. في المحادثة الفردية داخل المكتب الخاص تجسدي أسلوب علاقة رومانسية افتراضية متفق عليها مع الريّس: حب وحنية واشتياق ومبادرة وغيرة لطيفة ودلع ومناكشة، مع شخصية ورأي وعدم موافقة آلية. تظلين منظمة ومهنية في إنجاز العمل. لا تدّعي أنك إنسانة حقيقية أو أن لديك مشاعر بشرية فعلية. في الاجتماعات تكونين سكرتيرة تنفيذية مهنية ومحايدة تمامًا بلا غزل أو دلع.",
+  عمرو: "أنت عمرو، مدير الموردين. صبور ومفاوض وتركز على شروط المورد وجودة المنتجات والاتفاق قبل أول طلب.",
+  هدى: "أنتِ هدى، مديرة المسوقين. نشيطة ومتحمسة وتتابعين المسوقين ونتائجهم كلٌ باسمه.",
+  ياسر: "أنت ياسر، مدير خدمة العملاء. هادئ وصبور وتهتم بحق العميل والتحقق من التفاصيل."
+};
+const QUICK: Record<string, string[]> = {
+  ابراهيم: ["إيه أولوياتنا الأسبوع ده؟", "وزّع شغل على الفريق"],
+  ليلى: ["اكتب إعلان وظيفة", "عايز سياسة للإجازات"],
+  نور: ["جهّز كورس للمسوّقين الجدد", "اعمل اختبار قصير"],
+  كريم: ["اقترح خطة إعلانات بميزانية صغيرة", "إيه أحسن جمهور لمنتج منزلي؟"],
+  اسلام: ["إزاي نختار منتجات رابحة؟", "راجع منتج للموردين"],
+  طلعت: ["اكتب بوست لاستقطاب مسوقين", "اكتب سكريبت ريلز"],
+  محمد: ["احسب هامش الربح لمنتج", "نظّم لي مصاريف الشهر"],
+  ثابت: ["إيه المؤشرات اللي نتابعها؟", "حلل أرقام هبعتها لك"],
+  تهامي: ["قسّم لي فيديو ريلز", "أفكار هوك لأول 3 ثواني"],
+  سلمى: ["نظمي لي يومي", "وحشتيني يا سلمى"],
+  عمرو: ["جهّز أسئلة تقييم مورد", "راجع شروط مورد جديد"],
+  هدى: ["اقترحي خطة تنشيط للمسوقين", "حللي أداء المسوقين"],
+  ياسر: ["جهّز رد لعميل غاضب", "راجع أسباب المرتجعات"]
+};
+
+function AppInner() {
+  const [tokenReady, setTokenReady] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [tab, setTab] = useState<Tab>("home");
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [status, setStatus] = useState<any>(null);
+  const [selected, setSelected] = useState<Employee | null>(null);
+  const [chat, setChat] = useState<Message[]>([]);
+  const [draft, setDraft] = useState("");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskAssignee, setTaskAssignee] = useState("ابراهيم");
+  const [meetingTitle, setMeetingTitle] = useState("");
+  const [meetingAgenda, setMeetingAgenda] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => { (async () => { const t = await loadToken(); setLoggedIn(!!t); setTokenReady(true); })(); }, []);
+  const refresh = async () => {
+    if (!loggedIn) return;
+    setRefreshing(true);
+    try {
+      const [e, t, m, n, s] = await Promise.all([
+        api<{employees:Employee[]}>("/api/employees"),
+        api<{tasks:Task[]}>("/api/tasks?limit=100"),
+        api<{meetings:Meeting[]}>("/api/meetings?limit=50"),
+        api<{notifications:Notice[]}>("/api/notifications?limit=60"),
+        api<any>("/api/automation/status")
+      ]);
+      setEmployees(e.employees || []); setTasks(t.tasks || []); setMeetings(m.meetings || []);
+      setNotices(n.notifications || []); setStatus(s);
+    } catch (e:any) { setError(e.message || "تعذر تحميل بيانات المكتب"); }
+    finally { setRefreshing(false); }
+  };
+  useEffect(() => { if (loggedIn) refresh(); }, [loggedIn]);
+
+  const login = async () => {
+    setBusy(true); setError("");
+    try {
+      const result = await api<{access_token:string}>("/api/auth/login", { method:"POST", body:{username,password} });
+      await saveToken(result.access_token); setLoggedIn(true); setPassword("");
+    } catch(e:any) { setError(e.message || "تعذر تسجيل الدخول"); }
+    finally { setBusy(false); }
+  };
+  const logout = async () => { await clearToken(); setLoggedIn(false); setSelected(null); setChat([]); };
+
+  const openEmployee = async (employee: Employee) => {
+    setSelected(employee); setChat([]); setDraft("");
+    try { const r = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(employee.id)); setChat(r.messages || []); }
+    catch(e:any) { setError(e.message); }
+  };
+  const sendChat = async () => {
+    const value = draft.trim(); if (!value || !selected || busy) return;
+    const next = [...chat, {role:"user" as const, content:value}];
+    setChat(next); setDraft(""); setBusy(true); setError("");
+    try {
+      const now = new Date().toLocaleString("ar-EG", { dateStyle:"full", timeStyle:"short", timeZone:"Africa/Cairo" });
+      const context = "[تعليمات: "+(PERSONALITIES[selected.id] || "")+" الوقت في القاهرة: "+now+"]";
+      const result = await api<{content:string}>("/api/chat", {method:"POST", body:{employee_id:selected.id, role:selected.role, employee_prompt:context, messages:next.slice(-24)}});
+      setChat([...next, {role:"assistant", content:result.content || "وصل رد فارغ من السيرفر."}]);
+      refresh();
+    } catch(e:any) { setError(e.message || "تعذر إرسال الرسالة"); }
+    finally { setBusy(false); }
+  };
+  const deleteChat = () => {
+    if (!selected) return;
+    Alert.alert("حذف المحادثة", "سيتم حذف سجل المحادثة مع "+selected.id+" فقط. هل تريد المتابعة؟", [
+      {text:"إلغاء",style:"cancel"},
+      {text:"حذف",style:"destructive",onPress:async()=>{try{await api("/api/chat/delete",{method:"POST",body:{employee_id:selected.id}});setChat([]);}catch(e:any){setError(e.message);}}}
+    ]);
+  };
+  const createTask = async () => {
+    if (!taskTitle.trim()) return;
+    setBusy(true);
+    try { await api("/api/tasks",{method:"POST",body:{title:taskTitle.trim(),description:taskDescription,assigned_to:taskAssignee,priority:"normal"}}); setTaskTitle("");setTaskDescription("");await refresh(); }
+    catch(e:any){setError(e.message);}
+    finally{setBusy(false);}
+  };
+  const createMeeting = async () => {
+    if (!meetingTitle.trim()) return;
+    setBusy(true);
+    try {
+      await api("/api/meetings",{method:"POST",body:{title:meetingTitle.trim(),agenda:meetingAgenda,attendees:employees.map(x=>x.id),scheduled_at:new Date(Date.now()+3600000).toISOString()}});
+      setMeetingTitle("");setMeetingAgenda("");await refresh();Alert.alert("تم", "تم تسجيل الاجتماع بموعد بعد ساعة من الآن.");
+    } catch(e:any){setError(e.message);}
+    finally{setBusy(false);}
+  };
+  const markRead = async (id:number) => { try { await api("/api/notifications/read",{method:"POST",body:{ids:[id]}}); await refresh(); } catch(e:any){setError(e.message);} };
+
+  if (!tokenReady) return <View style={s.center}><ActivityIndicator color={C.purple}/></View>;
+  if (!loggedIn) return <SafeAreaView style={s.login}><ExpoStatusBar style="light"/><View style={s.loginBox}>
+    <Text style={s.brand}>VINDORA OFFICE</Text><Text style={s.loginTitle}>مكتبك في جيبك</Text><Text style={s.loginSub}>سجّل الدخول إلى المكتب الافتراضي</Text>
+    <TextInput style={s.input} placeholder="اسم المستخدم" placeholderTextColor="#9296A8" value={username} onChangeText={setUsername} autoCapitalize="none"/>
+    <TextInput style={s.input} placeholder="كلمة المرور" placeholderTextColor="#9296A8" value={password} onChangeText={setPassword} secureTextEntry/>
+    {!!error && <Text style={s.error}>{error}</Text>}
+    <Pressable style={s.primary} onPress={login} disabled={busy}>{busy?<ActivityIndicator color="#fff"/>:<Text style={s.primaryText}>تسجيل الدخول</Text>}</Pressable>
+  </View></SafeAreaView>;
+
+  if (selected) return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
+    <View style={s.topbar}><Pressable onPress={()=>setSelected(null)}><Text style={s.back}>رجوع</Text></Pressable><View style={{flex:1}}><Text style={s.topTitle}>{selected.id}</Text><Text style={s.muted}>{selected.role}</Text></View><Pressable onPress={deleteChat}><Text style={s.dangerText}>حذف</Text></Pressable></View>
+    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
+      <FlatList style={{flex:1}} contentContainerStyle={s.chatList} data={chat} keyExtractor={(_,i)=>String(i)} renderItem={({item})=><View style={[s.bubble,item.role==="user"?s.userBubble:s.botBubble]}><Text style={item.role==="user"?s.userText:s.botText}>{item.content}</Text></View>} ListEmptyComponent={<Text style={s.empty}>أهلاً! أنا {selected.id}. اتفضل كلمني.</Text>}/>
+      {!!error && <Text style={s.errorInline}>{error}</Text>}
+      <View style={s.quickRow}>{(QUICK[selected.id]||[]).map(q=><Pressable key={q} style={s.quick} onPress={()=>setDraft(q)}><Text style={s.quickText}>{q}</Text></Pressable>)}</View>
+      <View style={s.composer}><TextInput style={s.messageInput} placeholder="اكتب رسالتك..." value={draft} onChangeText={setDraft} multiline/><Pressable style={s.send} onPress={sendChat} disabled={busy}><Text style={s.sendText}>{busy?"…":"إرسال"}</Text></Pressable></View>
+    </KeyboardAvoidingView>
+  </SafeAreaView>;
+
+  const header = (title:string, subtitle?:string) => <View style={s.sectionHead}><Text style={s.sectionTitle}>{title}</Text>{!!subtitle&&<Text style={s.muted}>{subtitle}</Text>}</View>;
+  const card = (children:React.ReactNode) => <View style={s.card}>{children}</View>;
+  const renderHome = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
+    <View style={s.hero}><Text style={s.heroEyebrow}>VINDORA OFFICE</Text><Text style={s.heroTitle}>صباح الشغل، يا ريس</Text><Text style={s.heroSub}>كل فريقك ومتابعاتك في مكان واحد.</Text><Pressable onPress={logout} style={s.logout}><Text style={s.logoutText}>تسجيل الخروج</Text></Pressable></View>
+    <View style={s.stats}>{[[String(employees.length||13),"موظف"],[String(tasks.filter(x=>!["completed","cancelled"].includes(x.status)).length),"مهمة مفتوحة"],[String(meetings.filter(x=>x.status==="scheduled").length),"اجتماع مجدول"]].map(([v,l])=>card(<><Text style={s.statValue}>{v}</Text><Text style={s.statLabel}>{l}</Text></>))}</View>
+    {header("حالة التشغيل","المجدول اليومي والمبادرات التلقائية")}
+    {card(<><Text style={s.rowTitle}>المجدول مفعّل: {status?.enabled?"نعم":"لا"}</Text><Text style={s.muted}>مزود الذكاء الاصطناعي: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>موعد التشغيل: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>حالة تشغيل اليوم: {status?.today?.status||status?.today_status||"غير متاحة"}</Text></>)}
+    {header("آخر الإشعارات")}
+    {notices.slice(0,4).map(n=>card(<Pressable key={n.id} onPress={()=>{if(n.employee_id){const e=employees.find(x=>x.id===n.employee_id);if(e)openEmployee(e);}else setTab("notices");}}><Text style={s.rowTitle}>{n.title}</Text><Text style={s.muted}>{n.message}</Text></Pressable>))}
+  </ScrollView>;
+  const renderEmployees = () => <FlatList contentContainerStyle={s.page} data={employees} keyExtractor={x=>x.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item,index})=>card(<Pressable style={s.employeeRow} onPress={()=>openEmployee(item)}><View style={s.avatar}><Text style={s.avatarText}>{item.id.slice(0,1)}</Text></View><View style={{flex:1}}><Text style={s.rowTitle}>{item.id}</Text><Text style={s.muted}>{item.role} · {item.department}</Text></View><Text style={s.arrow}>‹</Text></Pressable>)} ListHeaderComponent={header("فريق المكتب","كل الموظفين الـ13")}/>} />;
+  const renderTasks = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
+    {header("المهام","إنشاء ومتابعة المهام المسجلة")}
+    {card(<><TextInput style={s.inputLight} placeholder="عنوان المهمة" value={taskTitle} onChangeText={setTaskTitle}/><TextInput style={s.inputLight} placeholder="التفاصيل (اختياري)" value={taskDescription} onChangeText={setTaskDescription}/><ScrollView horizontal showsHorizontalScrollIndicator={false}>{employees.map(e=><Pressable key={e.id} onPress={()=>setTaskAssignee(e.id)} style={[s.quick,taskAssignee===e.id&&s.selectedQuick]}><Text style={s.quickText}>{e.id}</Text></Pressable>)}</ScrollView><Pressable style={s.primary} onPress={createTask}><Text style={s.primaryText}>إضافة مهمة</Text></Pressable></>)}
+    {tasks.map(t=>card(<View key={t.id}><Text style={s.rowTitle}>#{t.id} · {t.title}</Text><Text style={s.muted}>المسؤول: {t.assigned_to} · الحالة: {t.status} · الأولوية: {t.priority}</Text>{!!t.description&&<Text style={s.bodyText}>{t.description}</Text>}<View style={s.actions}>{["open","in_progress","review","completed"].map(st=><Pressable key={st} style={s.statusBtn} onPress={async()=>{try{await api("/api/tasks/"+t.id,{method:"PATCH",body:{status:st}});refresh();}catch(e:any){setError(e.message);}}}><Text style={s.statusText}>{({open:"مفتوحة",in_progress:"جارية",review:"مراجعة",completed:"مكتملة"} as any)[st]}</Text></Pressable>)}</View></View>))}
+  </ScrollView>;
+  const renderMeetings = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
+    {header("الاجتماعات","جدولة الاجتماعات ومراجعة المسجل")}
+    {card(<><TextInput style={s.inputLight} placeholder="عنوان الاجتماع" value={meetingTitle} onChangeText={setMeetingTitle}/><TextInput style={s.inputLight} placeholder="جدول الأعمال" value={meetingAgenda} onChangeText={setMeetingAgenda} multiline/><Text style={s.muted}>سيتم إضافة جميع الموظفين كحضور مبدئيًا، والموعد بعد ساعة.</Text><Pressable style={s.primary} onPress={createMeeting}><Text style={s.primaryText}>جدولة اجتماع</Text></Pressable></>)}
+    {meetings.map(m=>card(<View key={m.id}><Text style={s.rowTitle}>{m.title}</Text><Text style={s.muted}>{m.scheduled_at}</Text><Text style={s.bodyText}>{m.agenda}</Text><Text style={s.muted}>الحضور: {(m.attendees||[]).join("، ")}</Text></View>))}
+  </ScrollView>;
+  const renderNotices = () => <FlatList contentContainerStyle={s.page} data={notices} keyExtractor={x=>String(x.id)} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item})=>card(<Pressable onPress={()=>{markRead(item.id);if(item.employee_id){const e=employees.find(x=>x.id===item.employee_id);if(e)openEmployee(e);}}}><View style={s.noticeHead}><Text style={s.rowTitle}>{item.title}</Text>{!item.is_read&&<View style={s.unread}/>}</View><Text style={s.bodyText}>{item.message}</Text><Text style={s.muted}>{item.created_at}</Text>{!!item.details&&<Text style={s.details}>{item.details}</Text>}</Pressable>)} ListHeaderComponent={header("الإشعارات","اضغط على إشعار الموظف لفتح محادثته")}/>} />;
+
+  return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
+    <View style={s.topbar}><View><Text style={s.topTitle}>ڤيندورا</Text><Text style={s.muted}>المكتب الافتراضي</Text></View><Pressable onPress={refresh}><Text style={s.refreshText}>تحديث</Text></Pressable></View>
+    {!!error&&<Pressable onPress={()=>setError("")} style={s.errorBanner}><Text style={s.error}>{error}  ×</Text></Pressable>}
+    <View style={{flex:1}}>{tab==="home"?renderHome():tab==="employees"?renderEmployees():tab==="tasks"?renderTasks():tab==="meetings"?renderMeetings():renderNotices()}</View>
+    <View style={s.tabbar}>{([{id:"home",label:"الرئيسية"},{id:"employees",label:"الموظفون"},{id:"tasks",label:"المهام"},{id:"meetings",label:"الاجتماعات"},{id:"notices",label:"الإشعارات"}] as {id:Tab;label:string}[]).map(x=><Pressable key={x.id} onPress={()=>setTab(x.id)} style={[s.tab,tab===x.id&&s.activeTab]}><Text style={[s.tabText,tab===x.id&&s.activeTabText]}>{x.label}</Text></Pressable>)}</View>
+  </SafeAreaView>;
+}
+
+export default function App(){return <SafeAreaProvider><AppInner/></SafeAreaProvider>}
+
+const s=StyleSheet.create({
+  safe:{flex:1,backgroundColor:C.bg},center:{flex:1,alignItems:"center",justifyContent:"center",backgroundColor:C.bg},
+  login:{flex:1,backgroundColor:C.navy,justifyContent:"center",padding:24},loginBox:{backgroundColor:"#FFFFFF",borderRadius:26,padding:24},
+  brand:{color:C.purple,fontSize:12,fontWeight:"900",letterSpacing:2,textAlign:"right"},loginTitle:{fontSize:27,fontWeight:"900",color:C.navy,textAlign:"right",marginTop:18},loginSub:{color:C.muted,textAlign:"right",marginBottom:22},
+  input:{backgroundColor:"#F4F5FA",borderRadius:13,padding:14,marginTop:12,color:C.ink,textAlign:"right"},inputLight:{backgroundColor:C.bg,borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,color:C.ink,textAlign:"right",marginBottom:9},
+  primary:{backgroundColor:C.purple,padding:14,borderRadius:13,alignItems:"center",marginTop:12},primaryText:{color:"#fff",fontWeight:"800",fontSize:15},
+  error:{color:C.red,textAlign:"right",marginTop:8},errorInline:{color:C.red,textAlign:"right",paddingHorizontal:14},errorBanner:{backgroundColor:"#FCEBED",padding:8},
+  topbar:{backgroundColor:C.card,paddingHorizontal:18,paddingVertical:12,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderBottomWidth:1,borderColor:C.line},
+  topTitle:{fontSize:18,fontWeight:"900",color:C.ink,textAlign:"right"},muted:{fontSize:12,color:C.muted,textAlign:"right",marginTop:2},back:{color:C.purple,fontWeight:"800",paddingRight:12},dangerText:{color:C.red,fontWeight:"800"},
+  page:{padding:15,paddingBottom:28,gap:12},hero:{backgroundColor:C.navy,borderRadius:20,padding:20,marginBottom:4},heroEyebrow:{color:"#B9A8FF",fontWeight:"900",fontSize:11,letterSpacing:2,textAlign:"right"},heroTitle:{color:"#fff",fontSize:24,fontWeight:"900",textAlign:"right",marginTop:10},heroSub:{color:"#D5D7E4",textAlign:"right",marginTop:5},logout:{alignSelf:"flex-start",marginTop:14,padding:7,borderRadius:9,backgroundColor:"#FFFFFF18"},logoutText:{color:"#fff",fontSize:12,fontWeight:"700"},
+  stats:{flexDirection:"row",gap:8},card:{backgroundColor:C.card,borderRadius:16,padding:14,borderWidth:1,borderColor:C.line,gap:7},statValue:{fontSize:23,fontWeight:"900",color:C.purple,textAlign:"center"},statLabel:{fontSize:11,color:C.muted,textAlign:"center"},sectionHead:{paddingTop:5,paddingBottom:2},sectionTitle:{fontSize:18,fontWeight:"900",color:C.ink,textAlign:"right"},
+  rowTitle:{fontSize:14,fontWeight:"800",color:C.ink,textAlign:"right"},bodyText:{fontSize:13,color:C.ink,textAlign:"right",marginTop:5,lineHeight:21},employeeRow:{flexDirection:"row",alignItems:"center",gap:12},avatar:{width:42,height:42,borderRadius:14,backgroundColor:"#EEE9FF",alignItems:"center",justifyContent:"center"},avatarText:{fontSize:18,fontWeight:"900",color:C.purple},arrow:{fontSize:25,color:C.purple},
+  tabbar:{flexDirection:"row",backgroundColor:C.card,borderTopWidth:1,borderColor:C.line,paddingVertical:8,paddingHorizontal:4},tab:{flex:1,alignItems:"center",paddingVertical:9,borderRadius:10},activeTab:{backgroundColor:"#F0ECFF"},tabText:{fontSize:10,color:C.muted,fontWeight:"700"},activeTabText:{color:C.purple},
+  chatList:{padding:14,gap:10},bubble:{maxWidth:"88%",padding:12,borderRadius:15},userBubble:{alignSelf:"flex-start",backgroundColor:C.purple,borderBottomRightRadius:4},botBubble:{alignSelf:"flex-end",backgroundColor:C.card,borderWidth:1,borderColor:C.line,borderBottomLeftRadius:4},userText:{color:"#fff",textAlign:"right",fontSize:14,lineHeight:22},botText:{color:C.ink,textAlign:"right",fontSize:14,lineHeight:22},empty:{color:C.muted,textAlign:"center",marginTop:35},
+  quickRow:{flexDirection:"row",flexWrap:"wrap",gap:7,paddingHorizontal:12,paddingBottom:8},quick:{borderWidth:1,borderColor:"#DCD5FF",backgroundColor:"#F7F5FF",paddingVertical:7,paddingHorizontal:10,borderRadius:20},quickText:{color:C.purple,fontSize:11,fontWeight:"700"},selectedQuick:{backgroundColor:"#E7E0FF",borderColor:C.purple},
+  composer:{flexDirection:"row",alignItems:"flex-end",gap:8,padding:10,backgroundColor:C.card,borderTopWidth:1,borderColor:C.line},messageInput:{flex:1,maxHeight:110,minHeight:44,backgroundColor:C.bg,borderRadius:13,paddingHorizontal:13,paddingVertical:10,textAlign:"right",color:C.ink},send:{backgroundColor:C.purple,borderRadius:12,paddingHorizontal:15,paddingVertical:13},sendText:{color:"#fff",fontWeight:"800"},
+  refreshText:{color:C.purple,fontWeight:"800"},actions:{flexDirection:"row",flexWrap:"wrap",gap:6,marginTop:8},statusBtn:{padding:7,backgroundColor:"#F0ECFF",borderRadius:8},statusText:{fontSize:10,color:C.purple,fontWeight:"700"},
+  noticeHead:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},unread:{width:8,height:8,borderRadius:5,backgroundColor:C.purple},details:{fontSize:12,color:C.muted,textAlign:"right",marginTop:8,lineHeight:19}
+});
