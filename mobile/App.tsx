@@ -255,8 +255,8 @@ function AppInner() {
     if(!activeMeeting||!meetingLines.length)return;
     setMinutesBusy(true);setError("");
     try{
-      const transcript=meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n").slice(-4500);
-      const result=await api<{content:string}>("/api/secretary/briefing",{method:"POST",body:{message:"أعدّي محضرًا مختصرًا لهذا الاجتماع اعتمادًا على النص التالي فقط. استخرجي القرارات المؤكدة، المهام مع المسؤول والموعد إن ذُكر، والنقاط المفتوحة. لا تخترعي أي قرار أو موعد. عنوان الاجتماع: "+activeMeeting.title+"\\nجدول الأعمال: "+activeMeeting.agenda+"\\nنص الاجتماع:\\n"+transcript}});
+      const transcript=meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\n").slice(-4500);
+      const result=await api<{content:string}>("/api/secretary/briefing",{method:"POST",body:{message:"أعدّي محضرًا مختصرًا لهذا الاجتماع اعتمادًا على النص التالي فقط. استخرجي القرارات المؤكدة، المهام مع المسؤول والموعد إن ذُكر، والنقاط المفتوحة. لا تخترعي أي قرار أو موعد. عنوان الاجتماع: "+activeMeeting.title+"\nجدول الأعمال: "+activeMeeting.agenda+"\nنص الاجتماع:\n"+transcript}});
       const summary=result.content||"لم يصل محضر.";
       const savedMinutes=JSON.stringify({transcript:meetingLines,summary});
       await api("/api/meetings/"+activeMeeting.id,{method:"PATCH",body:{minutes:savedMinutes}});
