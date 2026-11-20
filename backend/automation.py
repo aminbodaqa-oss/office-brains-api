@@ -352,6 +352,10 @@ async def salma_proactive_loop() -> None:
             except (TypeError, json.JSONDecodeError):
                 continue
         overview = workflow_overview()
+        try:
+            company_context = await employee_context("ابراهيم", days=7)
+        except Exception:
+            company_context = "لا تتوفر بيانات تجارية خارجية إضافية في هذه اللحظة."
         task_lines = [
             f"#{t['id']} {t['title']} | المسؤول: {t['assigned_to']} | الحالة: {t['status']} | الموعد: {t.get('due_at') or 'غير محدد'}"
             for t in overview.get("tasks", [])[:12]
@@ -372,6 +376,7 @@ async def salma_proactive_loop() -> None:
             "الوقت الحالي في القاهرة: " + datetime.now(CAIRO).isoformat() +
             "\nالمهام المسجلة:\n" + ("\n".join(task_lines) or "لا توجد مهام مسجلة.") +
             "\nالاجتماعات المسجلة:\n" + ("\n".join(meeting_lines) or "لا توجد اجتماعات مسجلة.") +
+            "\nملخص بيانات الشركة المتاحة:\n" + (company_context or "لا توجد بيانات إضافية.") +
             "\nآخر سياق للمحادثة الخاصة:\n" + ("\n".join(recent_chat[-8:]) or "لا توجد محادثة سابقة متاحة.") +
             "\nقرري هل توجد مبادرة واحدة مناسبة الآن. لا ترسلي تقريرًا صباحيًا مكررًا."
         )
