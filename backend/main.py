@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
+from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
@@ -155,6 +155,10 @@ class NotificationReadRequest(BaseModel):
     ids: list[int] = Field(default_factory=list, max_length=100)
     all_read: bool = False
 
+class NotificationDeleteRequest(BaseModel):
+    ids: list[int] = Field(default_factory=list, max_length=100)
+    all_items: bool = False
+
 class NotificationEventRequest(BaseModel):
     event_type: str = Field(min_length=1, max_length=40)
     title: str = Field(min_length=1, max_length=180)
@@ -188,6 +192,10 @@ async def list_notifications(limit: int = 50, unread_only: bool = False, _: str 
 @app.post("/api/notifications/read")
 async def read_notifications(body: NotificationReadRequest, _: str = Depends(require_owner)):
     return {"updated": mark_notifications_read(body.ids, body.all_read)}
+
+@app.post("/api/notifications/delete")
+async def delete_notification_items(body: NotificationDeleteRequest, _: str = Depends(require_owner)):
+    return {"deleted": delete_notifications(body.ids, body.all_items)}
 
 @app.post("/api/notifications/event")
 async def create_notification_event(body: NotificationEventRequest, _: str = Depends(require_owner)):
