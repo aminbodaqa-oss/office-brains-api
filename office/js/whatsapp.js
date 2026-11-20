@@ -114,8 +114,11 @@
     const content = $("waWebInput").value.trim(); if (!content || !selected) return;
     const send = $("waWebSend"); send.disabled = true;
     try {
-      await request("/api/whatsapp/send", {method:"POST",body:JSON.stringify({sender_id:"المالك",recipient_id:selected.id,content})});
-      $("waWebInput").value = ""; await loadThread(); status("تم إرسال الرسالة وحفظها.");
+      const result = await request("/api/whatsapp/send", {method:"POST",body:JSON.stringify({sender_id:"المالك",recipient_id:selected.id,content})});
+      $("waWebInput").value = ""; await loadThread();
+      if (result.reply_generated) status("تم إرسال الرسالة ووصل رد " + selected.id + ".");
+      else if (result.reply_error) status("الرسالة وصلت، لكن تعذر توليد الرد: " + result.reply_error);
+      else status("تم إرسال الرسالة وحفظها.");
     } catch (error) { status(error.message); }
     finally { send.disabled = !selected; }
   });
