@@ -181,9 +181,15 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     if body.employee_id not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     memories = get_memories(body.employee_id, 12)
+    assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
     system = "أنت موظف افتراضي متخصص داخل مكتب. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
     if memories:
         system += "\nذكريات محفوظة لهذا الموظف:\n" + "\n".join("- " + m["content"] for m in reversed(memories))
+    if assigned_tasks:
+        system += "\n\nالمهام المسجلة باسمك في نظام المكتب (هذه هي الحالة الفعلية المحفوظة):\n" + "\n".join(
+            f"- #{task['id']} {task['title']} | الحالة: {task['status']} | الأولوية: {task['priority']} | الموعد: {task.get('due_at') or 'غير محدد'} | التفاصيل: {task['description']}"
+            for task in assigned_tasks
+        ) + "\nلا تقل إنك أنجزت مهمة أو غيرت حالتها إلا إذا تم تحديث سجلها فعليًا من النظام."
     try:
         system += await employee_context(body.employee_id)
         content = await employee_reply(system, [m.model_dump() for m in body.messages])
@@ -237,7 +243,7 @@ async def post_task(body: TaskCreateRequest, _: str = Depends(require_owner)):
         raise HTTPException(status_code=400, detail="درجة أولوية غير صحيحة.")
     task = create_task(body.title, body.description, body.assigned_to, "الريّس",
                        body.priority, body.due_at, "owner")
-    add_notification("task_created", "مهمة جديدة لسلمى/الفريق",
+    add_notification("task_created", "مهمة جديدة في المكتب",
         "تم تسجيل مهمة وتكليف " + body.assigned_to + ".", 
         "المهمة: " + body.title + "\nالأولوية: " + body.priority + "\nالموعد: " + (body.due_at or "غير محدد"))
     return {"saved": True, "task": task}
