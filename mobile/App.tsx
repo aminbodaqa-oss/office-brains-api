@@ -196,7 +196,7 @@ function AppInner() {
   };
   const endMeeting = async () => {
     if (!activeMeeting) return;
-    const transcript = meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n\\n");
+    const transcript = meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n\\n").slice(-11000);
     try {
       await api("/api/notifications/event",{method:"POST",body:{
         event_type:"meeting_ended",title:"انتهى الاجتماع: "+activeMeeting.title,
@@ -221,8 +221,7 @@ function AppInner() {
     try {
       for(const employee of recipients){
         const instruction="أنت "+employee.id+" في اجتماع عمل رسمي داخل Vindora. هذا اجتماع وليس محادثة خاصة. التزم بشخصيتك المهنية وتخصصك فقط، ولا تستخدم غزلًا أو دلعًا أو سياقًا عاطفيًا حتى لو كنت سلمى. "+(addressed?"الريّس وجّه الكلام لك بالاسم. أنت وحدك المطلوب منك الرد الآن.":"الريّس طرح نقطة عامة على الحاضرين. أضف مساهمة واحدة قصيرة من زاوية تخصصك، ولا تكرر كلام الآخرين ولا تعلن قرارًا نهائيًا ولا تنه الاجتماع.")+" رد بالعامية المصرية في 1-3 جمل. لا تخترع بيانات أو نتائج. جدول الأعمال: "+activeMeeting.agenda;
-        const prior=updated.slice(-16).map(x=>({role:x.owner?"user":"assistant",content:(x.owner?"الريّس":x.speaker)+": "+x.content}));
-        const transcript=updated.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n");
+        const transcript=updated.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n").slice(-4500);
         const now=new Date().toLocaleString("ar-EG",{dateStyle:"full",timeStyle:"short",timeZone:"Africa/Cairo"});
         const result=await api<{content:string}>("/api/meeting/respond",{method:"POST",body:{employee_id:employee.id,role:employee.role,employee_prompt:PERSONALITIES[employee.id]||"",personality:PERS_DETAILS[employee.id]||"",company_context:COMPANY_CONTEXT,rules:instruction,time:now,transcript,instruction}});
         updated.push({speaker:employee.id,content:result.content||"لم يصل رد."});
@@ -236,7 +235,7 @@ function AppInner() {
     if(!activeMeeting||!meetingLines.length)return;
     setMinutesBusy(true);setError("");
     try{
-      const transcript=meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n");
+      const transcript=meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n").slice(-4500);
       const result=await api<{content:string}>("/api/secretary/briefing",{method:"POST",body:{message:"أعدّي محضرًا مختصرًا لهذا الاجتماع اعتمادًا على النص التالي فقط. استخرجي القرارات المؤكدة، المهام مع المسؤول والموعد إن ذُكر، والنقاط المفتوحة. لا تخترعي أي قرار أو موعد. عنوان الاجتماع: "+activeMeeting.title+"\\nجدول الأعمال: "+activeMeeting.agenda+"\\nنص الاجتماع:\\n"+transcript}});
       setMeetingLines(v=>[...v,{speaker:"سلمى — محضر الاجتماع",content:result.content||"لم يصل محضر."}]);
     }catch(e:any){setError(e.message||"تعذر إعداد المحضر");}
