@@ -8,6 +8,8 @@ from employees import EMPLOYEES, EMPLOYEE_IDS
 
 # Clearly fictional, non-dialable extensions: these are not telephone numbers.
 def virtual_number(employee_id: str) -> str:
+    if employee_id == "المالك":
+        return "VO-000"
     ids = [item["id"] for item in EMPLOYEES]
     if employee_id not in ids:
         raise ValueError("الموظف غير موجود.")
@@ -31,7 +33,7 @@ def whatsapp_contacts() -> list[dict[str, str]]:
              "virtual_number": virtual_number(item["id"])} for item in EMPLOYEES]
 
 def send_whatsapp_message(sender_id: str, recipient_id: str, content: str) -> dict[str, Any]:
-    if sender_id not in EMPLOYEE_IDS or recipient_id not in EMPLOYEE_IDS:
+    if sender_id not in EMPLOYEE_IDS | {"المالك"} or recipient_id not in EMPLOYEE_IDS:
         raise ValueError("اسم الموظف غير موجود.")
     if sender_id == recipient_id:
         raise ValueError("لا يمكن مراسلة نفسك.")
@@ -47,7 +49,7 @@ def send_whatsapp_message(sender_id: str, recipient_id: str, content: str) -> di
     return dict(row)
 
 def list_whatsapp_messages(employee_id: str, peer_id: str, limit: int = 100) -> list[dict[str, Any]]:
-    if employee_id not in EMPLOYEE_IDS or peer_id not in EMPLOYEE_IDS:
+    if employee_id not in EMPLOYEE_IDS | {"المالك"} or peer_id not in EMPLOYEE_IDS:
         raise ValueError("اسم الموظف غير موجود.")
     limit = max(1, min(int(limit), 200))
     with _connect() as conn:
