@@ -230,6 +230,9 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
         employee = next((item for item in EMPLOYEES if item["id"] == body.recipient_id), None)
         if employee:
             try:
+                if PROVIDER == "demo":
+                    result["reply_error"] = "محرك الذكاء الاصطناعي مضبوط على وضع التجربة وليس على مزود ردود فعلي."
+                    return result
                 thread = list_whatsapp_messages("المالك", body.recipient_id, 14)
                 history = [
                     {"role": "assistant" if item["sender_id"] == body.recipient_id else "user",
