@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { api, clearToken, loadToken, saveToken } from "./src/api";
+
+Notifications.setNotificationHandler({handleNotification: async () => ({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false})});
 
 type Employee = { id: string; role: string; department: string };
 type Message = { role: "user" | "assistant"; content: string };
@@ -77,6 +81,7 @@ function AppInner() {
   const [reports, setReports] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [briefingBusy, setBriefingBusy] = useState(false);
+  const [pushStatus, setPushStatus] = useState("لم يتم فحص إعداد الإشعارات");
   const [selected, setSelected] = useState<Employee | null>(null);
   const [memories, setMemories] = useState<any[]>([]);
   const [memoryDraft, setMemoryDraft] = useState("");
@@ -150,6 +155,40 @@ function AppInner() {
       Alert.alert("تم","تم تغيير كلمة المرور بنجاح.");
     }catch(e:any){setError(e.message||"تعذر تغيير كلمة المرور");}
   };
+  const registerPushNotifications = async () => {
+    if (Platform.OS !== "android") return;
+    const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) { setPushStatus("تحتاج ربط مشروع EAS أولًا"); return; }
+    try {
+      await Notifications.setNotificationChannelAsync("office-updates", {
+        name: "تحديثات المكتب",
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: C.purple,
+      });
+      let permission = await Notifications.getPermissionsAsync();
+      if (permission.status !== "granted") permission = await Notifications.requestPermissionsAsync();
+      if (permission.status !== "granted") { setPushStatus("إذن الإشعارات غير مفعّل"); return; }
+      const tokenResult = await Notifications.getExpoPushTokenAsync({projectId});
+      await api("/api/push/register", {method:"POST",body:{token:tokenResult.data,platform:"android",device_id:Constants.installationId || "android-device"}});
+      setPushStatus("الإشعارات الفورية مفعّلة");
+    } catch (e:any) {
+      setPushStatus("تعذر تفعيل الإشعارات الفورية");
+      setError(e.message || "تعذر تسجيل جهاز الإشعارات");
+    }
+  };
+  useEffect(() => { if (loggedIn) registerPushNotifications(); }, [loggedIn]);
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const employeeId = String(response.notification.request.content.data?.employee_id || "");
+      if (employeeId) {
+        const employee = employees.find(item => item.id === employeeId);
+        if (employee) { setTab("employees"); openEmployee(employee); return; }
+      }
+      setTab("notices");
+    });
+    return () => subscription.remove();
+  }, [employees]);
   const openEmployee = async (employee: Employee) => {
     setSelected(employee); setChat([]); setDraft(""); setShowMemories(false); setMemories([]); loadMemories(employee.id);
     try { const r = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(employee.id)); setChat(r.messages || []); }
