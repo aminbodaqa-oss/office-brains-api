@@ -49,14 +49,40 @@ def init_db() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT, event_type TEXT NOT NULL,
             title TEXT NOT NULL, message TEXT NOT NULL, details TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL, is_read INTEGER NOT NULL DEFAULT 0)""")
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(notifications)").fetchall()}
+        if "employee_id" not in columns:
+            conn.execute("ALTER TABLE notifications ADD COLUMN employee_id TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_employee ON notifications(employee_id,created_at DESC)")
 
 def delete_chat_interactions(employee_id: str) -> int:
     with _connect() as conn:
         cur = conn.execute(
-            "DELETE FROM interactions WHERE employee_id=? AND interaction_type='chat'",
+            "DELETE FROM interactions WHERE employee_id=? AND interaction_type IN ('chat','proactive_chat')",
             (employee_id,))
         return int(cur.rowcount)
+
+
+def get_chat_history(employee_id: str, limit: int = 100) -> list[dict[str, str]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT payload FROM interactions WHERE employee_id=? AND interaction_type IN ('chat','proactive_chat') ORDER BY id DESC LIMIT ?",
+            (employee_id, max(1, min(int(limit), 200))),
+        ).fetchall()
+    messages: list[dict[str, str]] = []
+    for row in reversed(rows):
+        try:
+            payload = json.loads(row["payload"])
+        except (TypeError, json.JSONDecodeError):
+            continue
+        history = payload.get("messages") or []
+        last_user = next((item for item in reversed(history) if item.get("role") == "user"), None)
+        if last_user and last_user.get("content"):
+            messages.append({"role": "user", "content": str(last_user["content"])})
+        response = payload.get("response")
+        if response:
+            messages.append({"role": "assistant", "content": str(response)})
+    return messages[-200:]
 
 
 def log_interaction(employee_id: str, interaction_type: str, payload: dict[str, Any]) -> None:
@@ -77,12 +103,13 @@ def get_memories(employee_id: str, limit: int = 20) -> list[dict[str, Any]]:
     return [{"id": r["id"], "content": r["content"], "tags": json.loads(r["tags"]), "created_at": r["created_at"]} for r in rows]
 
 
-def add_notification(event_type: str, title: str, message: str, details: str = "") -> int:
+def add_notification(event_type: str, title: str, message: str, details: str = "",
+                    employee_id: str | None = None) -> int:
     with _connect() as conn:
         cur = conn.execute(
-            "INSERT INTO notifications(event_type,title,message,details,created_at,is_read) VALUES(?,?,?,?,?,0)",
+            "INSERT INTO notifications(event_type,title,message,details,created_at,is_read,employee_id) VALUES(?,?,?,?,?,0,?)",
             (event_type[:40], title[:180], message[:1000], details[:12000],
-             datetime.now(timezone.utc).isoformat()))
+             datetime.now(timezone.utc).isoformat(), employee_id))
         return int(cur.lastrowid)
 
 def get_notifications(limit: int = 50, unread_only: bool = False) -> dict[str, Any]:
@@ -90,7 +117,7 @@ def get_notifications(limit: int = 50, unread_only: bool = False) -> dict[str, A
     with _connect() as conn:
         where = "WHERE is_read=0" if unread_only else ""
         rows = conn.execute(
-            f"SELECT id,event_type,title,message,details,created_at,is_read FROM notifications {where} ORDER BY id DESC LIMIT ?",
+            f"SELECT id,event_type,title,message,details,created_at,is_read,employee_id FROM notifications {where} ORDER BY id DESC LIMIT ?",
             (limit,)).fetchall()
         unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE is_read=0").fetchone()[0]
     return {"notifications": [dict(r) for r in rows], "unread_count": int(unread)}
