@@ -12,12 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash
+from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
+from push import push_delivery_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db)
 
 @asynccontextmanager
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
     init_workflow_db()
     scheduler_task = None
     proactive_task = None
+    push_task = asyncio.create_task(push_delivery_loop())
     if os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
         scheduler_task = asyncio.create_task(scheduler_loop())
         if PROVIDER != "demo":
@@ -34,7 +36,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        for task in (scheduler_task, proactive_task):
+        for task in (scheduler_task, proactive_task, push_task):
             if task:
                 task.cancel()
                 try:
@@ -144,6 +146,11 @@ class MeetingUpdateRequest(BaseModel):
 class SecretaryRequest(BaseModel):
     message: str = Field(default="نظمي لي يومي ووريني أهم المهام والمواعيد اللي محتاجة متابعة.", max_length=6000)
 
+class PushDeviceRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=255)
+    platform: Literal["android"] = "android"
+    device_id: str = Field(default="", max_length=128)
+
 class NotificationReadRequest(BaseModel):
     ids: list[int] = Field(default_factory=list, max_length=100)
     all_read: bool = False
@@ -186,6 +193,18 @@ async def read_notifications(body: NotificationReadRequest, _: str = Depends(req
 async def create_notification_event(body: NotificationEventRequest, _: str = Depends(require_owner)):
     notification_id = add_notification(body.event_type, body.title, body.message, body.details)
     return {"id": notification_id, "saved": True}
+
+@app.post("/api/push/register")
+async def register_push(body: PushDeviceRequest, _: str = Depends(require_owner)):
+    if not body.token.startswith(("ExponentPushToken[", "ExpoPushToken[")):
+        raise HTTPException(status_code=400, detail="رمز إشعارات Expo غير صالح.")
+    register_push_device(body.token, body.platform, body.device_id)
+    return {"registered": True}
+
+@app.post("/api/push/unregister")
+async def unregister_push(body: PushDeviceRequest, _: str = Depends(require_owner)):
+    unregister_push_device(body.token)
+    return {"registered": False}
 
 @app.get("/api/automation/status")
 async def get_automation_status(_: str = Depends(require_owner)):
