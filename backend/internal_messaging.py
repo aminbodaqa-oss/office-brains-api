@@ -93,7 +93,7 @@ def _normalize_with_positions(value: str) -> tuple[str, list[int]]:
 
 def detect_send_request(value: str) -> dict[str, str] | None:
     normalized, positions = _normalize_with_positions(value)
-    verbs = r"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|تبعتي|تبعت|تبعثي|تبعث|بلغي|بلغ|وصلي|وصل|راسلي|راسل|كلمي|كلم)"
+    verbs = r"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|تبعتي|تبعت|تبعثي|تبعث|بلغي|بلغي|راسلي|راسل|كلمي|كلم)"
     names = sorted(EMPLOYEE_IDS, key=len, reverse=True)
     aliases: dict[str, str] = {}
     for name in names:
@@ -118,4 +118,4 @@ def detect_send_request(value: str) -> dict[str, str] | None:
 
 def has_send_intent(value: str) -> bool:
     normalized, _ = _normalize_with_positions(value)
-    return bool(re.search(r"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|تبعتي|تبعت|تبعثي|تبعث|بلغي|بلغ|وصلي|وصل|راسلي|راسل|كلمي|كلم)", normalized))
+    return bool(re.search(r"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|تبعتي|تبعت|تبعثي|تبعث|بلغي|بلغي|راسلي|راسل|كلمي|كلم)", normalized))
