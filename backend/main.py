@@ -275,7 +275,10 @@ async def _notify_assigned_employee(task: dict, event_label: str) -> None:
     if not employee:
         return
     try:
-        context = await employee_context(employee_id, days=7)
+        try:
+            context = await employee_context(employee_id, days=7)
+        except Exception:
+            context = "لا تتوفر بيانات خارجية إضافية حاليًا؛ اعتمد فقط على تفاصيل المهمة المسجلة."
         system = (
             "أنت موظف افتراضي متخصص داخل مكتب Vindora. وصلتك معلومة عمل جديدة مرتبطة بمهمتك. "
             "اكتب مبادرة قصيرة للمالك بالعامية المصرية: وضّح فهمك للتحديث، واذكر اقتراحًا عمليًا أو سؤالًا واحدًا فقط إذا لزم. "
