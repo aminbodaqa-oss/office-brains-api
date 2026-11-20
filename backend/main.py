@@ -292,23 +292,23 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
     system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
     if inbox:
-        system += "\\n\\nرسائل واردة مسجلة فعليًا في صندوقك الداخلي (الأحدث أولًا):\\n" + "\\n".join(
-            f"- رقم الرسالة #{item['id']} | من: {item['sender_id']} | الحالة: {'مقروءة' if item['status'] == 'read' else 'مستلمة'} | التاريخ: {item['created_at']}\\nالمحتوى: {item['content']}"
+        system += "\n\nرسائل واردة مسجلة فعليًا في صندوقك الداخلي (الأحدث أولًا):\n" + "\n".join(
+            f"- رقم الرسالة #{item['id']} | من: {item['sender_id']} | الحالة: {'مقروءة' if item['status'] == 'read' else 'مستلمة'} | التاريخ: {item['created_at']}\nالمحتوى: {item['content']}"
             for item in inbox
-        ) + "\\nلو سألك المالك عما استلمته، ارجع لهذه الرسائل واذكر المرسل والمحتوى بدقة. لا تدّعِ استلام رسالة غير موجودة هنا."
+        ) + "\nلو سألك المالك عما استلمته، ارجع لهذه الرسائل واذكر المرسل والمحتوى بدقة. لا تدّعِ استلام رسالة غير موجودة هنا."
     if sent:
-        system += "\\n\\nآخر الرسائل التي أرسلتها فعلًا من صندوقك الداخلي:\\n" + "\\n".join(
+        system += "\n\nآخر الرسائل التي أرسلتها فعلًا من صندوقك الداخلي:\n" + "\n".join(
             f"- إلى: {item['recipient_id']} | الحالة: {item['status']} | التاريخ: {item['created_at']} | المحتوى: {item['content']}"
             for item in sent
         )
-    system += "\\nإذا طلب منك المالك إرسال رسالة لزميل، لا تقل إنك أرسلتها إلا إذا ظهر تأكيد الإرسال من النظام. الرسائل الداخلية لا تُرسل إلا بعد تسجيلها في صندوق المراسلات."
+    system += "\nإذا طلب منك المالك إرسال رسالة لزميل، لا تقل إنك أرسلتها إلا إذا ظهر تأكيد الإرسال من النظام. الرسائل الداخلية لا تُرسل إلا بعد تسجيلها في صندوق المراسلات."
     if memories:
-        system += "\\nذكريات محفوظة لهذا الموظف:\\n" + "\\n".join("- " + m["content"] for m in reversed(memories))
+        system += "\nذكريات محفوظة لهذا الموظف:\n" + "\n".join("- " + m["content"] for m in reversed(memories))
     if assigned_tasks:
-        system += "\\n\\nالمهام المسجلة باسمك في نظام المكتب (هذه هي الحالة الفعلية المحفوظة):\\n" + "\\n".join(
+        system += "\n\nالمهام المسجلة باسمك في نظام المكتب (هذه هي الحالة الفعلية المحفوظة):\n" + "\n".join(
             f"- #{task['id']} {task['title']} | الحالة: {task['status']} | الأولوية: {task['priority']} | الموعد: {task.get('due_at') or 'غير محدد'} | التفاصيل: {task['description']}"
             for task in assigned_tasks
-        ) + "\\nلا تقل إنك أنجزت مهمة أو غيرت حالتها إلا إذا تم تحديث سجلها فعليًا من النظام."
+        ) + "\nلا تقل إنك أنجزت مهمة أو غيرت حالتها إلا إذا تم تحديث سجلها فعليًا من النظام."
     try:
         system += await employee_context(body.employee_id)
         content = await employee_reply(system, [m.model_dump() for m in body.messages])
@@ -319,7 +319,7 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
     log_activity(body.employee_id, "employee_chat_reply", "chat", None, body.employee_id + " رد على رسالة الريّس", content)
     add_notification("chat", "محادثة جديدة مع " + body.employee_id,
-        "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\\n\\nرد الموظف:\\n" + content,
+        "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\n\nرد الموظف:\n" + content,
         employee_id=body.employee_id)
     return {"employee_id": body.employee_id, "content": content}
 
