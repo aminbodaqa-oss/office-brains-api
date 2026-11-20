@@ -465,9 +465,9 @@ let meetingClosed=localStorage.getItem('vo_meet_closed')==='1';
 const mOn=new Set(['ابراهيم','كريم','اسلام','طلعت']);
 const saveM=()=>{try{localStorage.setItem('vo_meet',JSON.stringify(mh.slice(-60)));localStorage.setItem('vo_meet_closed',meetingClosed?'1':'0')}catch(e){}};
 const normalizeMeetingText=s=>String(s||'').toLowerCase().replace(/[إأآ]/g,'ا').replace(/ى/g,'ي').replace(/[ًٌٍَُِّْـ]/g,'').replace(/[.,،؛!?؟]/g,' ').replace(/\s+/g,' ').trim();
-const isMeetingEndCommand=s=>/^(الاجتماع خلص|خلص الاجتماع|انتهي الاجتماع|الاجتماع انتهي|انهاء الاجتماع|اقفل الاجتماع|قفل الاجتماع|نقفل الاجتماع|كده الاجتماع خلص|كفايه كده)$/.test(normalizeMeetingText(s));
+const isMeetingEndCommand=s=>/(^| )(الاجتماع خلص|خلص الاجتماع|انتهي الاجتماع|الاجتماع انتهي|انهاء الاجتماع|اقفل الاجتماع|قفل الاجتماع|نقفل الاجتماع|كده الاجتماع خلص|كفايه كده)( |$)/.test(normalizeMeetingText(s));
 function setMeetingClosed(closed){meetingClosed=closed;saveM();$('mt').disabled=closed;$('ms').disabled=closed||busy;$('mEnd').disabled=closed;$('mstatus').textContent=closed?'انتهى الاجتماع بطلبك. ابدأ اجتماعًا جديدًا عند الحاجة.':'الجلسة مفتوحة · وجّه كلامك لموظف بالاسم ليرد هو.';mchips();}
-function mchips(){$('mchips').textContent='';T.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.e+' '+x.n;b.className=mOn.has(x.n)?'on':'';b.onclick=()=>{mOn.has(x.n)?mOn.delete(x.n):mOn.add(x.n);b.className=mOn.has(x.n)?'on':''};$('mchips').append(b)})}
+function mchips(){$('mchips').textContent='';T.forEach(x=>{const b=document.createElement('button');b.type='button';b.textContent=x.e+' '+x.n;b.className=mOn.has(x.n)?'on':'';b.disabled=meetingClosed;b.onclick=()=>{if(meetingClosed)return;mOn.has(x.n)?mOn.delete(x.n):mOn.add(x.n);b.className=mOn.has(x.n)?'on':''};$('mchips').append(b)})}
 function mdraw(){const box=$('mmsgs');box.textContent='';if(!mh.length){const d=document.createElement('div');d.className='note';d.textContent='اختار الحاضرين. لو ناديت موظف باسمه هيرد هو فقط، والكلام العام يفتح النقاش للحاضرين.';box.append(d)}
 mh.forEach(m=>{const d=document.createElement('div');d.className='m '+(m.u?'u':'b');if(!m.u){const w=document.createElement('b');w.textContent=m.e+' '+m.w;w.style.display='block';w.style.fontSize='12px';d.append(w)}d.append(document.createTextNode(m.c==='...'?'بيكتب…':m.c));box.append(d)});box.scrollTop=1e9}
 $('meetBtn').onclick=()=>{$('meet').classList.add('on');setMeetingClosed(meetingClosed);mdraw();notifyOfficeEvent("meeting","تم فتح غرفة الاجتماعات",meetingClosed?'الاجتماع السابق منتهٍ. ابدأ اجتماعًا جديدًا للمتابعة.':'غرفة الاجتماعات مفتوحة.',"المشاركون المحددون: "+Array.from(mOn).join("، "))};
@@ -487,7 +487,7 @@ async function mSend(){
  if(isMeetingEndCommand(txt)){finishMeeting();saveM();mdraw();return}
  const att=T.filter(x=>mOn.has(x.n));if(!att.length){$('mt').placeholder='اختار حاضر واحد على الأقل';return}
  const normalized=normalizeMeetingText(txt);
- const addressed=att.find(x=>normalized.includes(normalizeMeetingText(x.n)));
+ const addressed=T.find(x=>normalized.includes(normalizeMeetingText(x.n)));
  const recipients=addressed?[addressed]:att;
  busy=true;$('ms').disabled=true;
  try{for(const x of recipients){const bot={w:x.n,e:x.e,c:'...'};mh.push(bot);mdraw();
