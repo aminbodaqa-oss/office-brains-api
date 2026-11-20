@@ -170,7 +170,7 @@ function AppInner() {
     if (!meetingTitle.trim()) return;
     setBusy(true);
     try {
-      await api("/api/meetings",{method:"POST",body:{title:meetingTitle.trim(),agenda:meetingAgenda,attendees:employees.map(x=>x.id),scheduled_at:new Date(Date.now()+3600000).toISOString()}});
+      await api("/api/meetings",{method:"POST",body:{title:meetingTitle.trim(),agenda:meetingAgenda,attendees:attendees,scheduled_at:new Date(Date.now()+3600000).toISOString()}});
       setMeetingTitle("");setMeetingAgenda("");await refresh();Alert.alert("تم", "تم تسجيل الاجتماع بموعد بعد ساعة من الآن.");
     } catch(e:any){setError(e.message);}
     finally{setBusy(false);}
@@ -209,7 +209,7 @@ function AppInner() {
       for(const employee of recipients){
         const instruction="أنت "+employee.id+" في اجتماع عمل رسمي داخل Vindora. هذا اجتماع وليس محادثة خاصة. التزم بشخصيتك المهنية وتخصصك فقط، ولا تستخدم غزلًا أو دلعًا أو سياقًا عاطفيًا حتى لو كنت سلمى. "+(addressed?"الريّس وجّه الكلام لك بالاسم. أنت وحدك المطلوب منك الرد الآن.":"الريّس طرح نقطة عامة على الحاضرين. أضف مساهمة واحدة قصيرة من زاوية تخصصك، ولا تكرر كلام الآخرين ولا تعلن قرارًا نهائيًا ولا تنه الاجتماع.")+" رد بالعامية المصرية في 1-3 جمل. لا تخترع بيانات أو نتائج. جدول الأعمال: "+activeMeeting.agenda;
         const prior=updated.slice(-16).map(x=>({role:x.owner?"user":"assistant",content:(x.owner?"الريّس":x.speaker)+": "+x.content}));
-        const result=await api<{content:string}>("/api/chat",{method:"POST",body:{employee_id:employee.id,role:employee.role,employee_prompt:instruction,messages:prior}});
+        const transcript=updated.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n");\n        const now=new Date().toLocaleString("ar-EG",{dateStyle:"full",timeStyle:"short",timeZone:"Africa/Cairo"});\n        const result=await api<{content:string}>("/api/meeting/respond",{method:"POST",body:{employee_id:employee.id,role:employee.role,employee_prompt:PERSONALITIES[employee.id]||"",personality:PERS_DETAILS[employee.id]||"",company_context:COMPANY_CONTEXT,rules:instruction,time:now,transcript,instruction}});
         updated.push({speaker:employee.id,content:result.content||"لم يصل رد."});
         setMeetingLines([...updated]);
         if(addressed) break;
