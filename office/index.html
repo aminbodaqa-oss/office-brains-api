@@ -337,6 +337,24 @@ async function loadNotifications(){
       const d=new Date(item.created_at);time.textContent=Number.isNaN(d.getTime())?item.created_at:d.toLocaleString("ar-EG",{dateStyle:"medium",timeStyle:"short"});
       const detail=document.createElement("div");detail.className="notification-detail";detail.textContent=item.details||"لا توجد تفاصيل إضافية.";
       card.append(title,msg,time,detail);
+      if(item.employee_id){
+        const openButton=document.createElement("button");
+        openButton.type="button";
+        openButton.textContent="فتح محادثة الموظف";
+        openButton.style.marginTop="8px";
+        openButton.addEventListener("click",async event=>{
+          event.stopPropagation();
+          const employeeIndex=T.findIndex(employee=>employee.n===item.employee_id);
+          if(employeeIndex<0)return;
+          notificationPanel.classList.remove("open");
+          if(!item.is_read){
+            try{await fetch(base+"/api/notifications/read",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+ownerToken},body:JSON.stringify({ids:[item.id]})});}catch(e){}
+          }
+          await openChat(employeeIndex);
+          loadNotifications();
+        });
+        card.append(openButton);
+      }
       card.addEventListener("click",async()=>{
         card.classList.toggle("expanded");
         if(!item.is_read){
@@ -411,11 +429,22 @@ function avatarPhoto(i){const file=AVATAR_FILES[i];return file?`<img src="vindor
 $("grid").innerHTML=T.map((x,i)=>`<button class="desk ${x.gm?"gm":""}" data-i="${i}"><div class="av">${avatarPhoto(i)}</div><b>${x.n}</b><span>${x.r}</span></button>`).join("");
 $("grid").onclick=e=>{const b=e.target.closest(".desk");if(b)openChat(+b.dataset.i)};
 $("back").onclick=()=>{$("chat").classList.remove("on");cur=null};
-function openChat(i){
+async function openChat(i){
   cur=i;const x=T[i];hist[i]=hist[i]||[];
   $("cav").innerHTML=avatarPhoto(i);$("cname").textContent=x.n;$("crole").textContent=x.r;
   $("chips").innerHTML=x.q.map(q=>`<button type="button">${q}</button>`).join("");
   $("chat").classList.add("on");draw();
+  try{
+    const base=(window.OFFICE_API_URL||"").replace(/\/$/,"");
+    const response=await fetch(base+"/api/chat/history?employee_id="+encodeURIComponent(x.n),{headers:{Authorization:"Bearer "+ownerToken}});
+    if(response.ok){
+      const data=await response.json();
+      if(Array.isArray(data.messages)&&data.messages.length){
+        hist[i]=data.messages;saveH();
+        if(cur===i)draw();
+      }
+    }
+  }catch(e){}
 }
 $("chips").onclick=e=>{if(e.target.tagName==="BUTTON"){$("t").value=e.target.textContent;send()}};
 function draw(){
