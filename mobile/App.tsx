@@ -208,28 +208,31 @@ function AppInner() {
   };
   const endMeeting = async () => {
     if (!activeMeeting || meetingClosed || busy) return;
+    const meeting = activeMeeting;
     const finalLines = [...meetingLines,{speaker:"النظام",content:"انتهى الاجتماع بطلبك. لن يتم إرسال ردود جديدة في هذه الجلسة."}];
     const transcript = finalLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\n\n").slice(-11000);
+    const savedMinutes = JSON.stringify({ transcript: finalLines, summary: "" });
     try {
-      const savedMinutes = JSON.stringify({ transcript: finalLines, summary: "" });
-      await api("/api/meetings/"+activeMeeting.id,{method:"PATCH",body:{status:"completed",minutes:savedMinutes}});
-      await api("/api/notifications/event",{method:"POST",body:{
-        event_type:"meeting_ended",title:"انتهى الاجتماع: "+activeMeeting.title,
-        message:"تم إنهاء الاجتماع وحفظ نص الجلسة في سجل الاجتماعات.",
-        details:("جدول الأعمال: "+activeMeeting.agenda+"\n\n"+transcript).slice(-11000)
-      }});
+      await api("/api/meetings/"+meeting.id,{method:"PATCH",body:{status:"completed",minutes:savedMinutes}});
       setMeetingLines(finalLines);
       setMeetingClosed(true);
-      setMeetings(v=>v.map(x=>x.id===activeMeeting.id?{...x,status:"completed",minutes:savedMinutes}:x));
+      setMeetings(v=>v.map(x=>x.id===meeting.id?{...x,status:"completed",minutes:savedMinutes}:x));
       setActiveMeeting(null);
       refresh();
-    } catch(e:any) { setError("تعذر حفظ إنهاء الاجتماع. الجلسة ما زالت مفتوحة: "+e.message); }
+      try {
+        await api("/api/notifications/event",{method:"POST",body:{
+          event_type:"meeting_ended",title:"انتهى الاجتماع: "+meeting.title,
+          message:"تم إنهاء الاجتماع وحفظ نص الجلسة في سجل الاجتماعات.",
+          details:("جدول الأعمال: "+meeting.agenda+"\n\n"+transcript).slice(-11000)
+        }});
+      } catch(e:any) { setError("تم إنهاء الاجتماع وحفظه، لكن تعذر تسجيل إشعار الإنهاء: "+e.message); }
+    } catch(e:any) { setError("تعذر حفظ إنهاء الاجتماع. لم يتم إغلاق الجلسة: "+e.message); }
   };
   const sendMeetingMessage = async () => {
     const value=meetingDraft.trim();
     if(!value||!activeMeeting||busy)return;
     const normalized=value.toLowerCase().replace(/[إأآ]/g,"ا").replace(/ى/g,"ي").replace(/[ًٌٍَُِّْـ]/g,"").replace(/[.,،؛!?؟]/g," ").replace(/\s+/g," ").trim();
-    if(/(^| )(الاجتماع خلص|خلص الاجتماع|انتهي الاجتماع|الاجتماع انتهي|انهاء الاجتماع|اقفل الاجتماع|قفل الاجتماع|نقفل الاجتماع|كفايه كده)( |$)/.test(normalized)){setMeetingDraft("");await endMeeting();return;}
+    if(/(^| )(الاجتماع خلص|خلص الاجتماع|انتهي الاجتماع|الاجتماع انتهي|انهاء الاجتماع|اقفل الاجتماع|قفل الاجتماع|نقفل الاجتماع|كده الاجتماع خلص|كفايه كده)( |$)/.test(normalized)){setMeetingDraft("");await endMeeting();return;}
     const addressed=employees.find(e=>normalized.includes(e.id.toLowerCase().replace(/[إأآ]/g,"ا")));
     const recipients=addressed?[addressed]:employees.filter(e=>attendees.includes(e.id));
     if(!recipients.length){setError("اختار حاضرًا واحدًا على الأقل.");return;}
