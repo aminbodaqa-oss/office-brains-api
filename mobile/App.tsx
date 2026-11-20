@@ -178,6 +178,11 @@ function AppInner() {
     }
   };
   useEffect(() => { if (loggedIn) registerPushNotifications(); }, [loggedIn]);
+  const openEmployee = async (employee: Employee) => {
+    setSelected(employee); setChat([]); setDraft(""); setShowMemories(false); setMemories([]); loadMemories(employee.id);
+    try { const r = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(employee.id)); setChat(r.messages || []); }
+    catch(e:any) { setError(e.message); }
+  };
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       const employeeId = String(response.notification.request.content.data?.employee_id || "");
@@ -189,11 +194,6 @@ function AppInner() {
     });
     return () => subscription.remove();
   }, [employees]);
-  const openEmployee = async (employee: Employee) => {
-    setSelected(employee); setChat([]); setDraft(""); setShowMemories(false); setMemories([]); loadMemories(employee.id);
-    try { const r = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(employee.id)); setChat(r.messages || []); }
-    catch(e:any) { setError(e.message); }
-  };
   const sendChat = async () => {
     const value = draft.trim(); if (!value || !selected || busy) return;
     const next = [...chat, {role:"user" as const, content:value}];
