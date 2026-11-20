@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Vindora Office",
-    "slug": "vindora-office",
+    "slug": "vindora-96",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -20,6 +20,6 @@
     "extra": {
       "apiBaseUrl": "https://9ywu5lapwb.apps.bot-hosting.cloud"
     },
-    "owner": "vindora_eg"
+    "owner": "vindoraegs-team"
   }
 }
