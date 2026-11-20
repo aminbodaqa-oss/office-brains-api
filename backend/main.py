@@ -7,14 +7,14 @@ import time
 from contextlib import asynccontextmanager
 from typing import Literal
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash
+from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash
 from employees import EMPLOYEES, EMPLOYEE_IDS
-from brains import BrainUnavailable, employee_reply
+from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
@@ -25,17 +25,22 @@ async def lifespan(app: FastAPI):
     init_db()
     init_workflow_db()
     scheduler_task = None
+    proactive_task = None
     if os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
         scheduler_task = asyncio.create_task(scheduler_loop())
+        if PROVIDER != "demo":
+            from automation import salma_proactive_loop
+            proactive_task = asyncio.create_task(salma_proactive_loop())
     try:
         yield
     finally:
-        if scheduler_task:
-            scheduler_task.cancel()
-            try:
-                await scheduler_task
-            except asyncio.CancelledError:
-                pass
+        for task in (scheduler_task, proactive_task):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
 
 app = FastAPI(title="Office Brains API", version="0.2.0", lifespan=lifespan)
 origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "https://aminbodaqa-oss.github.io").split(",") if x.strip()]
@@ -193,6 +198,13 @@ async def delete_chat(body: ChatDeleteRequest, _: str = Depends(require_owner)):
     deleted = delete_chat_interactions(body.employee_id)
     return {"employee_id": body.employee_id, "deleted": deleted}
 
+@app.get("/api/chat/history")
+async def chat_history(employee_id: str, _: str = Depends(require_owner)):
+    if employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    return {"employee_id": employee_id, "messages": get_chat_history(employee_id)}
+
+
 @app.post("/api/chat")
 async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     if body.employee_id not in EMPLOYEE_IDS:
@@ -254,8 +266,43 @@ async def get_tasks(limit: int = 100, status: str | None = None, assigned_to: st
         raise HTTPException(status_code=404, detail="الموظف غير موجود.")
     return {"tasks": list_tasks(limit, status, assigned_to)}
 
+async def _notify_assigned_employee(task: dict, event_label: str) -> None:
+    if PROVIDER == "demo":
+        return
+    employee_id = str(task.get("assigned_to") or "")
+    employee = next((item for item in EMPLOYEES if item["id"] == employee_id), None)
+    if not employee:
+        return
+    try:
+        context = await employee_context(employee_id, days=7)
+        system = (
+            "أنت موظف افتراضي متخصص داخل مكتب Vindora. وصلتك معلومة عمل جديدة مرتبطة بمهمتك. "
+            "اكتب مبادرة قصيرة للمالك بالعامية المصرية: وضّح فهمك للتحديث، واذكر اقتراحًا عمليًا أو سؤالًا واحدًا فقط إذا لزم. "
+            "لا تدّعِ بدء التنفيذ أو إنجازه، ولا تخترع بيانات. إذا لم يكن لديك شيء مفيد جديد فاكتب فقط: لا يوجد تحديث يستحق الإرسال الآن.\n"
+            f"اسمك: {employee_id}\nوظيفتك: {employee['role']}\nالإدارة: {employee['department']}\n"
+            f"سياق البيانات المتاح: {context or 'لا توجد بيانات إضافية متاحة.'}"
+        )
+        prompt = (
+            f"الحدث: {event_label}\nالمهمة المسجلة: #{task.get('id')} {task.get('title')}\n"
+            f"التفاصيل: {task.get('description') or 'لا توجد'}\nالحالة: {task.get('status')}\n"
+            f"الأولوية: {task.get('priority')}\nالموعد: {task.get('due_at') or 'غير محدد'}"
+        )
+        content = (await employee_reply(system, [{"role": "user", "content": prompt}])).strip()
+        if not content or content.startswith("لا يوجد تحديث يستحق الإرسال"):
+            return
+        log_interaction(employee_id, "chat", {"messages": [], "response": content, "initiated_by_employee": True})
+        log_activity(employee_id, "employee_initiative", "task", int(task["id"]),
+                     employee_id + " بادر برسالة بعد تحديث مهمة مرتبطة به", content)
+        add_notification("employee_initiative", "رسالة من " + employee_id,
+                         employee_id + " بعتلك تحديثًا أو اقتراحًا بخصوص مهمة مسجلة.",
+                         "المهمة: #" + str(task.get("id")) + " · " + str(task.get("title")) + "\n\n" + content,
+                         employee_id=employee_id)
+    except Exception:
+        return
+
+
 @app.post("/api/tasks")
-async def post_task(body: TaskCreateRequest, _: str = Depends(require_owner)):
+async def post_task(body: TaskCreateRequest, background_tasks: BackgroundTasks, _: str = Depends(require_owner)):
     if body.assigned_to not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف المسؤول غير موجود.")
     if body.priority not in TASK_PRIORITIES:
@@ -265,10 +312,11 @@ async def post_task(body: TaskCreateRequest, _: str = Depends(require_owner)):
     add_notification("task_created", "مهمة جديدة في المكتب",
         "تم تسجيل مهمة وتكليف " + body.assigned_to + ".", 
         "المهمة: " + body.title + "\nالأولوية: " + body.priority + "\nالموعد: " + (body.due_at or "غير محدد"))
+    background_tasks.add_task(_notify_assigned_employee, task, "تم تكليفك بمهمة جديدة من المالك.")
     return {"saved": True, "task": task}
 
 @app.patch("/api/tasks/{task_id}")
-async def patch_task(task_id: int, body: TaskUpdateRequest, _: str = Depends(require_owner)):
+async def patch_task(task_id: int, body: TaskUpdateRequest, background_tasks: BackgroundTasks, _: str = Depends(require_owner)):
     updates = body.model_dump(exclude_unset=True)
     if "assigned_to" in updates and updates["assigned_to"] not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف المسؤول غير موجود.")
@@ -281,6 +329,8 @@ async def patch_task(task_id: int, body: TaskUpdateRequest, _: str = Depends(req
         raise HTTPException(status_code=404, detail="المهمة غير موجودة.")
     add_notification("task_updated", "تحديث مهمة #" + str(task_id),
         "تم تحديث حالة أو تفاصيل المهمة.", "المهمة: " + task["title"] + "\nالحالة: " + task["status"])
+    if "status" in updates or "assigned_to" in updates:
+        background_tasks.add_task(_notify_assigned_employee, task, "تم تحديث حالة المهمة أو المسؤول عنها.")
     return {"saved": True, "task": task}
 
 @app.get("/api/meetings")
