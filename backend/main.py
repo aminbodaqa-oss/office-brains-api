@@ -198,6 +198,7 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     except BrainUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
+    log_activity(body.employee_id, "employee_chat_reply", "chat", None, body.employee_id + " رد على رسالة الريّس", content)
     last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
     add_notification("chat", "محادثة جديدة مع " + body.employee_id,
         "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\n\nرد الموظف:\n" + content)
@@ -217,6 +218,7 @@ async def meeting_respond(body: MeetingRequest, _: str = Depends(require_owner))
     except BrainUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "meeting", {"transcript": body.transcript, "instruction": body.instruction, "response": content})
+    log_activity(body.employee_id, "meeting_contribution", "meeting", None, body.employee_id + " شارك في نقاش اجتماع", content)
     add_notification("meeting", "مداخلة من " + body.employee_id,
         "وصل رد جديد أثناء جلسة الاجتماع.", "التوجيه: " + body.instruction + "\n\nالرد:\n" + content)
     return {"employee_id": body.employee_id, "content": content}
