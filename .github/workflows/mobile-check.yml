@@ -3,10 +3,12 @@ on:
   push:
     paths:
       - "mobile/**"
+      - "backend/**"
       - ".github/workflows/mobile-check.yml"
   pull_request:
     paths:
       - "mobile/**"
+      - "backend/**"
       - ".github/workflows/mobile-check.yml"
 jobs:
   typecheck:
@@ -23,3 +25,5 @@ jobs:
           cache-dependency-path: mobile/package.json
       - run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit
+      - name: Check backend Python syntax
+        run: python -m compileall -q backend
