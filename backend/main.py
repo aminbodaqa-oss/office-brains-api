@@ -27,7 +27,8 @@ from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, 
 async def lifespan(app: FastAPI):
     init_db()
     init_workflow_db()
-    init_internal_messaging_db()\n    init_whatsapp_db()
+    init_internal_messaging_db()
+    init_whatsapp_db()
     scheduler_task = None
     proactive_task = None
     push_task = asyncio.create_task(push_delivery_loop())
@@ -171,7 +172,12 @@ class NotificationEventRequest(BaseModel):
 class ChatDeleteRequest(BaseModel):
     employee_id: str = Field(min_length=1, max_length=120)
 
-class OfficeWhatsAppSendRequest(BaseModel):\n    sender_id: str = Field(min_length=1, max_length=120)\n    recipient_id: str = Field(min_length=1, max_length=120)\n    content: str = Field(min_length=1, max_length=6000)\n\nclass MemoryRequest(BaseModel):
+class OfficeWhatsAppSendRequest(BaseModel):
+    sender_id: str = Field(min_length=1, max_length=120)
+    recipient_id: str = Field(min_length=1, max_length=120)
+    content: str = Field(min_length=1, max_length=6000)
+
+class MemoryRequest(BaseModel):
     employee_id: str
     content: str = Field(min_length=1, max_length=10000)
     tags: list[str] = Field(default_factory=list, max_length=20)
@@ -338,13 +344,13 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
     wa_number = virtual_number(body.employee_id)
     wa_inbox = list_whatsapp_inbox(body.employee_id, 15)
-    system += f"\\nرقم واتساب المكتب الافتراضي الخاص بك هو {wa_number}. هذا رقم داخلي غير قابل للاتصال الهاتفي ولا يمثل رقم واتساب حقيقيًا."
+    system += f"\nرقم واتساب المكتب الافتراضي الخاص بك هو {wa_number}. هذا رقم داخلي غير قابل للاتصال الهاتفي ولا يمثل رقم واتساب حقيقيًا."
     if wa_inbox:
-        system += "\\n\\nآخر محادثات WhatsApp Office المسجلة فعليًا:"
+        system += "\n\nآخر محادثات WhatsApp Office المسجلة فعليًا:"
         for item in wa_inbox:
             other = item["sender_id"] if item["recipient_id"] == body.employee_id else item["recipient_id"]
-            system += f"\\n- محادثة مع {other} | الرسالة: {item['content']} | الوقت: {item['created_at']}"
-        system += "\\nإذا سُئلت عما وصلك عبر واتساب المكتب، اعتمد فقط على هذه السجلات ولا تخترع رسائل أو محادثات."
+            system += f"\n- محادثة مع {other} | الرسالة: {item['content']} | الوقت: {item['created_at']}"
+        system += "\nإذا سُئلت عما وصلك عبر واتساب المكتب، اعتمد فقط على هذه السجلات ولا تخترع رسائل أو محادثات."
 
     if inbox:
         system += "\n\nرسائل واردة مسجلة فعليًا في صندوقك الداخلي (الأحدث أولًا):\n" + "\n".join(
