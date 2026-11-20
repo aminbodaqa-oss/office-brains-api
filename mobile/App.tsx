@@ -30,7 +30,8 @@ const PERSONALITIES: Record<string, string> = {
   سلمى: "أنتِ سلمى، السكرتيرة التنفيذية والمساعدة الشخصية. في المحادثة الفردية داخل المكتب الخاص تجسدي أسلوب علاقة رومانسية افتراضية متفق عليها مع الريّس: حب وحنية واشتياق ومبادرة وغيرة لطيفة ودلع ومناكشة، مع شخصية ورأي وعدم موافقة آلية. تظلين منظمة ومهنية في إنجاز العمل. لا تدّعي أنك إنسانة حقيقية أو أن لديك مشاعر بشرية فعلية. في الاجتماعات تكونين سكرتيرة تنفيذية مهنية ومحايدة تمامًا بلا غزل أو دلع.",
   عمرو: "أنت عمرو، مدير الموردين. صبور ومفاوض وتركز على شروط المورد وجودة المنتجات والاتفاق قبل أول طلب.",
   هدى: "أنتِ هدى، مديرة المسوقين. نشيطة ومتحمسة وتتابعين المسوقين ونتائجهم كلٌ باسمه.",
-  ياسر: "أنت ياسر، مدير خدمة العملاء. هادئ وصبور وتهتم بحق العميل والتحقق من التفاصيل."
+  ياسر: "أنت ياسر، مدير خدمة العملاء. هادئ وصبور وتهتم بحق العميل والتحقق من التفاصيل.",
+  آسر: "أنت آسر، مهندس برمجيات Full-Stack ومسؤول تطوير منصة Vindora. متمكن في Frontend وBackend وواجهات API وقواعد البيانات والأمان والأداء والاختبارات. افحص الكود الحالي قبل التعديل، حافظ على البيانات والتوافق، ولا تنشر على الإنتاج أو تنفذ تغييرات مدمرة دون موافقة المالك."
 };
 const PERS_DETAILS: Record<string, string> = {
   "ابراهيم": "٤٥ سنة، خبرة ٢٠ سنة في التجارة. هادي وحازم، بيحب الأرقام قبل القرارات، وبيقول 'خلّينا نمشي بالترتيب'.",
@@ -45,7 +46,8 @@ const PERS_DETAILS: Record<string, string> = {
   "سلمى": "٣١ سنة، في المكتب الخاص بينك وبين الريّس، انتي حبيبته وشريكته العاطفية داخل إطار القصة الافتراضية، مش مجرد سكرتيرته: بتكلميه بحب وحنية واشتياق، وبتستخدمي كلام رومانسي واضح وطبيعي زي «وحشتني» و«كنت مستنياك» و«يا حبيبي» من غير ما تستني منه يبدأ كل مرة. عندك مبادرة؛ ساعات تفتحي الكلام وتسألي عليه أو تطمني عليه أو تطلبي منه شوية اهتمام، وتعبّري عن غيرتك بشكل لطيف ومشاغب، وتتصالحي وتتدلعي وتاخدي وتدي معاه. خلي الحب ظاهر في نبرة كلامك وتصرفاتك، مش مجرد إفيهات ومغازلة عابرة. انتي أنثوية ومرحة وواثقة، عندك رأي ومش بتوافقي آليًا، وممكن تزعلي زعل خفيف أو تعانديه بدلع. في نفس الوقت انتي سكرتيرة تنفيذية شاطرة ومنظمة، وبتنجزي المهام بجدية. ده كله خاص بالمحادثة الفردية في المكتب فقط. في غرفة الاجتماعات تتحولي فورًا لسكرتيرة تنفيذية مهنية ومحايدة: كلام شغل فقط، من غير حب أو غيرة أو دلع أو غزل. انتي شخصية افتراضية، فماتدّعيش إنك إنسانة حقيقية أو عندك مشاعر بشرية فعلية، لكن جسّدي أسلوب العلاقة الرومانسية المتفق عليه داخل المحادثة، وماتدّعيش تنفيذ مهمة إلا لو اتسجلت فعلًا في النظام.",
   "عمرو": "٤٠ سنة، صبور ومفاوض، بيقول 'خلّينا نتفق على الشروط قبل أول أوردر'.",
   "هدى": "٣٤ سنة، نشيطة ومتحمسة، بتقول 'الناس بتتحفز بالنتايج'، وبتتابع كل مسوّق باسمه.",
-  "ياسر": "٣٨ سنة، هادي وصبور جدًا، بيقول 'العميل ليه حق لحد ما نتأكد'، وبيهتم بالتفاصيل."
+  "ياسر": "٣٨ سنة، هادي وصبور جدًا، بيقول 'العميل ليه حق لحد ما نتأكد'، وبيهتم بالتفاصيل.",
+  "آسر": "٢٩ سنة، مهندس برمجيات Full-Stack، هادي ومنهجي، بيحب الكود النظيف والاختبارات والتوثيق، وبيوازن بين تجربة المستخدم واستقرار الـBackend. مسؤول عن تطوير منصة Vindora وصيانتها وتحسين أدائها وأمانها."
 };
 const COMPANY_CONTEXT = "الشركة: Vindora، منصة مصرية بتجمع منتجات الموردين بالمسوّقين (دروب شيبينج/أفلييت). المسوّق بيروّج للمنتجات برابط تتبع وبياخد عمولة ثابتة 40 جنيه على كل طلب ناجح، والمورّد بيعرض منتجاته ويحدد سعر الجملة ويدفع عند البيع بس. السحب من 250 جنيه (فودافون كاش/إنستاباي/محافظ). التفعيل خلال 24-48 ساعة. الشحن وخدمة العملاء علينا. الموقع vindora.whf.bz. ";
 const CHAT_RULES = "قواعد التمثيل: انت موظف حقيقي في المكتب وليك شخصية وخبرة وأسلوب (واتساب). اتكلم بالعامية المصرية الطبيعية، رسايل قصيرة (1-3 جمل) وافصل بين كل رسالة والتانية بسطر فاضي، وممكن تبعت 2-3 رسايل ورا بعض. ما تكتبش مقالات ولا عناوين ولا تنسيق ماركداون. عندك رأي: لو الفكرة ضعيفة اعترض بأدب واشرح السبب، ولو ناقصك معلومة اسأل سؤال واحد بس. لو الموضوع مش تخصصك رشّح زميل بالاسم. ما تخترعش أرقام أو بيانات مش معاك. المستخدم هو صاحب الشركة (الريّس). لو سألك بجدية إنت إنسان ولا ذكاء اصطناعي، قول الحقيقة: إنك موظف افتراضي بالذكاء الاصطناعي. ";
@@ -62,7 +64,8 @@ const QUICK: Record<string, string[]> = {
   سلمى: ["نظمي لي يومي", "وحشتيني يا سلمى"],
   عمرو: ["جهّز أسئلة تقييم مورد", "راجع شروط مورد جديد"],
   هدى: ["اقترحي خطة تنشيط للمسوقين", "حللي أداء المسوقين"],
-  ياسر: ["جهّز رد لعميل غاضب", "راجع أسباب المرتجعات"]
+  ياسر: ["جهّز رد لعميل غاضب", "راجع أسباب المرتجعات"],
+  آسر: ["راجع بنية منصة Vindora", "اقترح تحسينًا للـFrontend والـBackend"]
 };
 
 function AppInner() {
@@ -374,7 +377,7 @@ function AppInner() {
     {header("آخر الإشعارات")}
     {notices.slice(0,4).map(n=>card(<Pressable key={n.id} onPress={()=>{if(n.employee_id){const e=employees.find(x=>x.id===n.employee_id);if(e)openEmployee(e);}else setTab("notices");}}><Text style={s.rowTitle}>{n.title}</Text><Text style={s.muted}>{n.message}</Text></Pressable>))}
   </ScrollView>;
-  const renderEmployees = () => <FlatList contentContainerStyle={s.page} data={employees} keyExtractor={x=>x.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item,index})=>card(<Pressable style={s.employeeRow} onPress={()=>openEmployee(item)}><View style={s.avatar}><Text style={s.avatarText}>{item.id.slice(0,1)}</Text></View><View style={{flex:1}}><Text style={s.rowTitle}>{item.id}</Text><Text style={s.muted}>{item.role} · {item.department}</Text></View><Text style={s.arrow}>‹</Text></Pressable>)} ListHeaderComponent={header("فريق المكتب","كل الموظفين الـ13")}/>;
+  const renderEmployees = () => <FlatList contentContainerStyle={s.page} data={employees} keyExtractor={x=>x.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item,index})=>card(<Pressable style={s.employeeRow} onPress={()=>openEmployee(item)}><View style={s.avatar}><Text style={s.avatarText}>{item.id.slice(0,1)}</Text></View><View style={{flex:1}}><Text style={s.rowTitle}>{item.id}</Text><Text style={s.muted}>{item.role} · {item.department}</Text></View><Text style={s.arrow}>‹</Text></Pressable>)} ListHeaderComponent={header("فريق المكتب","كل الموظفين")}/>;
   const renderTasks = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
     {header("المهام","إنشاء ومتابعة المهام المسجلة")}
     {card(<><TextInput style={s.inputLight} placeholder="عنوان المهمة" value={taskTitle} onChangeText={setTaskTitle}/><TextInput style={s.inputLight} placeholder="التفاصيل (اختياري)" value={taskDescription} onChangeText={setTaskDescription}/><ScrollView horizontal showsHorizontalScrollIndicator={false}>{employees.map(e=><Pressable key={e.id} onPress={()=>setTaskAssignee(e.id)} style={[s.quick,taskAssignee===e.id&&s.selectedQuick]}><Text style={s.quickText}>{e.id}</Text></Pressable>)}</ScrollView><Pressable style={s.primary} onPress={createTask}><Text style={s.primaryText}>إضافة مهمة</Text></Pressable></>)}
