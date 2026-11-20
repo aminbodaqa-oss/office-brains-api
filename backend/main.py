@@ -15,7 +15,7 @@ load_dotenv()
 from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
-from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox
+from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
@@ -289,6 +289,19 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     if body.employee_id not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
+
+    # Explicit WhatsApp Office commands are saved in their own mailbox.
+    wa_request = detect_whatsapp_send_request(last_user)
+    if wa_request:
+        try:
+            saved_wa = send_whatsapp_message(body.employee_id, wa_request["recipient_id"], wa_request["content"])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        response = f"تم إرسال رسالة WhatsApp Office إلى {wa_request['recipient_id']} وتسجيلها في المحادثة."
+        log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": response, "whatsapp_message_id": saved_wa["id"]})
+        log_activity(body.employee_id, "office_whatsapp_sent", "office_whatsapp_message", saved_wa["id"], f"{body.employee_id} أرسل واتساب داخليًا إلى {wa_request['recipient_id']}", wa_request["content"])
+        add_notification("office_whatsapp", f"رسالة WhatsApp Office من {body.employee_id}", f"وصلتك رسالة جديدة من {body.employee_id}.", wa_request["content"], employee_id=wa_request["recipient_id"])
+        return {"employee_id": body.employee_id, "content": response, "sent": True, "whatsapp": True, "message_id": saved_wa["id"]}
 
     # Explicit employee-to-employee send requests are persisted before the sender confirms delivery.
     if has_send_intent(last_user):
