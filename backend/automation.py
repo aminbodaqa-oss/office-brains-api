@@ -232,6 +232,7 @@ async def _generate_daily_briefing(run_date: str) -> None:
             )
             answer = await employee_reply(prompt, [{"role": "user", "content": "ابدأ تقريرك اليومي الآن."}])
             _save_report(run_date, employee_id, employee["department"], answer)
+            log_activity(employee_id, "daily_report", "report", None, employee_id + " أرسل تقرير بداية اليوم", answer)
             add_notification(
                 "employee_message",
                 "رسالة من " + employee_id,
@@ -265,6 +266,7 @@ async def _generate_daily_briefing(run_date: str) -> None:
         [{"role": "user", "content": manager_prompt}],
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
+    log_activity(manager["id"], "manager_briefing", "report", None, "إبراهيم أرسل الملخص الإداري اليومي", summary)
     add_notification("employee_message", "رسالة من إبراهيم · المدير العام",
         "إبراهيم أرسل لك الملخص الإداري اليومي بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
         "رسالة إبراهيم للمالك:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
