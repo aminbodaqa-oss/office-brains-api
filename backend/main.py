@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
+from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device, get_push_status
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
 from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
@@ -292,6 +292,11 @@ async def register_push(body: PushDeviceRequest, _: str = Depends(require_owner)
 async def unregister_push(body: PushDeviceRequest, _: str = Depends(require_owner)):
     unregister_push_device(body.token)
     return {"registered": False}
+
+
+@app.get("/api/push/status")
+async def get_push_delivery_status(_: str = Depends(require_owner)):
+    return get_push_status()
 
 @app.get("/api/automation/status")
 async def get_automation_status(_: str = Depends(require_owner)):

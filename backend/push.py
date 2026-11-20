@@ -34,7 +34,9 @@ def _send_expo_message(item: dict) -> dict:
     ticket = result.get("data") or {}
     if isinstance(ticket, list):
         ticket = ticket[0] if ticket else {}
-    return ticket if isinstance(ticket, dict) else {}
+    if not isinstance(ticket, dict):
+        return {"status": "error", "message": "Expo returned an invalid push ticket"}
+    return ticket
 
 
 async def push_delivery_loop() -> None:
