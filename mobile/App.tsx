@@ -7,7 +7,7 @@ import { api, clearToken, loadToken, saveToken } from "./src/api";
 type Employee = { id: string; role: string; department: string };
 type Message = { role: "user" | "assistant"; content: string };
 type Task = { id: number; title: string; description: string; assigned_to: string; status: string; priority: string; due_at?: string };
-type Meeting = { id: number; title: string; agenda: string; attendees: string[]; scheduled_at: string; status: string };
+type Meeting = { id: number; title: string; agenda: string; attendees: string[]; scheduled_at: string; status: string; minutes?: string };
 type Notice = { id: number; title: string; message: string; details: string; created_at: string; is_read: number; employee_id?: string | null };
 type Tab = "home" | "employees" | "tasks" | "meetings" | "notices" | "settings";
 type MeetingLine = { speaker: string; content: string; owner?: boolean };
@@ -91,6 +91,7 @@ function AppInner() {
   const [meetingTitle, setMeetingTitle] = useState("");
   const [meetingAgenda, setMeetingAgenda] = useState("");
   const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);
+  const [meetingClosed, setMeetingClosed] = useState(false);
   const [meetingLines, setMeetingLines] = useState<MeetingLine[]>([]);
   const [meetingDraft, setMeetingDraft] = useState("");
   const [attendees, setAttendees] = useState<string[]>(["ابراهيم","كريم","اسلام","طلعت"]);
@@ -190,28 +191,44 @@ function AppInner() {
   };
   const openMeetingRoom = (meeting: Meeting) => {
     setActiveMeeting(meeting);
-    setMeetingLines([{speaker:"النظام",content:"بدأ الاجتماع. الموظف الذي توجه له الكلام بالاسم هو الذي يرد وحده. لإنهاء الاجتماع استخدم زر إنهاء الاجتماع."}]);
     setAttendees(meeting.attendees || []);
     setMeetingDraft("");
+    setMeetingClosed(meeting.status === "completed" || meeting.status === "cancelled");
+    let restored: MeetingLine[] = [];
+    if (meeting.minutes) {
+      try {
+        const saved = JSON.parse(meeting.minutes);
+        if (Array.isArray(saved.transcript)) restored = saved.transcript;
+        if (saved.summary) restored = [...restored, { speaker: "سلمى — محضر الاجتماع", content: saved.summary }];
+      } catch {
+        restored = [{ speaker: "محضر محفوظ", content: meeting.minutes }];
+      }
+    }
+    setMeetingLines(restored.length ? restored : [{speaker:"النظام",content:"بدأ الاجتماع. الموظف الذي توجه له الكلام بالاسم هو الذي يرد وحده. لإنهاء الاجتماع استخدم زر إنهاء الاجتماع."}]);
   };
   const endMeeting = async () => {
-    if (!activeMeeting) return;
-    const transcript = meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n\\n").slice(-11000);
+    if (!activeMeeting || meetingClosed || busy) return;
+    const finalLines = [...meetingLines,{speaker:"النظام",content:"انتهى الاجتماع بطلبك. لن يتم إرسال ردود جديدة في هذه الجلسة."}];
+    const transcript = finalLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\n\n").slice(-11000);
     try {
+      const savedMinutes = JSON.stringify({ transcript: finalLines, summary: "" });
+      await api("/api/meetings/"+activeMeeting.id,{method:"PATCH",body:{status:"completed",minutes:savedMinutes}});
       await api("/api/notifications/event",{method:"POST",body:{
         event_type:"meeting_ended",title:"انتهى الاجتماع: "+activeMeeting.title,
-        message:"تم إنهاء الاجتماع من التطبيق.",
-        details:"جدول الأعمال: "+activeMeeting.agenda+"\\n\\n"+transcript
+        message:"تم إنهاء الاجتماع وحفظ نص الجلسة في سجل الاجتماعات.",
+        details:("جدول الأعمال: "+activeMeeting.agenda+"\n\n"+transcript).slice(-11000)
       }});
-    } catch(e:any) { setError("انتهى الاجتماع، لكن تعذر حفظ إشعار المحضر: "+e.message); }
-    setMeetingLines(v=>[...v,{speaker:"النظام",content:"انتهى الاجتماع بطلبك. لن يتم إرسال ردود جديدة في هذه الجلسة."}]);
-    setActiveMeeting(null);
-    refresh();
+      setMeetingLines(finalLines);
+      setMeetingClosed(true);
+      setMeetings(v=>v.map(x=>x.id===activeMeeting.id?{...x,status:"completed",minutes:savedMinutes}:x));
+      setActiveMeeting(null);
+      refresh();
+    } catch(e:any) { setError("تعذر حفظ إنهاء الاجتماع. الجلسة ما زالت مفتوحة: "+e.message); }
   };
   const sendMeetingMessage = async () => {
     const value=meetingDraft.trim();
     if(!value||!activeMeeting||busy)return;
-    const normalized=value.toLowerCase().replace(/[إأآ]/g,"ا").replace(/ى/g,"ي").replace(/[ًٌٍَُِّْـ]/g,"").replace(/[.,،؛!?؟]/g," ").replace(/\\s+/g," ").trim();
+    const normalized=value.toLowerCase().replace(/[إأآ]/g,"ا").replace(/ى/g,"ي").replace(/[ًٌٍَُِّْـ]/g,"").replace(/[.,،؛!?؟]/g," ").replace(/\s+/g," ").trim();
     if(/(^| )(الاجتماع خلص|خلص الاجتماع|انتهي الاجتماع|الاجتماع انتهي|انهاء الاجتماع|اقفل الاجتماع|قفل الاجتماع|نقفل الاجتماع|كفايه كده)( |$)/.test(normalized)){setMeetingDraft("");await endMeeting();return;}
     const addressed=employees.find(e=>normalized.includes(e.id.toLowerCase().replace(/[إأآ]/g,"ا")));
     const recipients=addressed?[addressed]:employees.filter(e=>attendees.includes(e.id));
@@ -221,13 +238,16 @@ function AppInner() {
     try {
       for(const employee of recipients){
         const instruction="أنت "+employee.id+" في اجتماع عمل رسمي داخل Vindora. هذا اجتماع وليس محادثة خاصة. التزم بشخصيتك المهنية وتخصصك فقط، ولا تستخدم غزلًا أو دلعًا أو سياقًا عاطفيًا حتى لو كنت سلمى. "+(addressed?"الريّس وجّه الكلام لك بالاسم. أنت وحدك المطلوب منك الرد الآن.":"الريّس طرح نقطة عامة على الحاضرين. أضف مساهمة واحدة قصيرة من زاوية تخصصك، ولا تكرر كلام الآخرين ولا تعلن قرارًا نهائيًا ولا تنه الاجتماع.")+" رد بالعامية المصرية في 1-3 جمل. لا تخترع بيانات أو نتائج. جدول الأعمال: "+activeMeeting.agenda;
-        const transcript=updated.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n").slice(-4500);
+        const transcript=updated.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\n").slice(-4500);
         const now=new Date().toLocaleString("ar-EG",{dateStyle:"full",timeStyle:"short",timeZone:"Africa/Cairo"});
         const result=await api<{content:string}>("/api/meeting/respond",{method:"POST",body:{employee_id:employee.id,role:employee.role,employee_prompt:PERSONALITIES[employee.id]||"",personality:PERS_DETAILS[employee.id]||"",company_context:COMPANY_CONTEXT,rules:instruction,time:now,transcript,instruction}});
         updated.push({speaker:employee.id,content:result.content||"لم يصل رد."});
         setMeetingLines([...updated]);
         if(addressed) break;
       }
+      const savedMinutes = JSON.stringify({transcript:updated,summary:""});
+      await api("/api/meetings/"+activeMeeting.id,{method:"PATCH",body:{minutes:savedMinutes}});
+      setMeetings(v=>v.map(x=>x.id===activeMeeting.id?{...x,minutes:savedMinutes}:x));
     } catch(e:any){setError(e.message||"تعذر الحصول على رد الموظف");}
     finally{setBusy(false);}
   };
@@ -237,7 +257,11 @@ function AppInner() {
     try{
       const transcript=meetingLines.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n").slice(-4500);
       const result=await api<{content:string}>("/api/secretary/briefing",{method:"POST",body:{message:"أعدّي محضرًا مختصرًا لهذا الاجتماع اعتمادًا على النص التالي فقط. استخرجي القرارات المؤكدة، المهام مع المسؤول والموعد إن ذُكر، والنقاط المفتوحة. لا تخترعي أي قرار أو موعد. عنوان الاجتماع: "+activeMeeting.title+"\\nجدول الأعمال: "+activeMeeting.agenda+"\\nنص الاجتماع:\\n"+transcript}});
-      setMeetingLines(v=>[...v,{speaker:"سلمى — محضر الاجتماع",content:result.content||"لم يصل محضر."}]);
+      const summary=result.content||"لم يصل محضر.";
+      const savedMinutes=JSON.stringify({transcript:meetingLines,summary});
+      await api("/api/meetings/"+activeMeeting.id,{method:"PATCH",body:{minutes:savedMinutes}});
+      setMeetingLines(v=>[...v,{speaker:"سلمى — محضر الاجتماع",content:summary}]);
+      setMeetings(v=>v.map(x=>x.id===activeMeeting.id?{...x,minutes:savedMinutes}:x));
     }catch(e:any){setError(e.message||"تعذر إعداد المحضر");}
     finally{setMinutesBusy(false);}
   };
@@ -262,12 +286,12 @@ function AppInner() {
   </View></SafeAreaView>;
 
   if (activeMeeting) return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
-    <View style={s.topbar}><Pressable onPress={()=>setActiveMeeting(null)}><Text style={s.back}>رجوع</Text></Pressable><View style={{flex:1}}><Text style={s.topTitle}>{activeMeeting.title}</Text><Text style={s.muted}>غرفة الاجتماعات · {busy?"جارٍ الرد":"الجلسة مفتوحة"}</Text></View></View>
+    <View style={s.topbar}><Pressable onPress={()=>setActiveMeeting(null)}><Text style={s.back}>رجوع</Text></Pressable><View style={{flex:1}}><Text style={s.topTitle}>{activeMeeting.title}</Text><Text style={s.muted}>غرفة الاجتماعات · {meetingClosed?"الاجتماع منتهٍ":busy?"جارٍ الرد":"الجلسة مفتوحة"}</Text></View></View>
     <View style={s.quickRow}>{employees.map(e=><Pressable key={e.id} disabled={busy} onPress={()=>setAttendees(v=>v.includes(e.id)?v.filter(x=>x!==e.id):[...v,e.id])} style={[s.quick,attendees.includes(e.id)&&s.selectedQuick]}><Text style={s.quickText}>{e.id}</Text></Pressable>)}</View>
     <FlatList style={{flex:1}} contentContainerStyle={s.chatList} data={meetingLines} keyExtractor={(_,i)=>String(i)} renderItem={({item})=><View style={[s.bubble,item.owner?s.userBubble:s.botBubble]}><Text style={s.muted}>{item.speaker}</Text><Text style={item.owner?s.userText:s.botText}>{item.content}</Text></View>}/>
     {!!error&&<Text style={s.errorInline}>{error}</Text>}
-    <View style={s.composer}><TextInput style={s.messageInput} placeholder="وجّه الكلام للحاضرين أو اذكر موظفًا بالاسم..." value={meetingDraft} onChangeText={setMeetingDraft} multiline/><Pressable style={s.send} onPress={sendMeetingMessage} disabled={busy}><Text style={s.sendText}>{busy?"…":"إرسال"}</Text></Pressable></View>
-    <View style={s.actions}><Pressable style={s.statusBtn} onPress={makeMinutes} disabled={minutesBusy||busy}><Text style={s.statusText}>{minutesBusy?"سلمى تكتب المحضر...":"إعداد محضر بواسطة سلمى"}</Text></Pressable><Pressable style={[s.statusBtn,{backgroundColor:"#FCEBED"}]} onPress={endMeeting} disabled={busy}><Text style={{color:C.red,fontWeight:"800",fontSize:11}}>إنهاء الاجتماع</Text></Pressable></View>
+    <View style={s.composer}><TextInput style={s.messageInput} placeholder="وجّه الكلام للحاضرين أو اذكر موظفًا بالاسم..." value={meetingDraft} onChangeText={setMeetingDraft} multiline/><Pressable style={s.send} onPress={sendMeetingMessage} disabled={busy||meetingClosed}><Text style={s.sendText}>{busy?"…":"إرسال"}</Text></Pressable></View>
+    <View style={s.actions}><Pressable style={s.statusBtn} onPress={makeMinutes} disabled={minutesBusy||busy}><Text style={s.statusText}>{minutesBusy?"سلمى تكتب المحضر...":"إعداد محضر بواسطة سلمى"}</Text></Pressable><Pressable style={[s.statusBtn,{backgroundColor:"#FCEBED"}]} onPress={endMeeting} disabled={busy||meetingClosed}><Text style={{color:C.red,fontWeight:"800",fontSize:11}}>إنهاء الاجتماع</Text></Pressable></View>
   </SafeAreaView>;
 
   if (selected) return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
@@ -287,7 +311,8 @@ function AppInner() {
     <View style={s.stats}>{[[String(employees.length||13),"موظف"],[String(tasks.filter(x=>!["completed","cancelled"].includes(x.status)).length),"مهمة مفتوحة"],[String(meetings.filter(x=>x.status==="scheduled").length),"اجتماع مجدول"]].map(([v,l])=>card(<><Text style={s.statValue}>{v}</Text><Text style={s.statLabel}>{l}</Text></>))}</View>
     {header("حالة التشغيل","المجدول اليومي والمبادرات التلقائية")}
     {card(<><Text style={s.rowTitle}>المجدول مفعّل: {status?.enabled?"نعم":"لا"}</Text><Text style={s.muted}>مزود الذكاء الاصطناعي: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>موعد التشغيل: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>حالة تشغيل اليوم: {status?.today?.status||status?.today_status||"غير متاحة"}</Text></>)}
-    {header("آخر التقارير اليومية")}\n    {reports.slice(0,4).map((r:any,i:number)=>card(<View key={String(r.run_date)+r.employee_id+i}><Text style={s.rowTitle}>{r.employee_id} · {r.department}</Text><Text style={s.muted}>{r.run_date}</Text><Text style={s.bodyText}>{r.content}</Text></View>))}
+    {header("آخر التقارير اليومية")}
+    {reports.slice(0,4).map((r:any,i:number)=>card(<View key={String(r.run_date)+r.employee_id+i}><Text style={s.rowTitle}>{r.employee_id} · {r.department}</Text><Text style={s.muted}>{r.run_date}</Text><Text style={s.bodyText}>{r.content}</Text></View>))}
     {header("آخر الإشعارات")}
     {notices.slice(0,4).map(n=>card(<Pressable key={n.id} onPress={()=>{if(n.employee_id){const e=employees.find(x=>x.id===n.employee_id);if(e)openEmployee(e);}else setTab("notices");}}><Text style={s.rowTitle}>{n.title}</Text><Text style={s.muted}>{n.message}</Text></Pressable>))}
   </ScrollView>;
