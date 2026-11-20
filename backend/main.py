@@ -1,5 +1,6 @@
 from __future__ import annotations
 import json
+import hmac
 import asyncio
 import os
 import time
@@ -11,10 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions
+from database import add_memory, get_memories, init_db, log_interaction, add_notification, get_notifications, mark_notifications_read, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from brains import BrainUnavailable, employee_reply
-from auth import issue_token, require_owner, verify_password
+from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db)
@@ -56,7 +57,7 @@ async def login(body: LoginRequest, request: Request):
     if len(attempts) >= 8:
         raise HTTPException(status_code=429, detail="محاولات دخول كثيرة. انتظر 15 دقيقة ثم حاول مجددًا.")
     expected_user = os.getenv("OWNER_USERNAME", "").strip()
-    password_hash = os.getenv("OWNER_PASSWORD_HASH", "").strip()
+    password_hash = get_owner_password_hash(os.getenv("OWNER_PASSWORD_HASH", "").strip())
     if not expected_user or not password_hash:
         raise HTTPException(status_code=503, detail="إعداد حساب المالك غير مكتمل على السيرفر.")
     valid_user = body.username.strip() == expected_user
@@ -71,6 +72,22 @@ async def login(body: LoginRequest, request: Request):
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return {"access_token": token, "token_type": "bearer", "expires_in": int(os.getenv("OFFICE_TOKEN_TTL_SECONDS", "1800"))}
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=512)
+    new_password: str = Field(min_length=8, max_length=512)
+
+@app.post("/api/auth/change-password")
+async def change_password(body: ChangePasswordRequest, username: str = Depends(require_owner)):
+    configured_hash = get_owner_password_hash(os.getenv("OWNER_PASSWORD_HASH", "").strip())
+    if not configured_hash or not verify_password(body.current_password, configured_hash):
+        raise HTTPException(status_code=400, detail="كلمة المرور الحالية غير صحيحة.")
+    if hmac.compare_digest(body.current_password, body.new_password):
+        raise HTTPException(status_code=400, detail="اختار كلمة مرور مختلفة عن الحالية.")
+    set_owner_password_hash(hash_password(body.new_password))
+    add_notification("security", "تم تغيير كلمة مرور المكتب", "تم تحديث كلمة مرور حساب المالك بنجاح.", "اسم المستخدم: " + username)
+    return {"changed": True, "message": "تم تغيير كلمة المرور بنجاح."}
+
 
 class Message(BaseModel):
     role: Literal["user", "assistant"]
