@@ -15,6 +15,7 @@ load_dotenv()
 from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
+from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
@@ -26,7 +27,7 @@ from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, 
 async def lifespan(app: FastAPI):
     init_db()
     init_workflow_db()
-    init_internal_messaging_db()
+    init_internal_messaging_db()\n    init_whatsapp_db()
     scheduler_task = None
     proactive_task = None
     push_task = asyncio.create_task(push_delivery_loop())
@@ -170,7 +171,7 @@ class NotificationEventRequest(BaseModel):
 class ChatDeleteRequest(BaseModel):
     employee_id: str = Field(min_length=1, max_length=120)
 
-class MemoryRequest(BaseModel):
+class OfficeWhatsAppSendRequest(BaseModel):\n    sender_id: str = Field(min_length=1, max_length=120)\n    recipient_id: str = Field(min_length=1, max_length=120)\n    content: str = Field(min_length=1, max_length=6000)\n\nclass MemoryRequest(BaseModel):
     employee_id: str
     content: str = Field(min_length=1, max_length=10000)
     tags: list[str] = Field(default_factory=list, max_length=20)
@@ -186,6 +187,37 @@ async def health():
 @app.get("/api/employees")
 async def employees(_: str = Depends(require_owner)):
     return {"employees": EMPLOYEES}
+
+@app.get("/api/whatsapp/contacts")
+async def get_whatsapp_contacts(_: str = Depends(require_owner)):
+    return {"contacts": whatsapp_contacts()}
+
+@app.get("/api/whatsapp/inbox")
+async def get_whatsapp_inbox(employee_id: str, limit: int = 30, _: str = Depends(require_owner)):
+    if employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    return {"employee_id": employee_id, "virtual_number": virtual_number(employee_id),
+            "messages": list_whatsapp_inbox(employee_id, limit)}
+
+@app.get("/api/whatsapp/messages")
+async def get_whatsapp_thread(employee_id: str, peer_id: str, limit: int = 100, _: str = Depends(require_owner)):
+    try:
+        return {"employee_id": employee_id, "peer_id": peer_id,
+                "messages": list_whatsapp_messages(employee_id, peer_id, limit)}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+@app.post("/api/whatsapp/send")
+async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depends(require_owner)):
+    try:
+        saved = send_whatsapp_message(body.sender_id, body.recipient_id, body.content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    log_activity(body.sender_id, "office_whatsapp_sent", "office_whatsapp_message", saved["id"],
+                 f"{body.sender_id} أرسل رسالة واتساب داخلية إلى {body.recipient_id}", body.content)
+    add_notification("office_whatsapp", f"رسالة واتساب داخلية من {body.sender_id}",
+                     f"وصلتك رسالة جديدة من {body.sender_id}.", body.content, employee_id=body.recipient_id)
+    return {"sent": True, "message": saved}
 
 @app.get("/api/notifications")
 async def list_notifications(limit: int = 50, unread_only: bool = False, _: str = Depends(require_owner)):
@@ -291,6 +323,16 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     memories = get_memories(body.employee_id, 12)
     assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
     system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    wa_number = virtual_number(body.employee_id)
+    wa_inbox = list_whatsapp_inbox(body.employee_id, 15)
+    system += f"\\nرقم واتساب المكتب الافتراضي الخاص بك هو {wa_number}. هذا رقم داخلي غير قابل للاتصال الهاتفي ولا يمثل رقم واتساب حقيقيًا."
+    if wa_inbox:
+        system += "\\n\\nآخر محادثات WhatsApp Office المسجلة فعليًا:"
+        for item in wa_inbox:
+            other = item["sender_id"] if item["recipient_id"] == body.employee_id else item["recipient_id"]
+            system += f"\\n- محادثة مع {other} | الرسالة: {item['content']} | الوقت: {item['created_at']}"
+        system += "\\nإذا سُئلت عما وصلك عبر واتساب المكتب، اعتمد فقط على هذه السجلات ولا تخترع رسائل أو محادثات."
+
     if inbox:
         system += "\n\nرسائل واردة مسجلة فعليًا في صندوقك الداخلي (الأحدث أولًا):\n" + "\n".join(
             f"- رقم الرسالة #{item['id']} | من: {item['sender_id']} | الحالة: {'مقروءة' if item['status'] == 'read' else 'مستلمة'} | التاريخ: {item['created_at']}\nالمحتوى: {item['content']}"
