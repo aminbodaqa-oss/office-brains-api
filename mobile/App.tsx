@@ -9,7 +9,8 @@ type Message = { role: "user" | "assistant"; content: string };
 type Task = { id: number; title: string; description: string; assigned_to: string; status: string; priority: string; due_at?: string };
 type Meeting = { id: number; title: string; agenda: string; attendees: string[]; scheduled_at: string; status: string };
 type Notice = { id: number; title: string; message: string; details: string; created_at: string; is_read: number; employee_id?: string | null };
-type Tab = "home" | "employees" | "tasks" | "meetings" | "notices" | "settings";\ntype MeetingLine = { speaker: string; content: string; owner?: boolean };
+type Tab = "home" | "employees" | "tasks" | "meetings" | "notices" | "settings";
+type MeetingLine = { speaker: string; content: string; owner?: boolean };
 
 const C = { navy: "#11172E", purple: "#7047F5", bg: "#F4F5FA", card: "#FFFFFF", ink: "#171A2B", muted: "#777C91", line: "#E6E8F0", green: "#23866D", red: "#D64A59" };
 const PERSONALITIES: Record<string, string> = {
@@ -73,15 +74,27 @@ function AppInner() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [status, setStatus] = useState<any>(null);
-  const [reports, setReports] = useState<any[]>([]);\n  const [briefingBusy, setBriefingBusy] = useState(false);
-  const [selected, setSelected] = useState<Employee | null>(null);\n  const [memories, setMemories] = useState<any[]>([]);\n  const [memoryDraft, setMemoryDraft] = useState("");\n  const [showMemories, setShowMemories] = useState(false);\n  const [currentPassword, setCurrentPassword] = useState("");\n  const [newPassword, setNewPassword] = useState("");\n  const [confirmPassword, setConfirmPassword] = useState("");
+  const [reports, setReports] = useState<any[]>([]);
+  const [briefingBusy, setBriefingBusy] = useState(false);
+  const [selected, setSelected] = useState<Employee | null>(null);
+  const [memories, setMemories] = useState<any[]>([]);
+  const [memoryDraft, setMemoryDraft] = useState("");
+  const [showMemories, setShowMemories] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [chat, setChat] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
   const [taskAssignee, setTaskAssignee] = useState("ابراهيم");
   const [meetingTitle, setMeetingTitle] = useState("");
-  const [meetingAgenda, setMeetingAgenda] = useState("");\n  const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);\n  const [meetingLines, setMeetingLines] = useState<MeetingLine[]>([]);\n  const [meetingDraft, setMeetingDraft] = useState("");\n  const [attendees, setAttendees] = useState<string[]>(["ابراهيم","كريم","اسلام","طلعت"]);\n  const [minutesBusy, setMinutesBusy] = useState(false);
+  const [meetingAgenda, setMeetingAgenda] = useState("");
+  const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);
+  const [meetingLines, setMeetingLines] = useState<MeetingLine[]>([]);
+  const [meetingDraft, setMeetingDraft] = useState("");
+  const [attendees, setAttendees] = useState<string[]>(["ابراهيم","كريم","اسلام","طلعت"]);
+  const [minutesBusy, setMinutesBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { (async () => { const t = await loadToken(); setLoggedIn(!!t); setTokenReady(true); })(); }, []);
@@ -209,7 +222,9 @@ function AppInner() {
       for(const employee of recipients){
         const instruction="أنت "+employee.id+" في اجتماع عمل رسمي داخل Vindora. هذا اجتماع وليس محادثة خاصة. التزم بشخصيتك المهنية وتخصصك فقط، ولا تستخدم غزلًا أو دلعًا أو سياقًا عاطفيًا حتى لو كنت سلمى. "+(addressed?"الريّس وجّه الكلام لك بالاسم. أنت وحدك المطلوب منك الرد الآن.":"الريّس طرح نقطة عامة على الحاضرين. أضف مساهمة واحدة قصيرة من زاوية تخصصك، ولا تكرر كلام الآخرين ولا تعلن قرارًا نهائيًا ولا تنه الاجتماع.")+" رد بالعامية المصرية في 1-3 جمل. لا تخترع بيانات أو نتائج. جدول الأعمال: "+activeMeeting.agenda;
         const prior=updated.slice(-16).map(x=>({role:x.owner?"user":"assistant",content:(x.owner?"الريّس":x.speaker)+": "+x.content}));
-        const transcript=updated.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n");\n        const now=new Date().toLocaleString("ar-EG",{dateStyle:"full",timeStyle:"short",timeZone:"Africa/Cairo"});\n        const result=await api<{content:string}>("/api/meeting/respond",{method:"POST",body:{employee_id:employee.id,role:employee.role,employee_prompt:PERSONALITIES[employee.id]||"",personality:PERS_DETAILS[employee.id]||"",company_context:COMPANY_CONTEXT,rules:instruction,time:now,transcript,instruction}});
+        const transcript=updated.map(x=>(x.owner?"الريّس":x.speaker)+": "+x.content).join("\\n");
+        const now=new Date().toLocaleString("ar-EG",{dateStyle:"full",timeStyle:"short",timeZone:"Africa/Cairo"});
+        const result=await api<{content:string}>("/api/meeting/respond",{method:"POST",body:{employee_id:employee.id,role:employee.role,employee_prompt:PERSONALITIES[employee.id]||"",personality:PERS_DETAILS[employee.id]||"",company_context:COMPANY_CONTEXT,rules:instruction,time:now,transcript,instruction}});
         updated.push({speaker:employee.id,content:result.content||"لم يصل رد."});
         setMeetingLines([...updated]);
         if(addressed) break;
