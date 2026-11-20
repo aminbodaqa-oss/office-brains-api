@@ -62,6 +62,16 @@ def mark_internal_inbox_read(employee_id: str) -> int:
         return int(cur.rowcount)
 
 
+def mark_internal_message_read(message_id: int, employee_id: str) -> bool:
+    now = datetime.now(timezone.utc).isoformat()
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE internal_messages SET status='read',read_at=? WHERE id=? AND recipient_id=? AND status='delivered'",
+            (now, int(message_id), employee_id),
+        )
+        return cur.rowcount > 0
+
+
 def _normalize_with_positions(value: str) -> tuple[str, list[int]]:
     chars: list[str] = []
     positions: list[int] = []
