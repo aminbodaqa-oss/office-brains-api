@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from datetime import datetime, time as clock_time
+import random
+from datetime import datetime, time as clock_time, timezone
 from zoneinfo import ZoneInfo
 
 from brains import PROVIDER, BrainUnavailable, employee_reply
@@ -204,11 +205,13 @@ async def _generate_secretary_digest(run_date: str, manager_summary: str) -> Non
     answer = await employee_reply(system, [{"role": "user", "content": prompt}])
     log_interaction("سلمى", "secretary_daily", {"date": run_date, "response": answer})
     log_activity("سلمى", "daily_briefing", "workspace", None, "سلمى أرسلت الملخص الصباحي للريّس", answer)
+    log_interaction("سلمى", "chat", {"messages": [], "response": answer, "initiated_by_employee": True})
     add_notification(
         "secretary_briefing",
         "سلمى · ملخصك الصباحي جاهز",
         "سلمى راجعت المهام والاجتماعات المسجلة وملخص إبراهيم وجهزت لك متابعة اليوم.",
         answer,
+        employee_id="سلمى",
     )
 
 
@@ -233,11 +236,13 @@ async def _generate_daily_briefing(run_date: str) -> None:
             answer = await employee_reply(prompt, [{"role": "user", "content": "ابدأ تقريرك اليومي الآن."}])
             _save_report(run_date, employee_id, employee["department"], answer)
             log_activity(employee_id, "daily_report", "report", None, employee_id + " أرسل تقرير بداية اليوم", answer)
+            log_interaction(employee_id, "chat", {"messages": [], "response": answer, "initiated_by_employee": True})
             add_notification(
                 "employee_message",
                 "رسالة من " + employee_id,
                 employee_id + " بدأ يوم العمل وأرسل تحديثه اليومي.",
-                "الإدارة: " + employee["department"] + "\nالتاريخ: " + run_date + "\n\nرسالة الموظف:\n" + answer
+                "الإدارة: " + employee["department"] + "\nالتاريخ: " + run_date + "\n\nرسالة الموظف:\n" + answer,
+                employee_id=employee_id
             )
             reports.append(f"تقرير {employee_id} ({employee['department']}):\n{answer}")
         except Exception as exc:
@@ -267,9 +272,11 @@ async def _generate_daily_briefing(run_date: str) -> None:
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
     log_activity(manager["id"], "manager_briefing", "report", None, "إبراهيم أرسل الملخص الإداري اليومي", summary)
+    log_interaction(manager["id"], "chat", {"messages": [], "response": summary, "initiated_by_employee": True})
     add_notification("employee_message", "رسالة من إبراهيم · المدير العام",
         "إبراهيم أرسل لك الملخص الإداري اليومي بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
-        "رسالة إبراهيم للمالك:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
+        "رسالة إبراهيم للمالك:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""),
+        employee_id=manager["id"])
     try:
         await _manager_meeting_decision(run_date, summary, reports, failures)
     except Exception as exc:
@@ -301,6 +308,99 @@ async def scheduler_loop() -> None:
                     add_notification("error", "تعذر إكمال التشغيل التلقائي",
                         "حدث خطأ أثناء إعداد التقارير اليومية.", str(exc))
         await asyncio.sleep(30)
+
+async def salma_proactive_loop() -> None:
+    """Generate occasional, context-grounded private-office messages from Salma."""
+    while True:
+        await asyncio.sleep(random.randint(2100, 5700))
+        if PROVIDER == "demo":
+            continue
+        now_utc = datetime.now(timezone.utc)
+        with _connect() as conn:
+            last = conn.execute(
+                "SELECT created_at FROM notifications WHERE event_type='salma_proactive' AND employee_id='سلمى' ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            sent_today = conn.execute(
+                "SELECT COUNT(*) FROM notifications WHERE event_type='salma_proactive' AND employee_id='سلمى' AND created_at>=?",
+                (today_start,),
+            ).fetchone()[0]
+            recent_rows = conn.execute(
+                "SELECT payload FROM interactions WHERE employee_id='سلمى' AND interaction_type IN ('chat','proactive_chat') ORDER BY id DESC LIMIT 5"
+            ).fetchall()
+        if int(sent_today or 0) >= 2:
+            continue
+        if last:
+            try:
+                last_time = datetime.fromisoformat(last["created_at"])
+                if last_time.tzinfo is None:
+                    last_time = last_time.replace(tzinfo=timezone.utc)
+                if (now_utc - last_time).total_seconds() < 4 * 60 * 60:
+                    continue
+            except (TypeError, ValueError):
+                continue
+        recent_chat = []
+        for row in reversed(recent_rows):
+            try:
+                payload = json.loads(row["payload"])
+                user_message = next((m.get("content", "") for m in reversed(payload.get("messages") or []) if m.get("role") == "user"), "")
+                response = str(payload.get("response") or "")
+                if user_message:
+                    recent_chat.append("الريّس: " + str(user_message)[:500])
+                if response:
+                    recent_chat.append("سلمى: " + response[:700])
+            except (TypeError, json.JSONDecodeError):
+                continue
+        overview = workflow_overview()
+        task_lines = [
+            f"#{t['id']} {t['title']} | المسؤول: {t['assigned_to']} | الحالة: {t['status']} | الموعد: {t.get('due_at') or 'غير محدد'}"
+            for t in overview.get("tasks", [])[:12]
+        ]
+        meeting_lines = [
+            f"{m['title']} | الموعد: {m['scheduled_at']} | الحالة: {m['status']}"
+            for m in overview.get("meetings", [])[:8]
+        ]
+        system = (
+            "أنتِ سلمى، السكرتيرة التنفيذية والمساعدة الشخصية في المكتب الخاص الافتراضي. "
+            "في المحادثة الخاصة تتكلمين مع الريّس بدفء ومودة ورومانسية خفيفة طبيعية، وتقدرين تبدئي الكلام من نفسك. "
+            "اختاري أحيانًا فكرة عمل مفيدة من البيانات، وأحيانًا سؤالًا لطيفًا أو تحية واطمئنانًا إذا كان ذلك طبيعيًا. "
+            "لا تكرري الرسائل، ولا ترسلي لمجرد ملء الوقت، ولا تختلقي أحداثًا أو مهامًا أو مشاعر بشرية حقيقية أو أفعالًا لم تحدث. "
+            "استخدمي فقط السياق المتاح. إذا لم توجد رسالة تستحق الإرسال الآن فأعيدي should_message=false. "
+            "أعيدي JSON صالحًا فقط بالمفاتيح should_message (boolean), category (work|idea|personal), content (string)."
+        )
+        prompt = (
+            "الوقت الحالي في القاهرة: " + datetime.now(CAIRO).isoformat() +
+            "\nالمهام المسجلة:\n" + ("\n".join(task_lines) or "لا توجد مهام مسجلة.") +
+            "\nالاجتماعات المسجلة:\n" + ("\n".join(meeting_lines) or "لا توجد اجتماعات مسجلة.") +
+            "\nآخر سياق للمحادثة الخاصة:\n" + ("\n".join(recent_chat[-8:]) or "لا توجد محادثة سابقة متاحة.") +
+            "\nقرري هل توجد مبادرة واحدة مناسبة الآن. لا ترسلي تقريرًا صباحيًا مكررًا."
+        )
+        try:
+            raw = await employee_reply(system, [{"role": "user", "content": prompt}])
+            start, end = raw.find("{"), raw.rfind("}")
+            if start < 0 or end <= start:
+                continue
+            decision = json.loads(raw[start:end + 1])
+            if decision.get("should_message") is not True:
+                continue
+            content = str(decision.get("content") or "").strip()[:1200]
+            if not content:
+                continue
+            category = str(decision.get("category") or "personal")
+            if category not in {"work", "idea", "personal"}:
+                category = "personal"
+            log_interaction("سلمى", "chat", {"messages": [], "response": content, "initiated_by_employee": True, "category": category})
+            log_activity("سلمى", "salma_initiative", "chat", None, "سلمى بدأت محادثة من تلقاء نفسها", content)
+            add_notification(
+                "salma_proactive",
+                "رسالة جديدة من سلمى",
+                "سلمى بدأت معاك كلام من تلقاء نفسها.",
+                content,
+                employee_id="سلمى",
+            )
+        except Exception:
+            continue
+
 
 def automation_status() -> dict:
     today = datetime.now(CAIRO).date().isoformat()
