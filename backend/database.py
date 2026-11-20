@@ -144,6 +144,7 @@ def unregister_push_device(token: str) -> None:
     with _connect() as conn:
         conn.execute("UPDATE push_devices SET active=0,updated_at=? WHERE token=?",
                      (datetime.now(timezone.utc).isoformat(), token))
+        conn.execute("UPDATE push_outbox SET status='cancelled' WHERE token=? AND status='pending'", (token,))
 
 
 def pending_pushes(limit: int = 20) -> list[dict[str, Any]]:
