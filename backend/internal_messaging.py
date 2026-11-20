@@ -91,7 +91,7 @@ def detect_send_request(value: str) -> dict[str, str] | None:
         aliases[key] = name
     alternatives = "|".join(re.escape(name) for name in aliases)
     pattern = re.compile(
-        rf"(?:^|\\s){verbs}\\s+(?:(?:رساله|مسج)\\s+)?(?:ل|الي)?\\s*(?:يا\\s*)?(?P<recipient>{alternatives})(?:\\s+(?P<body>.*))?$"
+        rf"(?:^|\s){verbs}\s+(?:(?:رساله|مسج)\s+)?(?:ل|الي)?\s*(?:يا\s*)?(?P<recipient>{alternatives})(?:\s+(?P<body>.*))?$"
     )
     match = pattern.search(normalized)
     if not match:
@@ -102,7 +102,7 @@ def detect_send_request(value: str) -> dict[str, str] | None:
         body = ""
     else:
         original_start = positions[body_start]
-        body = value[original_start:].strip(" \\t،,:؛-")
+        body = value[original_start:].strip(" \t،,:؛-")
     return {"recipient_id": recipient, "content": body}
 
 
