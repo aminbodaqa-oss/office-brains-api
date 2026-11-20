@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Vindora Office",
+    "slug": "vindora-office",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "vindoraoffice",
+    "android": {
+      "package": "com.vindora.office",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#11172E"
+      }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiBaseUrl": "https://9ywu5lapwb.apps.bot-hosting.cloud"
+    }
+  }
+}
