@@ -45,8 +45,11 @@ def detect_whatsapp_send_request(value: str) -> dict[str, str] | None:
     return {"recipient_id": match.group("recipient"), "content": match.group("content").strip()}
 
 def send_whatsapp_message(sender_id: str, recipient_id: str, content: str) -> dict[str, Any]:
-    if sender_id not in EMPLOYEE_IDS | {"المالك"} or recipient_id not in EMPLOYEE_IDS:
+    valid_ids = EMPLOYEE_IDS | {"المالك"}
+    if sender_id not in valid_ids or recipient_id not in valid_ids:
         raise ValueError("اسم الموظف غير موجود.")
+    if sender_id == recipient_id:
+        raise ValueError("لا يمكن مراسلة نفسك.")
     if sender_id == recipient_id:
         raise ValueError("لا يمكن مراسلة نفسك.")
     body = content.strip()
