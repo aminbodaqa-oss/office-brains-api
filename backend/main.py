@@ -223,7 +223,43 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
                  f"{body.sender_id} أرسل رسالة واتساب داخلية إلى {body.recipient_id}", body.content)
     add_notification("office_whatsapp", f"رسالة واتساب داخلية من {body.sender_id}",
                      f"وصلتك رسالة جديدة من {body.sender_id}.", body.content, employee_id=body.recipient_id)
-    return {"sent": True, "message": saved}
+
+    result = {"sent": True, "message": saved, "reply_generated": False}
+    # Owner messages trigger the selected employee's actual AI persona.
+    if body.sender_id == "المالك":
+        employee = next((item for item in EMPLOYEES if item["id"] == body.recipient_id), None)
+        if employee:
+            try:
+                thread = list_whatsapp_messages("المالك", body.recipient_id, 14)
+                history = [
+                    {"role": "assistant" if item["sender_id"] == body.recipient_id else "user",
+                     "content": item["content"]}
+                    for item in thread
+                ]
+                system = (
+                    "أنت موظف افتراضي متخصص داخل مكتب Vindora وتتحدث مباشرة مع مالك المكتب عبر WhatsApp Office. "
+                    "رد بشكل طبيعي وتفاعلي بالعامية المصرية، وافهم سياق المحادثة وتذكر الرسائل السابقة الظاهرة أمامك. "
+                    "التزم بتخصصك ولا تتصرف كأنك موظف آخر. لا تخترع أرقامًا أو نتائج أو إجراءات تمت. "
+                    "إذا طلب المالك تنفيذ إجراء يحتاج النظام، وضّح ما تستطيع فعله ولا تدّعِ تنفيذه دون تأكيد فعلي. "
+                    "اكتب ردًا واضحًا ومباشرًا ومناسبًا لطبيعة واتساب، وليس تقريرًا رسميًا إلا إذا طُلب ذلك.\n"
+                    f"اسمك: {employee['id']}\nوظيفتك: {employee['role']}\nالإدارة: {employee['department']}\n"
+                    "المتحدث الآخر هو مالك المكتب (الريّس)."
+                )
+                try:
+                    system += await employee_context(body.recipient_id)
+                except Exception:
+                    system += "\nلا تتوفر بيانات خارجية إضافية حاليًا؛ اعتمد على سياق المحادثة فقط."
+                reply_text = (await employee_reply(system, history)).strip()
+                if reply_text:
+                    reply = send_whatsapp_message(body.recipient_id, "المالك", reply_text)
+                    log_activity(body.recipient_id, "office_whatsapp_reply", "office_whatsapp_message", reply["id"],
+                                 f"{body.recipient_id} رد على المالك عبر واتساب المكتب", reply_text)
+                    result.update({"reply_generated": True, "reply": reply})
+            except (BrainUnavailable, VindoraUnavailable) as exc:
+                result["reply_error"] = str(exc)
+            except ValueError as exc:
+                result["reply_error"] = str(exc)
+    return result
 
 @app.get("/api/notifications")
 async def list_notifications(limit: int = 50, unread_only: bool = False, _: str = Depends(require_owner)):
