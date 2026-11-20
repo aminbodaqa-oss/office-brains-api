@@ -25,5 +25,7 @@ jobs:
           cache-dependency-path: mobile/package.json
       - run: npm install --no-audit --no-fund
       - run: npx tsc --noEmit
+      - name: Check Expo SDK dependency compatibility
+        run: npx expo install --check
       - name: Check backend Python syntax
         run: python -m compileall -q ../backend
