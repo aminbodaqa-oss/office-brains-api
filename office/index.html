@@ -518,7 +518,8 @@ $('mmin').onclick=async()=>{if(busy||!mh.length)return;busy=true;const x=T.find(
 $('mf').onsubmit=e=>{e.preventDefault();mSend()};
 $('mt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();mSend()}};
 </script>
-<script src="js/workspace.js">
+<script src="js/workspace.js"></script>
+<script>
 // Owner account settings: change password through the authenticated API.
 const settingsPanel=document.getElementById("settingsPanel");
 document.getElementById("settingsBtn").addEventListener("click",()=>{settingsPanel.style.display="flex";document.getElementById("passwordChangeMessage").textContent="";});
