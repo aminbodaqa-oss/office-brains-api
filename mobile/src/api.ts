@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 
 export const API_BASE = "https://9ywu5lapwb.apps.bot-hosting.cloud";
 const TOKEN_KEY = "vindora_office_access_token";
+const PUSH_TOKEN_KEY = "vindora_office_push_token";
 
 let token: string | null = null;
 export async function loadToken() {
@@ -31,3 +32,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   if (!response.ok) throw new Error(data.detail || `خطأ في الاتصال (${response.status})`);
   return data as T;
 }
+
+export async function savePushToken(value: string) { await SecureStore.setItemAsync(PUSH_TOKEN_KEY, value); }
+export async function loadPushToken() { return SecureStore.getItemAsync(PUSH_TOKEN_KEY); }
+export async function clearPushToken() { await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY); }
