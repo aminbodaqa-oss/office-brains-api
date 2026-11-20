@@ -95,6 +95,7 @@ function AppInner() {
   const [activity, setActivity] = useState<any[]>([]);
   const [briefingBusy, setBriefingBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState("لم يتم فحص إعداد الإشعارات");
+  const [pushDelivery, setPushDelivery] = useState<{active_devices:number;pending:number;sent:number;failed:number}|null>(null);
   const [selected, setSelected] = useState<Employee | null>(null);
   const [memories, setMemories] = useState<any[]>([]);
   const [memoryDraft, setMemoryDraft] = useState("");
@@ -175,6 +176,17 @@ function AppInner() {
       Alert.alert("تم","تم تغيير كلمة المرور بنجاح.");
     }catch(e:any){setError(e.message||"تعذر تغيير كلمة المرور");}
   };
+  const loadPushDeliveryStatus = async () => {
+    try { const result = await api<{active_devices:number;pending:number;sent:number;failed:number}>("/api/push/status"); setPushDelivery(result); }
+    catch (e:any) { setPushStatus(e.message || "تعذر قراءة حالة الإشعارات"); }
+  };
+  const sendTestPush = async () => {
+    try {
+      await api("/api/notifications/event", {method:"POST",body:{event_type:"push_test",title:"اختبار إشعارات Vindora Office",message:"تمام! الإشعارات الفورية وصلت من المكتب إلى هاتفك.",details:"رسالة اختبار للتأكد من وصول الإشعارات خارج التطبيق."}});
+      Alert.alert("تم إرسال طلب الاختبار", "اترك التطبيق في الخلفية وانتظر وصول الإشعار. حالة التسليم تتحدث بعد معالجة السيرفر للطابور.");
+      await loadPushDeliveryStatus();
+    } catch(e:any) { Alert.alert("تعذر إرسال الاختبار",e.message || "تحقق من اتصالك بالسيرفر."); }
+  };
   const registerPushNotifications = async () => {
     if (Platform.OS !== "android") return;
     const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
@@ -198,7 +210,7 @@ function AppInner() {
       setError(e.message || "تعذر تسجيل جهاز الإشعارات");
     }
   };
-  useEffect(() => { if (loggedIn) registerPushNotifications(); }, [loggedIn]);
+  useEffect(() => { if (loggedIn) { registerPushNotifications(); loadPushDeliveryStatus(); } }, [loggedIn]);
   const openEmployee = async (employee: Employee) => {
     setSelected(employee); setChat([]); setDraft(""); setShowMemories(false); setMemories([]); loadMemories(employee.id);
     try { const r = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(employee.id)); setChat(r.messages || []); }
@@ -426,6 +438,7 @@ function AppInner() {
   const renderSettings = () => <ScrollView contentContainerStyle={s.page}>
     {header("الإعدادات","إعدادات حساب المالك على المكتب")}
     {card(<><Text style={s.rowTitle}>تغيير كلمة المرور</Text><TextInput style={s.inputLight} placeholder="كلمة المرور الحالية" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry/><TextInput style={s.inputLight} placeholder="كلمة المرور الجديدة — 8 أحرف على الأقل" value={newPassword} onChangeText={setNewPassword} secureTextEntry/><TextInput style={s.inputLight} placeholder="تأكيد كلمة المرور الجديدة" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry/><Pressable style={s.primary} onPress={changePassword}><Text style={s.primaryText}>حفظ كلمة المرور</Text></Pressable></>)}
+    {card(<><Text style={s.rowTitle}>إشعارات الهاتف</Text><Text style={s.muted}>{pushStatus}</Text><Text style={s.muted}>الأجهزة المسجلة: {pushDelivery?.active_devices ?? "—"}</Text><Text style={s.muted}>بانتظار الإرسال: {pushDelivery?.pending ?? "—"} · تم التسليم إلى Expo: {pushDelivery?.sent ?? "—"}</Text><Text style={s.muted}>إخفاقات الإرسال: {pushDelivery?.failed ?? "—"}</Text><View style={s.actions}><Pressable style={s.statusBtn} onPress={registerPushNotifications}><Text style={s.statusText}>تفعيل / إعادة تسجيل الجهاز</Text></Pressable><Pressable style={s.statusBtn} onPress={loadPushDeliveryStatus}><Text style={s.statusText}>تحديث الحالة</Text></Pressable></View><Pressable style={s.primary} onPress={sendTestPush}><Text style={s.primaryText}>إرسال إشعار تجريبي</Text></Pressable></>)}
     {card(<><Text style={s.rowTitle}>حالة الأتمتة</Text><Text style={s.muted}>المجدول: {status?.enabled?"مفعّل":"متوقف"}</Text><Text style={s.muted}>المزود: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>التوقيت: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>أيام العمل: الأحد إلى الخميس</Text></>)}
     <Pressable style={s.primary} onPress={logout}><Text style={s.primaryText}>تسجيل الخروج</Text></Pressable>
   </ScrollView>;

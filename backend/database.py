@@ -173,6 +173,15 @@ def finish_push(push_id: int, success: bool, error: str = "") -> None:
 def deactivate_push_device(token: str) -> None:
     unregister_push_device(token)
 
+
+def get_push_status() -> dict[str, int]:
+    with _connect() as conn:
+        active = int(conn.execute("SELECT COUNT(*) FROM push_devices WHERE active=1").fetchone()[0])
+        pending = int(conn.execute("SELECT COUNT(*) FROM push_outbox WHERE status='pending'").fetchone()[0])
+        sent = int(conn.execute("SELECT COUNT(*) FROM push_outbox WHERE status='sent'").fetchone()[0])
+        failed = int(conn.execute("SELECT COUNT(*) FROM push_outbox WHERE status='failed'").fetchone()[0])
+    return {"active_devices": active, "pending": pending, "sent": sent, "failed": failed}
+
 def get_notifications(limit: int = 50, unread_only: bool = False) -> dict[str, Any]:
     limit = max(1, min(int(limit), 100))
     with _connect() as conn:
