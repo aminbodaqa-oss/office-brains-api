@@ -38,7 +38,7 @@ def detect_whatsapp_send_request(value: str) -> dict[str, str] | None:
     aliases = {item["id"]: item["id"] for item in EMPLOYEES}
     names = "|".join(re.escape(name) for name in sorted(aliases, key=len, reverse=True))
     match = re.search(
-        rf"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|بلغي|بلغ)\\s+(?:رسالة\\s+)?واتساب\\s+(?:ل|الى|إلى)?\\s*(?P<recipient>{names})\\s*(?:[:：-]\\s*|\\s+)(?P<content>.+)$",
+        rf"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|بلغي|بلغ)\s+(?:رسالة\s+)?واتساب\s+(?:ل|الى|إلى)?\s*(?P<recipient>{names})\s*(?:[:：-]\s*|\s+)(?P<content>.+)$",
         value.strip(), re.IGNORECASE)
     if not match:
         return None
