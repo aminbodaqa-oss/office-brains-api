@@ -188,7 +188,7 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
     <div class="showcase-bottom"><span>OFFICE BRAINS</span><span>PRIVATE WORKSPACE <b>•</b> 2026</span></div>
   </section>
   <section class="auth-panel" aria-label="تسجيل الدخول">
-    <form class="auth-card" id="loginForm">
+    <form class="auth-card" id="loginForm" method="post">
       <div class="mobile-brand"><div class="auth-logo">V</div><div><strong>OFFICE BRAINS</strong><small>VINDORA WORKSPACE</small></div></div>
       
       <h2>مرحباً بعودتك</h2>
@@ -406,7 +406,9 @@ if(hj)s+='<path d="M33 40Q50 22 67 40Q67 30 50 26Q33 30 33 40Z" fill="'+a.h+'"/>
 s+='<circle cx="43" cy="46" r="1.8" fill="#222"/><circle cx="57" cy="46" r="1.8" fill="#222"/><path d="M38 41Q43 39 47 41M53 41Q57 39 62 41" stroke="#222" stroke-width="1.5" fill="none"/><path d="M44 57Q50 61 56 57" stroke="#7a3b2e" stroke-width="1.6" fill="none" stroke-linecap="round"/>';
 if(a.g)s+='<g fill="none" stroke="#222" stroke-width="1.5"><circle cx="43" cy="46" r="6"/><circle cx="57" cy="46" r="6"/><path d="M49 46h2"/></g>';
 return s+'</svg>'}
-const AVATAR_FILES=["ibrahim.jpg","leila.jpg","nour.jpg","karim.jpg","islam.jpg","talaat.jpg","mohamed.jpg","thabet.jpg","tahamy.jpg","salma.jpg","amr.jpg","hoda.jpg","yasser.jpg"];\nfunction avatarPhoto(i){const file=AVATAR_FILES[i];return file?`<img src="vindora_employee_portraits/${file}" alt="${T[i].n}" loading="lazy">`:avSVG(i)}\n$("grid").innerHTML=T.map((x,i)=>`<button class="desk ${x.gm?"gm":""}" data-i="${i}"><div class="av">${avatarPhoto(i)}</div><b>${x.n}</b><span>${x.r}</span></button>`).join("");
+const AVATAR_FILES=["ibrahim.jpg","leila.jpg","nour.jpg","karim.jpg","islam.jpg","talaat.jpg","mohamed.jpg","thabet.jpg","tahamy.jpg","salma.jpg","amr.jpg","hoda.jpg","yasser.jpg"];
+function avatarPhoto(i){const file=AVATAR_FILES[i];return file?`<img src="vindora_employee_portraits/${file}" alt="${T[i].n}" loading="lazy">`:avSVG(i)}
+$("grid").innerHTML=T.map((x,i)=>`<button class="desk ${x.gm?"gm":""}" data-i="${i}"><div class="av">${avatarPhoto(i)}</div><b>${x.n}</b><span>${x.r}</span></button>`).join("");
 $("grid").onclick=e=>{const b=e.target.closest(".desk");if(b)openChat(+b.dataset.i)};
 $("back").onclick=()=>{$("chat").classList.remove("on");cur=null};
 function openChat(i){
