@@ -75,6 +75,7 @@ function AppInner() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [status, setStatus] = useState<any>(null);
   const [reports, setReports] = useState<any[]>([]);
+  const [activity, setActivity] = useState<any[]>([]);
   const [briefingBusy, setBriefingBusy] = useState(false);
   const [selected, setSelected] = useState<Employee | null>(null);
   const [memories, setMemories] = useState<any[]>([]);
@@ -103,16 +104,17 @@ function AppInner() {
     if (!loggedIn) return;
     setRefreshing(true);
     try {
-      const [e, t, m, n, s, rp] = await Promise.all([
+      const [e, t, m, n, s, rp, ac] = await Promise.all([
         api<{employees:Employee[]}>("/api/employees"),
         api<{tasks:Task[]}>("/api/tasks?limit=100"),
         api<{meetings:Meeting[]}>("/api/meetings?limit=50"),
         api<{notifications:Notice[]}>("/api/notifications?limit=60"),
         api<any>("/api/automation/status"),
-        api<{reports:any[]}>("/api/automation/reports?limit=8")
+        api<{reports:any[]}>("/api/automation/reports?limit=8"),
+        api<{activity:any[]}>("/api/activity?limit=12")
       ]);
       setEmployees(e.employees || []); setTasks(t.tasks || []); setMeetings(m.meetings || []);
-      setNotices(n.notifications || []); setStatus(s); setReports(rp.reports || []);
+      setNotices(n.notifications || []); setStatus(s); setReports(rp.reports || []); setActivity(ac.activity || []);
     } catch (e:any) { setError(e.message || "تعذر تحميل بيانات المكتب"); }
     finally { setRefreshing(false); }
   };
@@ -316,6 +318,8 @@ function AppInner() {
     {card(<><Text style={s.rowTitle}>المجدول مفعّل: {status?.enabled?"نعم":"لا"}</Text><Text style={s.muted}>مزود الذكاء الاصطناعي: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>موعد التشغيل: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>حالة تشغيل اليوم: {status?.today?.status||status?.today_status||"غير متاحة"}</Text></>)}
     {header("آخر التقارير اليومية")}
     {reports.slice(0,4).map((r:any,i:number)=>card(<View key={String(r.run_date)+r.employee_id+i}><Text style={s.rowTitle}>{r.employee_id} · {r.department}</Text><Text style={s.muted}>{r.run_date}</Text><Text style={s.bodyText}>{r.content}</Text></View>))}
+    {header("آخر نشاط في المكتب","تحديثات المهام والاجتماعات وردود الموظفين")}
+    {activity.slice(0,6).map((item:any)=>card(<View key={item.id}><Text style={s.rowTitle}>{item.summary}</Text><Text style={s.muted}>{item.actor} · {item.created_at}</Text>{!!item.details&&<Text style={s.bodyText}>{item.details}</Text>}</View>))}
     {header("آخر الإشعارات")}
     {notices.slice(0,4).map(n=>card(<Pressable key={n.id} onPress={()=>{if(n.employee_id){const e=employees.find(x=>x.id===n.employee_id);if(e)openEmployee(e);}else setTab("notices");}}><Text style={s.rowTitle}>{n.title}</Text><Text style={s.muted}>{n.message}</Text></Pressable>))}
   </ScrollView>;
