@@ -13,7 +13,9 @@ type Message = { role: "user" | "assistant"; content: string };
 type Task = { id: number; title: string; description: string; assigned_to: string; status: string; priority: string; due_at?: string };
 type Meeting = { id: number; title: string; agenda: string; attendees: string[]; scheduled_at: string; status: string; minutes?: string };
 type Notice = { id: number; title: string; message: string; details: string; created_at: string; is_read: number; employee_id?: string | null };
-type Tab = "home" | "employees" | "tasks" | "meetings" | "notices" | "settings";
+type Tab = "home" | "employees" | "tasks" | "meetings" | "whatsapp" | "notices" | "settings";
+type WAContact = Employee & { virtual_number: string };
+type WAMessage = { id:number; sender_id:string; recipient_id:string; content:string; created_at:string; read_at?:string|null };
 type MeetingLine = { speaker: string; content: string; owner?: boolean };
 
 const C = { navy: "#11172E", purple: "#7047F5", bg: "#F4F5FA", card: "#FFFFFF", ink: "#171A2B", muted: "#777C91", line: "#E6E8F0", green: "#23866D", red: "#D64A59" };
@@ -31,7 +33,8 @@ const PERSONALITIES: Record<string, string> = {
   عمرو: "أنت عمرو، مدير الموردين. صبور ومفاوض وتركز على شروط المورد وجودة المنتجات والاتفاق قبل أول طلب.",
   هدى: "أنتِ هدى، مديرة المسوقين. نشيطة ومتحمسة وتتابعين المسوقين ونتائجهم كلٌ باسمه.",
   ياسر: "أنت ياسر، مدير خدمة العملاء. هادئ وصبور وتهتم بحق العميل والتحقق من التفاصيل.",
-  آسر: "أنت آسر، مهندس برمجيات Full-Stack ومسؤول تطوير منصة Vindora. متمكن في Frontend وBackend وواجهات API وقواعد البيانات والأمان والأداء والاختبارات. افحص الكود الحالي قبل التعديل، حافظ على البيانات والتوافق، ولا تنشر على الإنتاج أو تنفذ تغييرات مدمرة دون موافقة المالك."
+  آسر: "أنت آسر، مهندس برمجيات Full-Stack ومسؤول تطوير منصة Vindora. متمكن في Frontend وBackend وواجهات API وقواعد البيانات والأمان والأداء والاختبارات. افحص الكود الحالي قبل التعديل، حافظ على البيانات والتوافق، ولا تنشر على الإنتاج أو تنفذ تغييرات مدمرة دون موافقة المالك.",
+  زياد: "أنت زياد، مسؤول الأمن السيبراني وتقنية المعلومات في Vindora. تراجع أمن الأنظمة والصلاحيات وقواعد البيانات، تتابع الثغرات والسجلات والنسخ الاحتياطية، وتتعاون مع آسر في مراجعة الكود. لا تكشف أسرارًا أو بيانات اعتماد، ولا تنفذ تغييرات أمنية مؤثرة أو تعطل الأنظمة دون موافقة المالك."
 };
 const PERS_DETAILS: Record<string, string> = {
   "ابراهيم": "٤٥ سنة، خبرة ٢٠ سنة في التجارة. هادي وحازم، بيحب الأرقام قبل القرارات، وبيقول 'خلّينا نمشي بالترتيب'.",
@@ -65,7 +68,8 @@ const QUICK: Record<string, string[]> = {
   عمرو: ["جهّز أسئلة تقييم مورد", "راجع شروط مورد جديد"],
   هدى: ["اقترحي خطة تنشيط للمسوقين", "حللي أداء المسوقين"],
   ياسر: ["جهّز رد لعميل غاضب", "راجع أسباب المرتجعات"],
-  آسر: ["راجع بنية منصة Vindora", "اقترح تحسينًا للـFrontend والـBackend"]
+  آسر: ["راجع بنية منصة Vindora", "اقترح تحسينًا للـFrontend والـBackend"],
+  زياد: ["راجع خطة تأمين المكتب", "اقترح قائمة فحوص أمنية دورية"]
 };
 
 function AppInner() {
@@ -81,6 +85,11 @@ function AppInner() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [waContacts, setWaContacts] = useState<WAContact[]>([]);
+  const [waPeer, setWaPeer] = useState<WAContact | null>(null);
+  const [waMessages, setWaMessages] = useState<WAMessage[]>([]);
+  const [waDraft, setWaDraft] = useState("");
+  const [waBusy, setWaBusy] = useState(false);
   const [status, setStatus] = useState<any>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
@@ -333,6 +342,32 @@ function AppInner() {
   const markRead = async (id:number) => { try { await api("/api/notifications/read",{method:"POST",body:{ids:[id]}}); await refresh(); } catch(e:any){setError(e.message);} };
   const deleteNotice = (id:number) => Alert.alert("حذف الإشعار","هل تريد حذف هذا الإشعار نهائيًا؟",[ {text:"إلغاء",style:"cancel"}, {text:"حذف",style:"destructive",onPress:async()=>{try{await api("/api/notifications/delete",{method:"POST",body:{ids:[id]}});await refresh();}catch(e:any){setError(e.message||"تعذر حذف الإشعار");}}} ]);
   const deleteAllNotices = () => Alert.alert("حذف كل الإشعارات","سيتم حذف كل الإشعارات المحفوظة في المكتب. هل تريد المتابعة؟",[ {text:"إلغاء",style:"cancel"}, {text:"حذف الكل",style:"destructive",onPress:async()=>{try{await api("/api/notifications/delete",{method:"POST",body:{all_items:true}});await refresh();}catch(e:any){setError(e.message||"تعذر حذف الإشعارات");}}} ]);
+  const loadWhatsAppContacts = async () => {
+    try { const r=await api<{contacts:WAContact[]}>("/api/whatsapp/contacts"); setWaContacts(r.contacts||[]); }
+    catch(e:any) { setError(e.message||"تعذر تحميل جهات اتصال المكتب"); }
+  };
+  const openWhatsApp = async () => {
+    setWaPeer(null); setWaMessages([]); setWaDraft(""); setTab("whatsapp"); setDrawerOpen(false);
+    await loadWhatsAppContacts();
+  };
+  const openWhatsAppThread = async (peer:WAContact) => {
+    setWaPeer(peer); setWaMessages([]);
+    try { const r=await api<{messages:WAMessage[]}>("/api/whatsapp/messages?employee_id="+encodeURIComponent("المالك")+"&peer_id="+encodeURIComponent(peer.id)); setWaMessages(r.messages||[]); }
+    catch(e:any) {
+      // Owner is the account operator; use the dedicated owner identity for the mailbox thread.
+      setError(e.message||"تعذر تحميل المحادثة");
+    }
+  };
+  const sendWhatsApp = async () => {
+    const value=waDraft.trim(); if(!value||!waPeer||waBusy)return;
+    setWaBusy(true); setError("");
+    try {
+      // Owner-originated messages are recorded under the explicit office owner identity.
+      const r=await api<{message:WAMessage}>("/api/whatsapp/send",{method:"POST",body:{sender_id:"المالك",recipient_id:waPeer.id,content:value}});
+      setWaMessages(v=>[...v,r.message]); setWaDraft("");
+    } catch(e:any) { setError(e.message||"تعذر إرسال الرسالة"); }
+    finally { setWaBusy(false); }
+  };
   const navigate = (next:Tab) => {setTab(next);setDrawerOpen(false);};
 
   if (!tokenReady) return <View style={s.center}><ActivityIndicator color={C.purple}/></View>;
@@ -394,13 +429,18 @@ function AppInner() {
     {card(<><Text style={s.rowTitle}>حالة الأتمتة</Text><Text style={s.muted}>المجدول: {status?.enabled?"مفعّل":"متوقف"}</Text><Text style={s.muted}>المزود: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>التوقيت: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>أيام العمل: الأحد إلى الخميس</Text></>)}
     <Pressable style={s.primary} onPress={logout}><Text style={s.primaryText}>تسجيل الخروج</Text></Pressable>
   </ScrollView>;
+  const renderWhatsApp = () => waPeer ? <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==="ios"?"padding":undefined}>
+    <View style={s.waThreadHead}><Pressable onPress={()=>{setWaPeer(null);setWaMessages([]);}}><Text style={s.back}>كل المحادثات</Text></Pressable><View style={{flex:1}}><Text style={s.rowTitle}>{waPeer.id}</Text><Text style={s.muted}>{waPeer.virtual_number} · رقم داخلي افتراضي</Text></View></View>
+    <FlatList style={{flex:1}} contentContainerStyle={s.chatList} data={waMessages} keyExtractor={x=>String(x.id)} renderItem={({item})=>{const mine=item.sender_id==="المالك";return <View style={[s.bubble,mine?s.userBubble:s.botBubble]}><Text style={mine?s.userText:s.botText}>{item.content}</Text><Text style={[s.muted,{marginTop:4,fontSize:9}]}>{item.created_at}</Text></View>}} ListEmptyComponent={<Text style={s.empty}>ابدأ أول محادثة مع {waPeer.id}.</Text>}/>
+    <View style={s.composer}><TextInput style={s.messageInput} placeholder="اكتب رسالة داخلية..." value={waDraft} onChangeText={setWaDraft} multiline/><Pressable style={s.send} onPress={sendWhatsApp} disabled={waBusy}><Text style={s.sendText}>{waBusy?"…":"إرسال"}</Text></Pressable></View>
+  </KeyboardAvoidingView> : <FlatList contentContainerStyle={s.page} data={waContacts.filter(x=>x.id!=="المالك")} keyExtractor={x=>x.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadWhatsAppContacts}/>} ListHeaderComponent={<View>{header("WhatsApp Office","مراسلات داخلية بأرقام افتراضية غير قابلة للاتصال الخارجي")}{card(<><Text style={s.rowTitle}>رقمك الافتراضي: VO-000</Text><Text style={s.muted}>حساب المالك · مراسلات المكتب فقط</Text></>)}</View>} renderItem={({item})=>card(<Pressable style={s.employeeRow} onPress={()=>openWhatsAppThread(item)}><View style={s.avatar}><Text style={s.avatarText}>{item.id.slice(0,1)}</Text></View><View style={{flex:1}}><Text style={s.rowTitle}>{item.id}</Text><Text style={s.muted}>{item.virtual_number} · {item.department}</Text></View><Text style={s.arrow}>‹</Text></Pressable>)}/>;
   const renderNotices = () => <FlatList contentContainerStyle={s.page} data={notices} keyExtractor={x=>String(x.id)} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} ListHeaderComponent={<View style={{gap:10}}>{header("الإشعارات","تحكم كامل في الإشعارات المحفوظة")}{notices.length>0&&<Pressable style={s.deleteAllButton} onPress={deleteAllNotices}><Text style={s.deleteAllText}>حذف كل الإشعارات</Text></Pressable>}</View>} renderItem={({item})=>card(<View><Pressable onPress={()=>{markRead(item.id);if(item.employee_id){const e=employees.find(x=>x.id===item.employee_id);if(e)openEmployee(e);}}}><View style={s.noticeHead}><Text style={s.rowTitle}>{item.title}</Text>{!item.is_read&&<View style={s.unread}/>}</View><Text style={s.bodyText}>{item.message}</Text><Text style={s.muted}>{item.created_at}</Text>{!!item.details&&<Text style={s.details}>{item.details}</Text>}</Pressable><View style={s.noticeActions}><Pressable style={s.deleteNoticeButton} onPress={()=>deleteNotice(item.id)}><Text style={s.deleteNoticeText}>حذف الإشعار</Text></Pressable></View></View>)} ListEmptyComponent={<Text style={s.empty}>لا توجد إشعارات حاليًا.</Text>}/>;
 
   return <SafeAreaView style={s.safe}><ExpoStatusBar style="dark"/>
     <View style={s.topbar}><Pressable style={s.menuTrigger} onPress={()=>setDrawerOpen(true)}><Text style={s.menuTriggerText}>القائمة</Text></Pressable><View style={{flex:1,alignItems:"flex-end"}}><Text style={s.topTitle}>ڤيندورا</Text><Text style={s.muted}>المكتب الافتراضي</Text></View><Pressable style={s.notificationTrigger} onPress={()=>navigate("notices")}><Text style={s.notificationGlyph}>🔔</Text>{notices.some(n=>!n.is_read)&&<View style={s.notificationDot}/>}</Pressable></View>
     {!!error&&<Pressable onPress={()=>setError("")} style={s.errorBanner}><Text style={s.error}>{error}  ×</Text></Pressable>}
-    <View style={{flex:1}}>{tab==="home"?renderHome():tab==="employees"?renderEmployees():tab==="tasks"?renderTasks():tab==="meetings"?renderMeetings():tab==="notices"?renderNotices():renderSettings()}</View>
-    <Modal visible={drawerOpen} transparent animationType="fade" onRequestClose={()=>setDrawerOpen(false)}><View style={s.drawerOverlay}><Pressable style={s.drawerScrim} onPress={()=>setDrawerOpen(false)}/><View style={s.drawerPanel}><View style={s.drawerBrand}><Text style={s.drawerBrandName}>VINDORA</Text><Text style={s.drawerSubtitle}>المكتب الافتراضي</Text></View>{([{id:"home",label:"الرئيسية",hint:"نظرة عامة"},{id:"employees",label:"الموظفون",hint:"فريق العمل"},{id:"tasks",label:"المهام",hint:"التكليفات والمتابعة"},{id:"meetings",label:"الاجتماعات",hint:"غرف النقاش"},{id:"notices",label:"الإشعارات",hint:"التنبيهات الواردة"},{id:"settings",label:"الإعدادات",hint:"الحساب والتشغيل"}] as {id:Tab;label:string;hint:string}[]).map(item=><Pressable key={item.id} onPress={()=>navigate(item.id)} style={[s.drawerItem,tab===item.id&&s.drawerItemActive]}><View style={{flex:1}}><Text style={[s.drawerItemTitle,tab===item.id&&s.drawerItemTitleActive]}>{item.label}</Text><Text style={s.drawerItemHint}>{item.hint}</Text></View>{item.id==="notices"&&notices.some(n=>!n.is_read)&&<View style={s.drawerUnread}/>}</Pressable>)}<View style={s.drawerDivider}/><Pressable style={s.drawerLogout} onPress={()=>{setDrawerOpen(false);logout();}}><Text style={s.drawerLogoutText}>تسجيل الخروج</Text></Pressable><Text style={s.drawerVersion}>Vindora Office · 1.0.0</Text></View></View></Modal>
+    <View style={{flex:1}}>{tab==="home"?renderHome():tab==="employees"?renderEmployees():tab==="tasks"?renderTasks():tab==="meetings"?renderMeetings():tab==="whatsapp"?renderWhatsApp():tab==="notices"?renderNotices():renderSettings()}</View>
+    <Modal visible={drawerOpen} transparent animationType="fade" onRequestClose={()=>setDrawerOpen(false)}><View style={s.drawerOverlay}><Pressable style={s.drawerScrim} onPress={()=>setDrawerOpen(false)}/><View style={s.drawerPanel}><View style={s.drawerBrand}><Text style={s.drawerBrandName}>VINDORA</Text><Text style={s.drawerSubtitle}>المكتب الافتراضي</Text></View>{([{id:"home",label:"الرئيسية",hint:"نظرة عامة"},{id:"employees",label:"الموظفون",hint:"فريق العمل"},{id:"tasks",label:"المهام",hint:"التكليفات والمتابعة"},{id:"meetings",label:"الاجتماعات",hint:"غرف النقاش"},{id:"whatsapp",label:"WhatsApp Office",hint:"مراسلات الموظفين"},{id:"notices",label:"الإشعارات",hint:"التنبيهات الواردة"},{id:"settings",label:"الإعدادات",hint:"الحساب والتشغيل"}] as {id:Tab;label:string;hint:string}[]).map(item=><Pressable key={item.id} onPress={()=>navigate(item.id)} style={[s.drawerItem,tab===item.id&&s.drawerItemActive]}><View style={{flex:1}}><Text style={[s.drawerItemTitle,tab===item.id&&s.drawerItemTitleActive]}>{item.label}</Text><Text style={s.drawerItemHint}>{item.hint}</Text></View>{item.id==="notices"&&notices.some(n=>!n.is_read)&&<View style={s.drawerUnread}/>}</Pressable>)}<View style={s.drawerDivider}/><Pressable style={s.drawerLogout} onPress={()=>{setDrawerOpen(false);logout();}}><Text style={s.drawerLogoutText}>تسجيل الخروج</Text></Pressable><Text style={s.drawerVersion}>Vindora Office · 1.0.0</Text></View></View></Modal>
   </SafeAreaView>;
 }
 
@@ -419,7 +459,7 @@ const s=StyleSheet.create({
   stats:{flexDirection:"row",gap:8},card:{backgroundColor:C.card,borderRadius:16,padding:14,borderWidth:1,borderColor:C.line,gap:7},statValue:{fontSize:23,fontWeight:"900",color:C.purple,textAlign:"center"},statLabel:{fontSize:11,color:C.muted,textAlign:"center"},sectionHead:{paddingTop:5,paddingBottom:2},sectionTitle:{fontSize:18,fontWeight:"900",color:C.ink,textAlign:"right"},
   rowTitle:{fontSize:14,fontWeight:"800",color:C.ink,textAlign:"right"},bodyText:{fontSize:13,color:C.ink,textAlign:"right",marginTop:5,lineHeight:21},employeeRow:{flexDirection:"row",alignItems:"center",gap:12},avatar:{width:42,height:42,borderRadius:14,backgroundColor:"#EEE9FF",alignItems:"center",justifyContent:"center"},avatarText:{fontSize:18,fontWeight:"900",color:C.purple},arrow:{fontSize:25,color:C.purple},
   menuTrigger:{paddingVertical:9,paddingHorizontal:12,borderRadius:11,backgroundColor:"#F0ECFF"},menuTriggerText:{color:C.purple,fontWeight:"800",fontSize:12},notificationTrigger:{width:40,height:40,borderRadius:13,backgroundColor:"#F7F5FF",alignItems:"center",justifyContent:"center",marginLeft:10},notificationGlyph:{fontSize:17},notificationDot:{position:"absolute",top:7,right:7,width:8,height:8,borderRadius:5,backgroundColor:C.red,borderWidth:1,borderColor:"#fff"},
-  drawerOverlay:{flex:1,flexDirection:"row-reverse",backgroundColor:"#10142655"},drawerScrim:{flex:1},drawerPanel:{width:"82%",maxWidth:340,backgroundColor:"#FFFFFF",paddingTop:48,paddingHorizontal:20,paddingBottom:24,borderTopLeftRadius:24,borderBottomLeftRadius:24},drawerBrand:{backgroundColor:C.navy,borderRadius:19,padding:20,marginBottom:22},drawerBrandName:{color:"#FFFFFF",fontSize:19,fontWeight:"900",letterSpacing:2,textAlign:"right"},drawerSubtitle:{color:"#C9C0FF",fontSize:12,textAlign:"right",marginTop:5},drawerItem:{flexDirection:"row",alignItems:"center",paddingVertical:13,paddingHorizontal:13,borderRadius:13,marginBottom:5},drawerItemActive:{backgroundColor:"#F0ECFF"},drawerItemTitle:{fontSize:14,fontWeight:"800",color:C.ink,textAlign:"right"},drawerItemTitleActive:{color:C.purple},drawerItemHint:{fontSize:10,color:C.muted,textAlign:"right",marginTop:3},drawerUnread:{width:8,height:8,borderRadius:5,backgroundColor:C.purple},drawerDivider:{height:1,backgroundColor:C.line,marginVertical:14},drawerLogout:{padding:13,borderRadius:12,backgroundColor:"#FCEBED"},drawerLogoutText:{color:C.red,fontWeight:"800",textAlign:"right"},drawerVersion:{color:C.muted,fontSize:10,textAlign:"center",marginTop:20},deleteAllButton:{alignSelf:"flex-end",paddingVertical:8,paddingHorizontal:12,borderRadius:10,backgroundColor:"#FCEBED"},deleteAllText:{color:C.red,fontWeight:"800",fontSize:12},noticeActions:{alignItems:"flex-start",marginTop:8},deleteNoticeButton:{paddingVertical:6,paddingHorizontal:10,borderRadius:9,backgroundColor:"#FFF1F2"},deleteNoticeText:{color:C.red,fontSize:11,fontWeight:"800"},
+  waThreadHead:{flexDirection:"row",alignItems:"center",gap:12,padding:14,backgroundColor:C.card,borderBottomWidth:1,borderColor:C.line},\n  drawerOverlay:{flex:1,flexDirection:"row-reverse",backgroundColor:"#10142655"},drawerScrim:{flex:1},drawerPanel:{width:"82%",maxWidth:340,backgroundColor:"#FFFFFF",paddingTop:48,paddingHorizontal:20,paddingBottom:24,borderTopLeftRadius:24,borderBottomLeftRadius:24},drawerBrand:{backgroundColor:C.navy,borderRadius:19,padding:20,marginBottom:22},drawerBrandName:{color:"#FFFFFF",fontSize:19,fontWeight:"900",letterSpacing:2,textAlign:"right"},drawerSubtitle:{color:"#C9C0FF",fontSize:12,textAlign:"right",marginTop:5},drawerItem:{flexDirection:"row",alignItems:"center",paddingVertical:13,paddingHorizontal:13,borderRadius:13,marginBottom:5},drawerItemActive:{backgroundColor:"#F0ECFF"},drawerItemTitle:{fontSize:14,fontWeight:"800",color:C.ink,textAlign:"right"},drawerItemTitleActive:{color:C.purple},drawerItemHint:{fontSize:10,color:C.muted,textAlign:"right",marginTop:3},drawerUnread:{width:8,height:8,borderRadius:5,backgroundColor:C.purple},drawerDivider:{height:1,backgroundColor:C.line,marginVertical:14},drawerLogout:{padding:13,borderRadius:12,backgroundColor:"#FCEBED"},drawerLogoutText:{color:C.red,fontWeight:"800",textAlign:"right"},drawerVersion:{color:C.muted,fontSize:10,textAlign:"center",marginTop:20},deleteAllButton:{alignSelf:"flex-end",paddingVertical:8,paddingHorizontal:12,borderRadius:10,backgroundColor:"#FCEBED"},deleteAllText:{color:C.red,fontWeight:"800",fontSize:12},noticeActions:{alignItems:"flex-start",marginTop:8},deleteNoticeButton:{paddingVertical:6,paddingHorizontal:10,borderRadius:9,backgroundColor:"#FFF1F2"},deleteNoticeText:{color:C.red,fontSize:11,fontWeight:"800"},
   tabbar:{flexDirection:"row",backgroundColor:C.card,borderTopWidth:1,borderColor:C.line,paddingVertical:8,paddingHorizontal:4},tab:{flex:1,alignItems:"center",paddingVertical:9,borderRadius:10},activeTab:{backgroundColor:"#F0ECFF"},tabText:{fontSize:10,color:C.muted,fontWeight:"700"},activeTabText:{color:C.purple},
   chatList:{padding:14,gap:10},bubble:{maxWidth:"88%",padding:12,borderRadius:15},userBubble:{alignSelf:"flex-start",backgroundColor:C.purple,borderBottomRightRadius:4},botBubble:{alignSelf:"flex-end",backgroundColor:C.card,borderWidth:1,borderColor:C.line,borderBottomLeftRadius:4},userText:{color:"#fff",textAlign:"right",fontSize:14,lineHeight:22},botText:{color:C.ink,textAlign:"right",fontSize:14,lineHeight:22},empty:{color:C.muted,textAlign:"center",marginTop:35},
   quickRow:{flexDirection:"row",flexWrap:"wrap",gap:7,paddingHorizontal:12,paddingBottom:8},quick:{borderWidth:1,borderColor:"#DCD5FF",backgroundColor:"#F7F5FF",paddingVertical:7,paddingHorizontal:10,borderRadius:20},quickText:{color:C.purple,fontSize:11,fontWeight:"700"},selectedQuick:{backgroundColor:"#E7E0FF",borderColor:C.purple},
