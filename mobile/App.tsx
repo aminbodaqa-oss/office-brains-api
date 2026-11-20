@@ -4,7 +4,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
-import { api, clearToken, loadToken, saveToken } from "./src/api";
+import { api, clearToken, loadToken, saveToken, savePushToken, loadPushToken, clearPushToken } from "./src/api";
 
 Notifications.setNotificationHandler({handleNotification: async () => ({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false})});
 
@@ -133,7 +133,14 @@ function AppInner() {
     } catch(e:any) { setError(e.message || "تعذر تسجيل الدخول"); }
     finally { setBusy(false); }
   };
-  const logout = async () => { await clearToken(); setLoggedIn(false); setSelected(null); setChat([]); };
+  const logout = async () => {
+    const pushToken = await loadPushToken();
+    if (pushToken) {
+      try { await api("/api/push/unregister",{method:"POST",body:{token:pushToken,platform:"android"}}); } catch {}
+      await clearPushToken();
+    }
+    await clearToken(); setLoggedIn(false); setSelected(null); setChat([]);
+  };
 
   const loadMemories = async (employeeId:string) => {
     try { const r=await api<{memories:any[]}>("/api/memories/"+encodeURIComponent(employeeId)+"?limit=30"); setMemories(r.memories||[]); }
@@ -171,6 +178,7 @@ function AppInner() {
       if (permission.status !== "granted") { setPushStatus("إذن الإشعارات غير مفعّل"); return; }
       const tokenResult = await Notifications.getExpoPushTokenAsync({projectId});
       await api("/api/push/register", {method:"POST",body:{token:tokenResult.data,platform:"android",device_id:Constants.installationId || "android-device"}});
+      await savePushToken(tokenResult.data);
       setPushStatus("الإشعارات الفورية مفعّلة");
     } catch (e:any) {
       setPushStatus("تعذر تفعيل الإشعارات الفورية");
