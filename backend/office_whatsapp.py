@@ -32,6 +32,18 @@ def whatsapp_contacts() -> list[dict[str, str]]:
     return [{"id": item["id"], "role": item["role"], "department": item["department"],
              "virtual_number": virtual_number(item["id"])} for item in EMPLOYEES]
 
+
+def detect_whatsapp_send_request(value: str) -> dict[str, str] | None:
+    import re
+    aliases = {item["id"]: item["id"] for item in EMPLOYEES}
+    names = "|".join(re.escape(name) for name in sorted(aliases, key=len, reverse=True))
+    match = re.search(
+        rf"(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|بلغي|بلغ)\\s+(?:رسالة\\s+)?واتساب\\s+(?:ل|الى|إلى)?\\s*(?P<recipient>{names})\\s*(?:[:：-]\\s*|\\s+)(?P<content>.+)$",
+        value.strip(), re.IGNORECASE)
+    if not match:
+        return None
+    return {"recipient_id": match.group("recipient"), "content": match.group("content").strip()}
+
 def send_whatsapp_message(sender_id: str, recipient_id: str, content: str) -> dict[str, Any]:
     if sender_id not in EMPLOYEE_IDS | {"المالك"} or recipient_id not in EMPLOYEE_IDS:
         raise ValueError("اسم الموظف غير موجود.")
