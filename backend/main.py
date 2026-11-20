@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device
 from employees import EMPLOYEES, EMPLOYEE_IDS
+from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
@@ -25,6 +26,7 @@ from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, 
 async def lifespan(app: FastAPI):
     init_db()
     init_workflow_db()
+    init_internal_messaging_db()
     scheduler_task = None
     proactive_task = None
     push_task = asyncio.create_task(push_delivery_loop())
@@ -235,21 +237,78 @@ async def chat_history(employee_id: str, _: str = Depends(require_owner)):
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     return {"employee_id": employee_id, "messages": get_chat_history(employee_id)}
 
+@app.get("/api/internal-messages")
+async def get_internal_messages(employee_id: str, folder: Literal["inbox", "sent"] = "inbox", limit: int = 30, _: str = Depends(require_owner)):
+    if employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    return {"employee_id": employee_id, "folder": folder, "messages": list_internal_messages(employee_id, folder, limit)}
+
+@app.post("/api/internal-messages/{message_id}/read")
+async def read_internal_message(message_id: int, employee_id: str, _: str = Depends(require_owner)):
+    if employee_id not in EMPLOYEE_IDS:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    if not mark_internal_message_read(message_id, employee_id):
+        raise HTTPException(status_code=404, detail="الرسالة غير موجودة في صندوق وارد الموظف.")
+    return {"read": True, "message_id": message_id}
+
 
 @app.post("/api/chat")
 async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     if body.employee_id not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
+    last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
+
+    # Explicit employee-to-employee send requests are persisted before the sender confirms delivery.
+    if has_send_intent(last_user):
+        request = detect_send_request(last_user)
+        if not request:
+            content = "أقدر أوصل الرسالة، بس محتاج تحدد اسم الموظف المستلم بوضوح، وبعدها أرسلها له من خلال صندوق المراسلات الداخلي."
+            log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
+            return {"employee_id": body.employee_id, "content": content, "sent": False, "needs_clarification": True}
+        recipient_id = request["recipient_id"]
+        message_content = request["content"]
+        if recipient_id == body.employee_id:
+            content = "مش هينفع أبعت رسالة للموظف نفسه. اختار زميل تاني وأنا أوصلها له."
+            return {"employee_id": body.employee_id, "content": content, "sent": False, "needs_clarification": True}
+        if not message_content:
+            content = f"تمام، الرسالة هتتبعت لـ{recipient_id}. اكتبلي محتوى الرسالة اللي تحب أوصلهوله."
+            log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
+            return {"employee_id": body.employee_id, "content": content, "sent": False, "needs_clarification": True}
+        try:
+            saved = send_internal_message(body.employee_id, recipient_id, message_content)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        content = f"تم إرسال الرسالة إلى {recipient_id} وتسجيلها في صندوق الوارد الداخلي.\n\nنص الرسالة:\n{message_content}"
+        log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content, "internal_message_id": saved["id"]})
+        log_activity(body.employee_id, "internal_message_sent", "internal_message", saved["id"], f"{body.employee_id} أرسل رسالة إلى {recipient_id}", message_content)
+        add_notification("internal_message", f"رسالة داخلية من {body.employee_id} إلى {recipient_id}", f"تم تسليم رسالة داخلية إلى {recipient_id}.", message_content, employee_id=recipient_id)
+        return {"employee_id": body.employee_id, "content": content, "sent": True, "message_id": saved["id"], "recipient_id": recipient_id}
+
+    # Incoming and outgoing mail are supplied from the real mailbox, never inferred by the model.
+    mark_internal_inbox_read(body.employee_id)
+    inbox = list_internal_messages(body.employee_id, "inbox", 12)
+    sent = list_internal_messages(body.employee_id, "sent", 8)
     memories = get_memories(body.employee_id, 12)
     assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
-    system = "أنت موظف افتراضي متخصص داخل مكتب. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    if inbox:
+        system += "\\n\\nرسائل واردة مسجلة فعليًا في صندوقك الداخلي (الأحدث أولًا):\\n" + "\\n".join(
+            f"- رقم الرسالة #{item['id']} | من: {item['sender_id']} | الحالة: {'مقروءة' if item['status'] == 'read' else 'مستلمة'} | التاريخ: {item['created_at']}\\nالمحتوى: {item['content']}"
+            for item in inbox
+        ) + "\\nلو سألك المالك عما استلمته، ارجع لهذه الرسائل واذكر المرسل والمحتوى بدقة. لا تدّعِ استلام رسالة غير موجودة هنا."
+    if sent:
+        system += "\\n\\nآخر الرسائل التي أرسلتها فعلًا من صندوقك الداخلي:\\n" + "\\n".join(
+            f"- إلى: {item['recipient_id']} | الحالة: {item['status']} | التاريخ: {item['created_at']} | المحتوى: {item['content']}"
+            for item in sent
+        )
+    system += "\\nإذا طلب منك المالك إرسال رسالة لزميل، لا تقل إنك أرسلتها إلا إذا ظهر تأكيد الإرسال من النظام. الرسائل الداخلية لا تُرسل إلا بعد تسجيلها في صندوق المراسلات."
     if memories:
-        system += "\nذكريات محفوظة لهذا الموظف:\n" + "\n".join("- " + m["content"] for m in reversed(memories))
+        system += "\\nذكريات محفوظة لهذا الموظف:\\n" + "\\n".join("- " + m["content"] for m in reversed(memories))
     if assigned_tasks:
-        system += "\n\nالمهام المسجلة باسمك في نظام المكتب (هذه هي الحالة الفعلية المحفوظة):\n" + "\n".join(
+        system += "\\n\\nالمهام المسجلة باسمك في نظام المكتب (هذه هي الحالة الفعلية المحفوظة):\\n" + "\\n".join(
             f"- #{task['id']} {task['title']} | الحالة: {task['status']} | الأولوية: {task['priority']} | الموعد: {task.get('due_at') or 'غير محدد'} | التفاصيل: {task['description']}"
             for task in assigned_tasks
-        ) + "\nلا تقل إنك أنجزت مهمة أو غيرت حالتها إلا إذا تم تحديث سجلها فعليًا من النظام."
+        ) + "\\nلا تقل إنك أنجزت مهمة أو غيرت حالتها إلا إذا تم تحديث سجلها فعليًا من النظام."
     try:
         system += await employee_context(body.employee_id)
         content = await employee_reply(system, [m.model_dump() for m in body.messages])
@@ -259,9 +318,8 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
     log_activity(body.employee_id, "employee_chat_reply", "chat", None, body.employee_id + " رد على رسالة الريّس", content)
-    last_user = next((m.content for m in reversed(body.messages) if m.role == "user"), "")
     add_notification("chat", "محادثة جديدة مع " + body.employee_id,
-        "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\n\nرد الموظف:\n" + content,
+        "الموظف رد على رسالتك داخل المكتب.", "رسالتك: " + last_user + "\\n\\nرد الموظف:\\n" + content,
         employee_id=body.employee_id)
     return {"employee_id": body.employee_id, "content": content}
 
