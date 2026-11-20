@@ -95,6 +95,7 @@ function AppInner() {
   const [activity, setActivity] = useState<any[]>([]);
   const [briefingBusy, setBriefingBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState("لم يتم فحص إعداد الإشعارات");
+  const [pushRegistering, setPushRegistering] = useState(false);
   const [pushDelivery, setPushDelivery] = useState<{active_devices:number;pending:number;sent:number;failed:number}|null>(null);
   const [selected, setSelected] = useState<Employee | null>(null);
   const [memories, setMemories] = useState<any[]>([]);
@@ -188,26 +189,45 @@ function AppInner() {
     } catch(e:any) { Alert.alert("تعذر إرسال الاختبار",e.message || "تحقق من اتصالك بالسيرفر."); }
   };
   const registerPushNotifications = async () => {
-    if (Platform.OS !== "android") return;
-    const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
-    if (!projectId) { setPushStatus("تحتاج ربط مشروع EAS أولًا"); return; }
+    if (pushRegistering) return;
+    if (Platform.OS !== "android") {
+      Alert.alert("غير مدعوم", "تسجيل إشعارات الهاتف متاح حاليًا على أندرويد فقط.");
+      return;
+    }
+    setPushRegistering(true);
+    setPushStatus("جارٍ تجهيز قناة الإشعارات...");
+    setError("");
     try {
+      const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId;
+      if (!projectId) throw new Error("معرّف مشروع Expo غير موجود في إعدادات التطبيق.");
       await Notifications.setNotificationChannelAsync("office-updates", {
         name: "تحديثات المكتب",
-        importance: Notifications.AndroidImportance.HIGH,
+        importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: C.purple,
       });
+      setPushStatus("جارٍ التحقق من إذن الإشعارات...");
       let permission = await Notifications.getPermissionsAsync();
       if (permission.status !== "granted") permission = await Notifications.requestPermissionsAsync();
-      if (permission.status !== "granted") { setPushStatus("إذن الإشعارات غير مفعّل"); return; }
+      if (permission.status !== "granted") {
+        throw new Error(permission.canAskAgain === false
+          ? "إذن الإشعارات مرفوض نهائيًا. افتح إعدادات الهاتف ثم التطبيقات ثم Vindora Office ثم الإشعارات وفعّلها."
+          : "لم يتم منح إذن الإشعارات. وافق على الرسالة التي تظهر من أندرويد ثم أعد المحاولة.");
+      }
+      setPushStatus("تم منح الإذن، جارٍ تسجيل الجهاز على السيرفر...");
       const tokenResult = await Notifications.getExpoPushTokenAsync({projectId});
+      if (!tokenResult.data) throw new Error("لم يتمكن Expo من إنشاء رمز الإشعارات لهذا الجهاز.");
       await api("/api/push/register", {method:"POST",body:{token:tokenResult.data,platform:"android",device_id:Constants.installationId || "android-device"}});
       await savePushToken(tokenResult.data);
-      setPushStatus("الإشعارات الفورية مفعّلة");
+      setPushStatus("تم تفعيل الإشعارات وتسجيل هذا الهاتف بنجاح");
+      await loadPushDeliveryStatus();
+      Alert.alert("تم بنجاح", "تم تسجيل هاتفك لاستقبال إشعارات Vindora Office.");
     } catch (e:any) {
-      setPushStatus("تعذر تفعيل الإشعارات الفورية");
-      setError(e.message || "تعذر تسجيل جهاز الإشعارات");
+      const message = e?.message || "حدث خطأ غير معروف أثناء تسجيل الجهاز.";
+      setPushStatus("فشل تسجيل الجهاز: " + message);
+      Alert.alert("تعذر تفعيل الإشعارات", message);
+    } finally {
+      setPushRegistering(false);
     }
   };
   useEffect(() => { if (loggedIn) { registerPushNotifications(); loadPushDeliveryStatus(); } }, [loggedIn]);
@@ -438,7 +458,7 @@ function AppInner() {
   const renderSettings = () => <ScrollView contentContainerStyle={s.page}>
     {header("الإعدادات","إعدادات حساب المالك على المكتب")}
     {card(<><Text style={s.rowTitle}>تغيير كلمة المرور</Text><TextInput style={s.inputLight} placeholder="كلمة المرور الحالية" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry/><TextInput style={s.inputLight} placeholder="كلمة المرور الجديدة — 8 أحرف على الأقل" value={newPassword} onChangeText={setNewPassword} secureTextEntry/><TextInput style={s.inputLight} placeholder="تأكيد كلمة المرور الجديدة" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry/><Pressable style={s.primary} onPress={changePassword}><Text style={s.primaryText}>حفظ كلمة المرور</Text></Pressable></>)}
-    {card(<><Text style={s.rowTitle}>إشعارات الهاتف</Text><Text style={s.muted}>{pushStatus}</Text><Text style={s.muted}>الأجهزة المسجلة: {pushDelivery?.active_devices ?? "—"}</Text><Text style={s.muted}>بانتظار الإرسال: {pushDelivery?.pending ?? "—"} · تم التسليم إلى Expo: {pushDelivery?.sent ?? "—"}</Text><Text style={s.muted}>إخفاقات الإرسال: {pushDelivery?.failed ?? "—"}</Text><View style={s.actions}><Pressable style={s.statusBtn} onPress={registerPushNotifications}><Text style={s.statusText}>تفعيل / إعادة تسجيل الجهاز</Text></Pressable><Pressable style={s.statusBtn} onPress={loadPushDeliveryStatus}><Text style={s.statusText}>تحديث الحالة</Text></Pressable></View><Pressable style={s.primary} onPress={sendTestPush}><Text style={s.primaryText}>إرسال إشعار تجريبي</Text></Pressable></>)}
+    {card(<><Text style={s.rowTitle}>إشعارات الهاتف</Text><Text style={s.muted}>{pushStatus}</Text><Text style={s.muted}>الأجهزة المسجلة: {pushDelivery?.active_devices ?? "—"}</Text><Text style={s.muted}>بانتظار الإرسال: {pushDelivery?.pending ?? "—"} · تم التسليم إلى Expo: {pushDelivery?.sent ?? "—"}</Text><Text style={s.muted}>إخفاقات الإرسال: {pushDelivery?.failed ?? "—"}</Text><View style={s.actions}><Pressable style={[s.statusBtn,pushRegistering&&{opacity:0.6}]} onPress={registerPushNotifications} disabled={pushRegistering}>{pushRegistering?<ActivityIndicator color={C.purple}/>:<Text style={s.statusText}>تفعيل / إعادة تسجيل الجهاز</Text>}</Pressable><Pressable style={s.statusBtn} onPress={loadPushDeliveryStatus}><Text style={s.statusText}>تحديث الحالة</Text></Pressable></View><Pressable style={s.primary} onPress={sendTestPush}><Text style={s.primaryText}>إرسال إشعار تجريبي</Text></Pressable></>)}
     {card(<><Text style={s.rowTitle}>حالة الأتمتة</Text><Text style={s.muted}>المجدول: {status?.enabled?"مفعّل":"متوقف"}</Text><Text style={s.muted}>المزود: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>التوقيت: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>أيام العمل: الأحد إلى الخميس</Text></>)}
     <Pressable style={s.primary} onPress={logout}><Text style={s.primaryText}>تسجيل الخروج</Text></Pressable>
   </ScrollView>;
