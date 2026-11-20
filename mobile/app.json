@@ -18,7 +18,10 @@
       "expo-notifications"
     ],
     "extra": {
-      "apiBaseUrl": "https://9ywu5lapwb.apps.bot-hosting.cloud"
+      "apiBaseUrl": "https://9ywu5lapwb.apps.bot-hosting.cloud",
+      "eas": {
+        "projectId": "0a298a2b-154a-4918-b8a5-352666a362ed"
+      }
     },
     "owner": "vindora_eg"
   }
