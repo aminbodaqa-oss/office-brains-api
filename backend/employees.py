@@ -12,5 +12,6 @@ EMPLOYEES = [
     {"id":"عمرو","role":"مدير إدارة الموردين","department":"الموردين"},
     {"id":"هدى","role":"مدير إدارة المسوّقين","department":"المسوّقين"},
     {"id":"ياسر","role":"مدير إدارة خدمة العملاء","department":"خدمة العملاء"},
+    {"id":"آسر","role":"مهندس برمجيات Full-Stack","department":"تطوير المنصة"},
 ]
 EMPLOYEE_IDS = {item["id"] for item in EMPLOYEES}
