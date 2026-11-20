@@ -159,6 +159,31 @@ def create_meeting(title: str, agenda: str, attendees: list[str], scheduled_at: 
     return item
 
 
+
+def update_meeting(meeting_id: int, updates: dict[str, Any], actor: str) -> dict[str, Any] | None:
+    allowed = {"status", "minutes"}
+    clean = {key: value for key, value in updates.items() if key in allowed}
+    if not clean:
+        return None
+    if "minutes" in clean:
+        clean["minutes"] = str(clean["minutes"])[:20000]
+    columns = list(clean)
+    with _connect() as conn:
+        before = conn.execute("SELECT * FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+        if before is None:
+            return None
+        conn.execute("UPDATE meetings SET " + ",".join(f"{column}=?" for column in columns) + " WHERE id=?",
+                     [clean[column] for column in columns] + [meeting_id])
+        row = conn.execute("SELECT * FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+    log_activity(actor, "meeting_updated", "meeting", meeting_id,
+                 f"تم تحديث الاجتماع #{meeting_id}", ", ".join(columns))
+    item = dict(row)
+    try:
+        item["attendees"] = json.loads(item["attendees"])
+    except (TypeError, json.JSONDecodeError):
+        item["attendees"] = []
+    return item
+
 def list_activity(limit: int = 60) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), 150))
     with _connect() as conn:
