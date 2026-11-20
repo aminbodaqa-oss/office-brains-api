@@ -29,8 +29,8 @@
   const $ = id => document.getElementById(id);
   let contacts = [], selected = null, poll = null, loading = false;
   const authHeaders = json => {
-    if (!window.ownerToken) throw new Error("سجّل الدخول إلى المكتب أولًا.");
-    const headers = {Authorization:"Bearer " + window.ownerToken};
+    if (!ownerToken) throw new Error("سجّل الدخول إلى المكتب أولًا.");
+    const headers = {Authorization:"Bearer " + ownerToken};
     if (json) headers["Content-Type"] = "application/json";
     return headers;
   };
@@ -40,7 +40,7 @@
       Object.assign({}, opts, {headers:authHeaders(!!opts.body)}));
     const data = await response.json().catch(() => ({}));
     if (response.status === 401) {
-      window.ownerToken = null; sessionStorage.removeItem("office_owner_token");
+      ownerToken = null; sessionStorage.removeItem("office_owner_token");
       document.getElementById("authGate").classList.remove("hidden");
       throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
     }
