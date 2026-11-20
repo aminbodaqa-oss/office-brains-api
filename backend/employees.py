@@ -13,5 +13,6 @@ EMPLOYEES = [
     {"id":"هدى","role":"مدير إدارة المسوّقين","department":"المسوّقين"},
     {"id":"ياسر","role":"مدير إدارة خدمة العملاء","department":"خدمة العملاء"},
     {"id":"آسر","role":"مهندس برمجيات Full-Stack","department":"تطوير المنصة"},
+    {"id":"زياد","role":"مسؤول الأمن السيبراني وتقنية المعلومات","department":"الأمن السيبراني وIT"},
 ]
 EMPLOYEE_IDS = {item["id"] for item in EMPLOYEES}
