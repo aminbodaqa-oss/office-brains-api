@@ -183,6 +183,21 @@ def get_notifications(limit: int = 50, unread_only: bool = False) -> dict[str, A
         unread = conn.execute("SELECT COUNT(*) FROM notifications WHERE is_read=0").fetchone()[0]
     return {"notifications": [dict(r) for r in rows], "unread_count": int(unread)}
 
+
+def delete_notifications(notification_ids: list[int] | None = None, all_items: bool = False) -> int:
+    with _connect() as conn:
+        if all_items:
+            cur = conn.execute("DELETE FROM notifications")
+        elif notification_ids:
+            ids = [int(x) for x in notification_ids[:100] if int(x) > 0]
+            if not ids:
+                return 0
+            marks = ",".join("?" for _ in ids)
+            cur = conn.execute(f"DELETE FROM notifications WHERE id IN ({marks})", ids)
+        else:
+            return 0
+        return int(cur.rowcount)
+
 def mark_notifications_read(notification_ids: list[int] | None = None, all_read: bool = False) -> int:
     with _connect() as conn:
         if all_read:
