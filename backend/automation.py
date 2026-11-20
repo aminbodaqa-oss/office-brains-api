@@ -7,9 +7,10 @@ from datetime import datetime, time as clock_time
 from zoneinfo import ZoneInfo
 
 from brains import PROVIDER, BrainUnavailable, employee_reply
-from database import _connect, add_notification
+from database import _connect, add_notification, log_interaction
 from employee_data_access import EMPLOYEE_DATASETS
 from employees import EMPLOYEES
+from workflow import workflow_overview, log_activity
 from vindora_client import VindoraUnavailable, employee_context
 
 CAIRO = ZoneInfo("Africa/Cairo")
@@ -172,6 +173,45 @@ async def _manager_meeting_decision(run_date: str, summary: str, reports: list[s
         return
     await _run_autonomous_meeting(run_date, reason, agenda, attendees)
 
+
+async def _generate_secretary_digest(run_date: str, manager_summary: str) -> None:
+    overview = workflow_overview()
+    tasks = overview.get("tasks", [])
+    meetings = overview.get("meetings", [])
+    task_lines = [
+        f"#{item['id']} {item['title']} | المسؤول: {item['assigned_to']} | الحالة: {item['status']} | الأولوية: {item['priority']} | الموعد: {item.get('due_at') or 'غير محدد'}"
+        for item in tasks
+    ]
+    meeting_lines = [
+        f"{item['title']} | الموعد: {item['scheduled_at']} | الحضور: {'، '.join(item.get('attendees') or [])}"
+        for item in meetings if item.get("status") == "scheduled"
+    ]
+    system = (
+        "أنتِ سلمى، السكرتيرة التنفيذية والمساعدة الشخصية للمالك. جهزي رسالة صباحية عملية للريّس. "
+        "شخصيتك مصرية نغشة وخفيفة الدم باعتدال، لكن دقيقة جدًا في المواعيد والمتابعة. "
+        "استخدمي المهام والاجتماعات المسجلة فقط. اذكري المتأخرات والأولويات والاجتماعات القادمة. "
+        "لو لا توجد مهام أو اجتماعات مسجلة فقولي ذلك بوضوح. لا تنشئي مهام ولا تدّعي إرسال تذكيرات أو تكليف موظفين. "
+        "افصلي بين الواقع المسجل وأي اقتراح منك، واختتمي بأهم شيء يحتاج قرار الريّس."
+    )
+    prompt = (
+        f"تاريخ اليوم: {run_date}\n"
+        f"ملخص إبراهيم المدير العام:\n{manager_summary[:5000]}\n\n"
+        f"إحصاءات المهام: {json.dumps(overview.get('task_counts', {}), ensure_ascii=False)}\n"
+        f"إجمالي المهام: {overview.get('tasks_total', 0)} · المتأخرة: {overview.get('overdue_tasks', 0)}\n"
+        "المهام المسجلة:\n" + ("\n".join(task_lines) or "لا توجد مهام مسجلة.") +
+        "\n\nالاجتماعات المسجلة:\n" + ("\n".join(meeting_lines) or "لا توجد اجتماعات قادمة مسجلة.")
+    )
+    answer = await employee_reply(system, [{"role": "user", "content": prompt}])
+    log_interaction("سلمى", "secretary_daily", {"date": run_date, "response": answer})
+    log_activity("سلمى", "daily_briefing", "workspace", None, "سلمى أرسلت الملخص الصباحي للريّس", answer)
+    add_notification(
+        "secretary_briefing",
+        "سلمى · ملخصك الصباحي جاهز",
+        "سلمى راجعت المهام والاجتماعات المسجلة وملخص إبراهيم وجهزت لك متابعة اليوم.",
+        answer,
+    )
+
+
 async def _generate_daily_briefing(run_date: str) -> None:
     reports = []
     failures = []
@@ -192,6 +232,7 @@ async def _generate_daily_briefing(run_date: str) -> None:
             )
             answer = await employee_reply(prompt, [{"role": "user", "content": "ابدأ تقريرك اليومي الآن."}])
             _save_report(run_date, employee_id, employee["department"], answer)
+            log_activity(employee_id, "daily_report", "report", None, employee_id + " أرسل تقرير بداية اليوم", answer)
             add_notification(
                 "employee_message",
                 "رسالة من " + employee_id,
@@ -225,6 +266,7 @@ async def _generate_daily_briefing(run_date: str) -> None:
         [{"role": "user", "content": manager_prompt}],
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
+    log_activity(manager["id"], "manager_briefing", "report", None, "إبراهيم أرسل الملخص الإداري اليومي", summary)
     add_notification("employee_message", "رسالة من إبراهيم · المدير العام",
         "إبراهيم أرسل لك الملخص الإداري اليومي بتاريخ " + run_date + (" مع وجود تنبيهات تحتاج مراجعة." if failures else "."),
         "رسالة إبراهيم للمالك:\n" + summary + "\n\nتقارير الفريق بالتفصيل:\n" + "\n\n".join(reports) + ("\n\nملاحظات التشغيل:\n" + "\n".join(failures) if failures else ""))
@@ -235,6 +277,13 @@ async def _generate_daily_briefing(run_date: str) -> None:
         add_notification("meeting_error", "تعذر إكمال الاجتماع التلقائي",
             "اكتمل التقرير اليومي، لكن تعذر إكمال مرحلة قرار الاجتماع أو المحضر.",
             str(exc)[:5000])
+    try:
+        await _generate_secretary_digest(run_date, summary)
+    except Exception as exc:
+        failures.append("ملخص سلمى الصباحي: " + str(exc)[:300])
+        add_notification("secretary_error", "تعذر إعداد ملخص سلمى الصباحي",
+            "اكتمل تقرير المدير، لكن تعذر إعداد ملخص السكرتيرة التنفيذية.",
+            str(exc)[:3000])
     _finish_run(run_date, "completed_with_warnings" if failures else "completed", summary, "\n".join(failures))
 
 async def scheduler_loop() -> None:
