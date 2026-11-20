@@ -18,7 +18,7 @@ from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
-from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db)
+from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -136,6 +136,10 @@ class MeetingCreateRequest(BaseModel):
     agenda: str = Field(default="", max_length=5000)
     attendees: list[str] = Field(default_factory=list, max_length=20)
     scheduled_at: str = Field(min_length=10, max_length=80)
+
+class MeetingUpdateRequest(BaseModel):
+    status: Literal["scheduled", "completed", "cancelled"] | None = None
+    minutes: str | None = Field(default=None, max_length=20000)
 
 class SecretaryRequest(BaseModel):
     message: str = Field(default="نظمي لي يومي ووريني أهم المهام والمواعيد اللي محتاجة متابعة.", max_length=6000)
@@ -358,6 +362,14 @@ async def post_meeting(body: MeetingCreateRequest, _: str = Depends(require_owne
     add_notification("meeting_scheduled", "تمت جدولة اجتماع جديد",
         body.title + " · " + body.scheduled_at,
         "الحضور: " + "، ".join(body.attendees) + "\nجدول الأعمال:\n" + body.agenda)
+    return {"saved": True, "meeting": meeting}
+
+@app.patch("/api/meetings/{meeting_id}")
+async def patch_meeting(meeting_id: int, body: MeetingUpdateRequest, _: str = Depends(require_owner)):
+    updates = body.model_dump(exclude_unset=True)
+    meeting = update_meeting(meeting_id, updates, "الريّس")
+    if meeting is None:
+        raise HTTPException(status_code=404, detail="الاجتماع غير موجود أو لا توجد تغييرات.")
     return {"saved": True, "meeting": meeting}
 
 @app.get("/api/activity")
