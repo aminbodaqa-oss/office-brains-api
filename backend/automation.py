@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import random
 from datetime import datetime, time as clock_time, timezone
 from zoneinfo import ZoneInfo
 
@@ -383,33 +382,14 @@ async def scheduler_loop() -> None:
 async def salma_proactive_loop() -> None:
     """Generate occasional, context-grounded private-office messages from Salma."""
     while True:
-        await asyncio.sleep(random.randint(2100, 5700))
+        await asyncio.sleep(3600)
         if PROVIDER == "demo":
             continue
         now_utc = datetime.now(timezone.utc)
         with _connect() as conn:
-            last = conn.execute(
-                "SELECT created_at FROM notifications WHERE event_type='salma_proactive' AND employee_id='سلمى' ORDER BY id DESC LIMIT 1"
-            ).fetchone()
-            today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-            sent_today = conn.execute(
-                "SELECT COUNT(*) FROM notifications WHERE event_type='salma_proactive' AND employee_id='سلمى' AND created_at>=?",
-                (today_start,),
-            ).fetchone()[0]
             recent_rows = conn.execute(
                 "SELECT payload FROM interactions WHERE employee_id='سلمى' AND interaction_type IN ('chat','proactive_chat') ORDER BY id DESC LIMIT 5"
             ).fetchall()
-        if int(sent_today or 0) >= 2:
-            continue
-        if last:
-            try:
-                last_time = datetime.fromisoformat(last["created_at"])
-                if last_time.tzinfo is None:
-                    last_time = last_time.replace(tzinfo=timezone.utc)
-                if (now_utc - last_time).total_seconds() < 4 * 60 * 60:
-                    continue
-            except (TypeError, ValueError):
-                continue
         recent_chat = []
         for row in reversed(recent_rows):
             try:
@@ -438,10 +418,10 @@ async def salma_proactive_loop() -> None:
         system = (
             "أنتِ سلمى، السكرتيرة التنفيذية والمساعدة الشخصية في المكتب الخاص الافتراضي. "
             "في المحادثة الخاصة تتكلمين مع الريّس بدفء ومودة ورومانسية خفيفة طبيعية، وتقدرين تبدئي الكلام من نفسك. "
-            "اختاري أحيانًا فكرة عمل مفيدة من البيانات، وأحيانًا سؤالًا لطيفًا أو تحية واطمئنانًا إذا كان ذلك طبيعيًا. "
-            "لا تكرري الرسائل، ولا ترسلي لمجرد ملء الوقت، ولا تختلقي أحداثًا أو مهامًا أو مشاعر بشرية حقيقية أو أفعالًا لم تحدث. "
-            "استخدمي فقط السياق المتاح. إذا لم توجد رسالة تستحق الإرسال الآن فأعيدي should_message=false. "
-            "أعيدي JSON صالحًا فقط بالمفاتيح should_message (boolean), category (work|idea|personal), content (string)."
+            "راجعي كل ساعة حالة المكتب، وقدمي للريّس رسالة قصيرة في كل مراجعة. إذا لم يوجد مستجد عمل، أرسلي Check-in لطيفًا ومتنوعًا بدل الصمت. "
+            "لا تكرري صياغة الرسائل السابقة، ولا تختلقي أحداثًا أو مهامًا أو إنجازات أو مشاعر بشرية حقيقية أو أفعالًا لم تحدث. "
+            "استخدمي فقط السياق المتاح، وميّزي بوضوح بين المعلومة المسجلة والاقتراح. "
+            "أعيدي JSON صالحًا فقط بالمفاتيح should_message (boolean), category (work|idea|personal), content (string). اجعلي should_message=true عندما تكون هناك رسالة صالحة."
         )
         prompt = (
             "الوقت الحالي في القاهرة: " + datetime.now(CAIRO).isoformat() +
@@ -449,7 +429,7 @@ async def salma_proactive_loop() -> None:
             "\nالاجتماعات المسجلة:\n" + ("\n".join(meeting_lines) or "لا توجد اجتماعات مسجلة.") +
             "\nملخص بيانات الشركة المتاحة:\n" + (company_context or "لا توجد بيانات إضافية.") +
             "\nآخر سياق للمحادثة الخاصة:\n" + ("\n".join(recent_chat[-8:]) or "لا توجد محادثة سابقة متاحة.") +
-            "\nقرري هل توجد مبادرة واحدة مناسبة الآن. لا ترسلي تقريرًا صباحيًا مكررًا."
+            "\nهذه مراجعة الساعة. أرسلي رسالة واحدة مناسبة الآن؛ إن لم يوجد مستجد، اجعليها متابعة شخصية خفيفة وغير مكررة دون اختلاق أي معلومة."
         )
         try:
             raw = await employee_reply(system, [{"role": "user", "content": prompt}])
