@@ -64,6 +64,16 @@ def init_db() -> None:
             conn.execute("ALTER TABLE notifications ADD COLUMN employee_id TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_notifications_employee ON notifications(employee_id,created_at DESC)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS auth_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            refresh_token_hash TEXT NOT NULL UNIQUE,
+            expires_at INTEGER NOT NULL,
+            revoked_at INTEGER,
+            created_at TEXT NOT NULL,
+            last_used_at TEXT NOT NULL
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(username,revoked_at)")
 
 def delete_chat_interactions(employee_id: str) -> int:
     with _connect() as conn:
@@ -220,3 +230,38 @@ def mark_notifications_read(notification_ids: list[int] | None = None, all_read:
         else:
             return 0
         return int(cur.rowcount)
+
+
+def create_auth_session(username: str, refresh_token_hash: str, expires_at: int) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO auth_sessions(username,refresh_token_hash,expires_at,created_at,last_used_at) VALUES(?,?,?,?,?)",
+            (username, refresh_token_hash, int(expires_at), now, now))
+
+
+def rotate_auth_session(old_hash: str, new_hash: str, expires_at: int) -> str | None:
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+    now = datetime.now(timezone.utc).isoformat()
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT username FROM auth_sessions WHERE refresh_token_hash=? AND revoked_at IS NULL AND expires_at>?",
+            (old_hash, now_epoch)).fetchone()
+        if not row:
+            return None
+        cur = conn.execute(
+            "UPDATE auth_sessions SET refresh_token_hash=?,expires_at=?,last_used_at=? WHERE refresh_token_hash=? AND revoked_at IS NULL AND expires_at>?",
+            (new_hash, int(expires_at), now, old_hash, now_epoch))
+        return str(row["username"]) if cur.rowcount == 1 else None
+
+
+def revoke_auth_session(refresh_token_hash: str) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE auth_sessions SET revoked_at=? WHERE refresh_token_hash=? AND revoked_at IS NULL",
+                     (int(datetime.now(timezone.utc).timestamp()), refresh_token_hash))
+
+
+def revoke_user_auth_sessions(username: str) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE auth_sessions SET revoked_at=? WHERE username=? AND revoked_at IS NULL",
+                     (int(datetime.now(timezone.utc).timestamp()), username))
