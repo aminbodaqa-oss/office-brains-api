@@ -374,7 +374,7 @@ def save_delegation_plan(task_id: int, plan: list[dict[str, Any]]) -> bool:
     return True
 
 
-def approve_delegation_plan(task_id: int) -> list[dict[str, Any]] | None:
+def approve_delegation_plan(task_id: int, allowed_employee_ids: set[str]) -> list[dict[str, Any]] | None:
     """Atomically create approved child tasks once; repeated approvals cannot duplicate them."""
     now = _now()
     created: list[dict[str, Any]] = []
@@ -392,13 +392,18 @@ def approve_delegation_plan(task_id: int) -> list[dict[str, Any]] | None:
             return None
         if not isinstance(plan, list) or not plan or len(plan) > 8:
             return None
+        normalized = []
         for item in plan:
+            if not isinstance(item, dict):
+                return None
             title = str(item.get("title", "")).strip()[:180]
             description = str(item.get("description", "")).strip()[:5000]
             assigned_to = str(item.get("assigned_to", "")).strip()[:120]
             priority = str(item.get("priority", "normal")).strip()
-            if not title or not assigned_to or priority not in TASK_PRIORITIES:
+            if not title or assigned_to not in allowed_employee_ids or priority not in TASK_PRIORITIES:
                 return None
+            normalized.append((title, description, assigned_to, priority))
+        for title, description, assigned_to, priority in normalized:
             cur = conn.execute(
                 """INSERT INTO tasks(title,description,assigned_to,created_by,status,priority,due_at,source,created_at,updated_at)
                    VALUES(?,?,?,?,?,?,?,?,?,?)""",
