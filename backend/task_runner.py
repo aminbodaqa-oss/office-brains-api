@@ -96,25 +96,40 @@ async def task_execution_loop() -> None:
                         json.dumps(team, ensure_ascii=False) +
                         "\n\nاقترح المهام الفرعية. استخدم assigned_to من id فقط، والأولوية واحدة من low/normal/high/urgent."
                     )
-                    raw_plan = (await employee_reply(
-                        delegation_system, [{"role": "user", "content": delegation_prompt}]
-                    )).strip()
-                    start, end = raw_plan.find("{"), raw_plan.rfind("}")
-                    parsed = json.loads(raw_plan[start:end + 1]) if start >= 0 and end > start else {}
                     allowed = {item["id"] for item in team}
-                    proposals = parsed.get("delegations", [])
                     clean_plan = []
-                    if isinstance(proposals, list):
-                        for item in proposals[:5]:
-                            if not isinstance(item, dict):
-                                continue
-                            assignee = str(item.get("assigned_to", "")).strip()
-                            title = str(item.get("title", "")).strip()
-                            description = str(item.get("description", "")).strip()
-                            priority = str(item.get("priority", "normal")).strip()
-                            if assignee in allowed and title and priority in {"low", "normal", "high", "urgent"}:
-                                clean_plan.append({"title": title[:180], "description": description[:5000],
-                                                   "assigned_to": assignee, "priority": priority})
+                    last_error = ""
+                    for attempt in range(2):
+                        try:
+                            retry_prompt = delegation_prompt if attempt == 0 else (
+                                "أعد إخراج خطة التفويض كـ JSON صحيح فقط، دون Markdown أو شرح. "
+                                "استخدم أسماء الموظفين حرفيًا من القائمة، ومهمة واحدة إلى خمس مهام عند وجود توصيات قابلة للتنفيذ.\n"
+                                + delegation_prompt
+                            )
+                            raw_plan = (await employee_reply(
+                                delegation_system, [{"role": "user", "content": retry_prompt}]
+                            )).strip()
+                            start, end = raw_plan.find("{"), raw_plan.rfind("}")
+                            parsed = json.loads(raw_plan[start:end + 1]) if start >= 0 and end > start else {}
+                            proposals = parsed.get("delegations", [])
+                            candidate = []
+                            if isinstance(proposals, list):
+                                for item in proposals[:5]:
+                                    if not isinstance(item, dict):
+                                        continue
+                                    assignee = str(item.get("assigned_to", "")).strip()
+                                    title = str(item.get("title", "")).strip()
+                                    description = str(item.get("description", "")).strip()
+                                    priority = str(item.get("priority", "normal")).strip()
+                                    if assignee in allowed and title and priority in {"low", "normal", "high", "urgent"}:
+                                        candidate.append({"title": title[:180], "description": description[:5000],
+                                                          "assigned_to": assignee, "priority": priority})
+                            if candidate:
+                                clean_plan = candidate
+                                break
+                            last_error = "لم يُرجع المحرك مهامًا صالحة قابلة للتفويض."
+                        except Exception as exc:
+                            last_error = str(exc)[:900] or "تعذر تحليل خطة التفويض."
                     if clean_plan and save_delegation_plan(task_id, clean_plan):
                         add_notification(
                             "delegation_plan_ready",
@@ -122,9 +137,28 @@ async def task_execution_loop() -> None:
                             f"إبراهيم اقترح {len(clean_plan)} مهام فرعية. لم تُرسل التكليفات بعد.",
                             "راجع المقترحات ثم اعتمد توزيعها من لوحة مهام الشركة."
                         )
-                except Exception:
-                    # The employee's main deliverable remains valid even if delegation planning fails.
-                    pass
+                    else:
+                        detail = last_error or "تعذر حفظ خطة التفويض."
+                        log_interaction("ابراهيم", "delegation_plan_failed", {
+                            "task_id": task_id, "error": detail, "report": result[:4000]
+                        })
+                        add_notification(
+                            "delegation_plan_failed",
+                            f"تعذر تجهيز خطة التفويض · #{task_id}",
+                            "تم حفظ تقرير إبراهيم، لكن لم تتولد قائمة مهام فرعية صالحة. لم يتم إرسال أي تكليف.",
+                            detail
+                        )
+                except Exception as exc:
+                    detail = str(exc)[:900] or "خطأ غير معروف في مرحلة التفويض."
+                    log_interaction("ابراهيم", "delegation_plan_failed", {
+                        "task_id": task_id, "error": detail
+                    })
+                    add_notification(
+                        "delegation_plan_failed",
+                        f"تعذر تجهيز خطة التفويض · #{task_id}",
+                        "تم حفظ تقرير إبراهيم، لكن مرحلة تحويل التوصيات إلى تكليفات تعثرت. لم يتم إرسال أي تكليف.",
+                        detail
+                    )
 
             add_notification(
                 "task_ready_for_review",
