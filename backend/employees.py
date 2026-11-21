@@ -75,7 +75,7 @@ def management_context_for(employee_id: str) -> str:
         return ""
     context = TEAM_DIRECTORY_CONTEXT
     if employee_id == "ابراهيم":
-        context += "\\n\\n" + MANAGEMENT_TEAM_CONTEXT
+        context += "\n\n" + MANAGEMENT_TEAM_CONTEXT
     elif employee_id == "سلمى":
-        context += "\\n\\n" + SALMA_TEAM_CONTEXT
+        context += "\n\n" + SALMA_TEAM_CONTEXT
     return context
