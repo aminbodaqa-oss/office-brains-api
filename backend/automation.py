@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from database import _connect, add_notification, log_interaction
-from employees import EMPLOYEES
+from employees import EMPLOYEES, management_context_for
 from workflow import workflow_overview, log_activity, list_tasks, list_activity, list_meetings
 from vindora_client import VindoraUnavailable, employee_context
 
@@ -98,7 +98,8 @@ async def _run_autonomous_meeting(run_date: str, reason: str, agenda: list[str],
     manager_context = await employee_context("ابراهيم", days=30)
     manager_result = await employee_reply(
         "أنت إبراهيم المدير العام لـ Vindora. راجع نقاش الاجتماع، واكتب خلاصة قرارات وتوصيات واضحة. "
-        "افصل القرارات المتفق عليها عن المقترحات، وحدد المسؤول والموعد فقط إذا ورد أساس لهما. لا تخترع تنفيذًا.",
+        "افصل القرارات المتفق عليها عن المقترحات، وحدد المسؤول والموعد فقط إذا ورد أساس لهما. لا تخترع تنفيذًا.\n\n"
+        + management_context_for("ابراهيم"),
         [{"role": "user", "content": "بيانات الإدارة: " + manager_context + "\n\nنقاش الاجتماع:\n" + discussion}]
     )
     secretary = next(item for item in EMPLOYEES if item["id"] == "سلمى")
@@ -130,7 +131,8 @@ async def _manager_meeting_decision(run_date: str, summary: str, reports: list[s
         ("\n\nتعثرات التقارير:\n" + "\n".join(failures) if failures else "")
     )
     raw = await employee_reply(
-        "أنت إبراهيم. مهمتك إصدار قرار اجتماع آلي قابل للقراءة البرمجية. أعد JSON فقط.",
+        "أنت إبراهيم. مهمتك إصدار قرار اجتماع آلي قابل للقراءة البرمجية. أعد JSON فقط.\n\n"
+        + management_context_for("ابراهيم"),
         [{"role": "user", "content": prompt}]
     )
     start, end = raw.find("{"), raw.rfind("}")
@@ -337,7 +339,8 @@ async def _generate_daily_briefing(run_date: str) -> None:
         + ("\n\nتعذر إعداد بعض التقارير:\n" + "\n".join(failures) if failures else "")
     )
     summary = await employee_reply(
-        "أنت المدير العام إبراهيم. كن دقيقًا، لا تخترع بيانات، واكتب تقريرًا تنفيذيًا موجزًا للمالك.",
+        "أنت المدير العام إبراهيم. كن دقيقًا، لا تخترع بيانات، واكتب تقريرًا تنفيذيًا موجزًا للمالك.\n\n"
+        + management_context_for("ابراهيم"),
         [{"role": "user", "content": manager_prompt}],
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
