@@ -3,6 +3,7 @@ import json
 import hmac
 import asyncio
 import os
+import secrets
 import time
 from contextlib import asynccontextmanager
 from typing import Literal
@@ -12,12 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 load_dotenv()
-from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device, get_push_status
+from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device, get_push_status, create_auth_session, rotate_auth_session, revoke_auth_session, revoke_user_auth_sessions
 from employees import EMPLOYEES, EMPLOYEE_IDS
 from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
 from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
 from brains import PROVIDER, BrainUnavailable, employee_reply
-from auth import issue_token, require_owner, verify_password, hash_password
+from auth import issue_token, require_owner, verify_password, hash_password, hash_refresh_token
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -82,7 +83,38 @@ async def login(body: LoginRequest, request: Request):
         token = issue_token(expected_user)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    return {"access_token": token, "token_type": "bearer", "expires_in": int(os.getenv("OFFICE_TOKEN_TTL_SECONDS", "1800"))}
+    refresh_token = secrets.token_urlsafe(48)
+    refresh_ttl = int(os.getenv("OFFICE_REFRESH_TTL_SECONDS", str(90 * 24 * 60 * 60)))
+    create_auth_session(expected_user, hash_refresh_token(refresh_token), int(time.time()) + refresh_ttl)
+    return {"access_token": token, "refresh_token": refresh_token, "token_type": "bearer",
+            "expires_in": int(os.getenv("OFFICE_TOKEN_TTL_SECONDS", "1800"))}
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=20, max_length=512)
+
+
+@app.post("/api/auth/refresh")
+async def refresh_session(body: RefreshRequest):
+    old_hash = hash_refresh_token(body.refresh_token)
+    new_refresh = secrets.token_urlsafe(48)
+    refresh_ttl = int(os.getenv("OFFICE_REFRESH_TTL_SECONDS", str(90 * 24 * 60 * 60)))
+    username = rotate_auth_session(old_hash, hash_refresh_token(new_refresh), int(time.time()) + refresh_ttl)
+    expected_user = os.getenv("OWNER_USERNAME", "").strip()
+    if not username or not expected_user or not hmac.compare_digest(username, expected_user):
+        raise HTTPException(status_code=401, detail="انتهت جلسة الدخول. سجّل الدخول مرة أخرى.")
+    try:
+        access = issue_token(username)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"access_token": access, "refresh_token": new_refresh, "token_type": "bearer",
+            "expires_in": int(os.getenv("OFFICE_TOKEN_TTL_SECONDS", "1800"))}
+
+
+@app.post("/api/auth/logout")
+async def logout_session(body: RefreshRequest):
+    revoke_auth_session(hash_refresh_token(body.refresh_token))
+    return {"logged_out": True}
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1, max_length=512)
@@ -96,6 +128,7 @@ async def change_password(body: ChangePasswordRequest, username: str = Depends(r
     if hmac.compare_digest(body.current_password, body.new_password):
         raise HTTPException(status_code=400, detail="اختار كلمة مرور مختلفة عن الحالية.")
     set_owner_password_hash(hash_password(body.new_password))
+    revoke_user_auth_sessions(username)
     add_notification("security", "تم تغيير كلمة مرور المكتب", "تم تحديث كلمة مرور حساب المالك بنجاح.", "اسم المستخدم: " + username)
     return {"changed": True, "message": "تم تغيير كلمة المرور بنجاح."}
 
