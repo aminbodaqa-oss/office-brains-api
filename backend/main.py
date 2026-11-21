@@ -251,17 +251,70 @@ async def platform_admin_login(body: PlatformAdminLoginRequest):
 
 @app.get("/api/platform/admin/overview")
 async def platform_admin_overview(_: str = Depends(require_platform_admin)):
-    # Deliberately aggregate-only: this first console slice exposes no customer,
-    # conversation, task-detail, memory, or Vindora business records.
+    # Aggregate-only platform telemetry. Never return workspace conversations,
+    # memories, task content, notification text, or customer-identifying records.
     from database import _connect
+
     with _connect() as conn:
-        tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-        task_total = int(conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]) if "tasks" in tables else 0
+        tables = {row["name"] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+
+        task_total = 0
+        task_status_counts = {}
+        if "tasks" in tables:
+            task_total = int(conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0])
+            task_status_counts = {
+                str(row["status"]): int(row["total"])
+                for row in conn.execute(
+                    "SELECT status, COUNT(*) AS total FROM tasks GROUP BY status"
+                ).fetchall()
+            }
+
+        execution_status_counts = {}
+        if "task_executions" in tables:
+            execution_status_counts = {
+                str(row["status"]): int(row["total"])
+                for row in conn.execute(
+                    "SELECT status, COUNT(*) AS total FROM task_executions GROUP BY status"
+                ).fetchall()
+            }
+
+        meetings_total = int(conn.execute(
+            "SELECT COUNT(*) FROM meetings"
+        ).fetchone()[0]) if "meetings" in tables else 0
+        meetings_scheduled = int(conn.execute(
+            "SELECT COUNT(*) FROM meetings WHERE status='scheduled'"
+        ).fetchone()[0]) if "meetings" in tables else 0
+        notifications_unread = int(conn.execute(
+            "SELECT COUNT(*) FROM notifications WHERE is_read=0"
+        ).fetchone()[0]) if "notifications" in tables else 0
+        push_devices_active = int(conn.execute(
+            "SELECT COUNT(*) FROM push_devices WHERE active=1"
+        ).fetchone()[0]) if "push_devices" in tables else 0
+
+    automation_enabled = os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
     return {
         "api": {"status": "ok", "provider": PROVIDER},
-        "operations": {"tasks_total": task_total},
+        "system": {
+            "database": "ok",
+            "automation_enabled": automation_enabled,
+            "provider_ready": PROVIDER != "demo",
+            "admin_auth": "active",
+        },
+        "operations": {
+            "tasks_total": task_total,
+            "task_status_counts": task_status_counts,
+            "execution_status_counts": execution_status_counts,
+            "meetings_total": meetings_total,
+            "meetings_scheduled": meetings_scheduled,
+            "notifications_unread": notifications_unread,
+            "push_devices_active": push_devices_active,
+        },
         "catalog": {"employee_templates": len(EMPLOYEES)},
-        "scope": "aggregate_only"
+        "scope": "aggregate_only",
     }
 
 @app.get("/api/employees")
