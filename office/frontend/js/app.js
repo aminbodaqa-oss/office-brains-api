@@ -193,7 +193,7 @@ s+='<circle cx="43" cy="46" r="1.8" fill="#222"/><circle cx="57" cy="46" r="1.8"
 if(a.g)s+='<g fill="none" stroke="#222" stroke-width="1.5"><circle cx="43" cy="46" r="6"/><circle cx="57" cy="46" r="6"/><path d="M49 46h2"/></g>';
 return s+'</svg>'}
 const AVATAR_FILES=["ibrahim.jpg","leila.jpg","nour.jpg","karim.jpg","islam.jpg","talaat.jpg","mohamed.jpg","thabet.jpg","tahamy.jpg","salma.jpg","amr.jpg","hoda.jpg","yasser.jpg",null,null];
-function avatarPhoto(i){const file=AVATAR_FILES[i];return file?`<img src="vindora_employee_portraits/${file}" alt="${T[i].n}" loading="lazy">`:avSVG(i)}
+function avatarPhoto(i){const file=AVATAR_FILES[i];return file?`<img src="../vindora_employee_portraits/${file}" alt="${T[i].n}" loading="lazy">`:avSVG(i)}
 $("grid").innerHTML=T.map((x,i)=>`<button class="desk ${x.gm?"gm":""}" data-i="${i}"><div class="av">${avatarPhoto(i)}</div><b>${x.n}</b><span>${x.r}</span></button>`).join("");
 $("grid").onclick=e=>{const b=e.target.closest(".desk");if(b)openChat(+b.dataset.i)};
 $("back").onclick=()=>{$("chat").classList.remove("on");cur=null};
