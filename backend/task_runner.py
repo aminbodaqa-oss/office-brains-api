@@ -20,9 +20,9 @@ async def finalize_delegation_group(parent_task_id: int) -> bool:
     if not children or not all(item.get("execution_status") in {"review", "completed"} for item in children):
         return False
     team_report_prompt = (
-        f"المهمة الرئيسية: #{parent_task_id}\\n"
+        f"المهمة الرئيسية: #{parent_task_id}\n"
         "اجمع النتائج المسجلة التالية في تقرير تنفيذي موحد. لا تضف حقائق غير موجودة، "
-        "واشرح أي تعارض أو نقص، وافصل بين النتائج المؤكدة والتوصيات.\\n\\n"
+        "واشرح أي تعارض أو نقص، وافصل بين النتائج المؤكدة والتوصيات.\n\n"
         + json.dumps(children, ensure_ascii=False)
     )
     try:
@@ -132,8 +132,8 @@ async def task_execution_loop() -> None:
                 try:
                     send_internal_message(
                         employee_id, "ابراهيم",
-                        f"تم تجهيز نتيجة المهمة الفرعية #{task_id} وإرسالها للمدير العام.\\n"
-                        f"المهمة: {task['title']}\\nالنتيجة المسجلة للمراجعة:\\n{result[:4500]}"
+                        f"تم تجهيز نتيجة المهمة الفرعية #{task_id} وإرسالها للمدير العام.\n"
+                        f"المهمة: {task['title']}\nالنتيجة المسجلة للمراجعة:\n{result[:4500]}"
                     )
                 except Exception as exc:
                     add_notification(
