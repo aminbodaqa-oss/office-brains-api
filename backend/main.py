@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device, get_push_status, create_auth_session, rotate_auth_session, revoke_auth_session, revoke_user_auth_sessions
 from employees import EMPLOYEES, EMPLOYEE_IDS, management_context_for
-from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
+from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent, detect_contact_request)
 from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password, hash_refresh_token
@@ -614,8 +614,78 @@ async def patch_meeting(meeting_id: int, body: MeetingUpdateRequest, _: str = De
 async def get_activity(limit: int = 60, _: str = Depends(require_owner)):
     return {"activity": list_activity(limit)}
 
+
+
+async def _employee_contact_owner(employee_id: str, owner_request: str) -> None:
+    """Generate and record a direct, employee-initiated message to the owner."""
+    employee = next((item for item in EMPLOYEES if item["id"] == employee_id), None)
+    if not employee:
+        return
+    if PROVIDER == "demo":
+        log_activity("سلمى", "contact_request_failed", "employee", None,
+                     "تعذر تنفيذ طلب التواصل لأن مزود الذكاء الاصطناعي في وضع التجربة",
+                     "الموظف المطلوب: " + employee_id)
+        add_notification("contact_request_failed", "تعذر بدء التواصل",
+                         "طلب التواصل مع " + employee_id + " لم يُنفذ لأن محرك الذكاء الاصطناعي في وضع التجربة.",
+                         "لم يتم إرسال رسالة من الموظف.")
+        return
+    try:
+        system = (
+            "أنت موظف افتراضي متخصص داخل مكتب Vindora. المالك طلب منك أن تبدأ التواصل معه بنفسك الآن. "
+            "اكتب له رسالة مباشرة بصوتك وشخصيتك وتخصصك، وابدأ بذكر سبب تواصلك وما الذي تحتاج مناقشته أو توضيحه. "
+            "استخدم العامية المصرية المهنية والطبيعية. لا تدّعِ تنفيذ عمل أو إرسال شيء خارج المكتب، ولا تخترع حقائق. "
+            "إذا كان طلب المالك عامًا، ابدأ برسالة قصيرة واسأله عن النقطة التي يريد مناقشتها. "
+            f"اسمك: {employee['id']}\nوظيفتك: {employee['role']}\nالإدارة: {employee['department']}"
+        )
+        team_context = management_context_for(employee_id)
+        if team_context:
+            system += "\n\nمعرفة الفريق والتنسيق في حدود الاختصاص:\n" + team_context
+        if employee.get("instructions"):
+            system += "\n\nتعليمات التخصص:\n" + employee["instructions"]
+        try:
+            system += await employee_context(employee_id)
+        except Exception:
+            system += "\nلا تتوفر بيانات خارجية إضافية؛ اعتمد على طلب المالك فقط."
+        prompt = (
+            "هذه إحالة تواصل مباشرة من سلمى بناءً على طلب المالك. "
+            "المالك قال لها: " + owner_request[:1500] +
+            "\nابدأ أنت المحادثة برسالة مباشرة للمالك، ولا ترد على سلمى."
+        )
+        content = (await employee_reply(system, [{"role": "user", "content": prompt}])).strip()
+        if not content:
+            raise RuntimeError("الموظف لم يُنتج رسالة تواصل.")
+        log_interaction(employee_id, "chat", {
+            "messages": [{"role": "user", "content": "سلمى أحالت إليّ طلب تواصل من الريّس: " + owner_request[:1500]}],
+            "response": content, "initiated_by_employee": True, "contact_request": True
+        })
+        log_activity(employee_id, "employee_contact_owner", "chat", None,
+                     employee_id + " بدأ التواصل مع الريّس بناءً على طلب سلمى", content)
+        add_notification(
+            "employee_message", "رسالة من " + employee_id,
+            employee_id + " بدأ التواصل معاك بناءً على طلبك من سلمى.",
+            "طلبك الأصلي: " + owner_request[:1500] + "\n\nرسالة " + employee_id + ":\n" + content,
+            employee_id=employee_id,
+        )
+    except Exception as exc:
+        log_activity("سلمى", "contact_request_failed", "employee", None,
+                     "تعذر إكمال طلب التواصل مع " + employee_id, str(exc)[:1000])
+        add_notification("contact_request_failed", "تعذر إكمال طلب التواصل",
+                         "سلمى لم تتمكن من الحصول على رسالة من " + employee_id + ".",
+                         "السبب: " + str(exc)[:1200] + "\nالطلب: " + owner_request[:1000])
+
 @app.post("/api/secretary/briefing")
-async def secretary_briefing(body: SecretaryRequest, _: str = Depends(require_owner)):
+async def secretary_briefing(body: SecretaryRequest, background_tasks: BackgroundTasks, _: str = Depends(require_owner)):
+    requested_employee = detect_contact_request(body.message)
+    if requested_employee:
+        log_activity("سلمى", "contact_request_created", "employee", None,
+                     "سلمى سجلت طلب تواصل من الريّس مع " + requested_employee, body.message)
+        add_notification("contact_request", "سلمى بدأت تنسيق التواصل",
+                         "سلمى أحالت طلبك إلى " + requested_employee + "، وهيوصلك إشعار لما يبدأ التواصل.",
+                         body.message, employee_id=requested_employee)
+        background_tasks.add_task(_employee_contact_owner, requested_employee, body.message)
+        answer = "حاضر يا ريس. سجلت طلبك ووجّهته لـ" + requested_employee + "، وطلبت منه يبدأ هو المحادثة معاك. هتابع النتيجة، وهيوصلك إشعار أول ما رسالته تتسجل."
+        log_interaction("سلمى", "secretary", {"request": body.message, "response": answer, "contact_request": requested_employee})
+        return {"employee_id": "سلمى", "content": answer, "contact_requested": True, "contact_employee": requested_employee}
     overview = workflow_overview()
     reports = recent_reports(12)
     tasks_text = "\n".join(
