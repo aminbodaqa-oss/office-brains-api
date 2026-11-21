@@ -620,9 +620,9 @@ async def approve_task_delegations(task_id: int, _: str = Depends(require_owner)
         raise HTTPException(status_code=409, detail="لا توجد خطة مقترحة قابلة للاعتماد، أو سبق اعتمادها.")
     for child in children:
         message = (
-            "تم تكليفك بمهمة فرعية من إبراهيم المدير العام بعد موافقة الريّس.\\n"
-            f"المهمة: #{child['id']} · {child['title']}\\n"
-            f"التفاصيل: {child['description']}\\nالأولوية: {child['priority']}"
+            "تم تكليفك بمهمة فرعية من إبراهيم المدير العام بعد موافقة الريّس.\n"
+            f"المهمة: #{child['id']} · {child['title']}\n"
+            f"التفاصيل: {child['description']}\nالأولوية: {child['priority']}"
         )
         try:
             send_internal_message("ابراهيم", child["assigned_to"], message)
@@ -632,13 +632,13 @@ async def approve_task_delegations(task_id: int, _: str = Depends(require_owner)
         add_notification(
             "delegated_task_assigned", "تكليف جديد من إبراهيم",
             f"إبراهيم كلفك بالمهمة: {child['title']}",
-            f"المهمة الرئيسية: #{task_id}\\n{message}", employee_id=child["assigned_to"]
+            f"المهمة الرئيسية: #{task_id}\n{message}", employee_id=child["assigned_to"]
         )
     add_notification(
         "delegations_approved", "تم اعتماد توزيع المهام",
         f"تم إنشاء {len(children)} مهام فرعية بعد موافقتك.",
-        "المهمة الرئيسية: #" + str(task_id) + "\\n" +
-        "\\n".join(f"#{item['id']} · {item['title']} — {item['assigned_to']}" for item in children)
+        "المهمة الرئيسية: #" + str(task_id) + "\n" +
+        "\n".join(f"#{item['id']} · {item['title']} — {item['assigned_to']}" for item in children)
     )
     return {"approved": True, "parent_task_id": task_id, "created_tasks": children}
 
