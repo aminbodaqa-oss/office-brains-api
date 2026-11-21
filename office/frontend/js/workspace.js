@@ -110,7 +110,12 @@
   async function renderTasks() {
     const data = await loadOverview();
     const counts = data.task_counts || {};
+    const engine = data.task_execution_engine || {};
+    const engineNotice = engine.ready
+      ? '<div class="ws-muted" style="margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:10px">محرك تنفيذ المهام مفعّل. النتائج تُسلّم للمراجعة ولا تُغلق تلقائيًا.</div>'
+      : '<div class="ws-muted" style="margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:10px">المهام ستُحفظ ويصل التكليف للموظف، لكن التنفيذ الآلي متوقف حاليًا. يلزم تفعيل AUTONOMOUS_OFFICE_ENABLED=true واختيار مزود ذكاء اصطناعي فعلي بدل demo على السيرفر.</div>';
     $w("wsContent").innerHTML = `
+      ${engineNotice}
       <div class="ws-stats">
         <div class="ws-stat"><b>${data.tasks_total || 0}</b><span>كل المهام</span></div>
         <div class="ws-stat"><b>${counts.open || 0}</b><span>جديدة</span></div>
