@@ -615,7 +615,7 @@ async def retry_task(task_id: int, _: str = Depends(require_owner)):
 
 @app.post("/api/tasks/{task_id}/delegations/approve")
 async def approve_task_delegations(task_id: int, _: str = Depends(require_owner)):
-    children = approve_delegation_plan(task_id)
+    children = approve_delegation_plan(task_id, EMPLOYEE_IDS)
     if children is None:
         raise HTTPException(status_code=409, detail="لا توجد خطة مقترحة قابلة للاعتماد، أو سبق اعتمادها.")
     for child in children:
