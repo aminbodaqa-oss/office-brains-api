@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/real-office-workflow
+      - feat/task-execution-workflow
   pull_request:
     branches:
       - main
@@ -23,4 +24,6 @@ jobs:
       - name: Check Python syntax
         run: python -m compileall -q backend
       - name: Check workspace JavaScript syntax
-        run: node --check office/js/workspace.js
+        run: |
+          node --check office/frontend/js/workspace.js
+          node --check office/js/workspace.js

@@ -22,7 +22,8 @@ from auth import issue_token, require_owner, verify_password, hash_password, has
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
-from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db)
+from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution)
+from task_runner import task_execution_loop
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,16 +33,18 @@ async def lifespan(app: FastAPI):
     init_whatsapp_db()
     scheduler_task = None
     proactive_task = None
+    task_worker_task = None
     push_task = asyncio.create_task(push_delivery_loop())
     if os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
         scheduler_task = asyncio.create_task(scheduler_loop())
         if PROVIDER != "demo":
             from automation import salma_proactive_loop
             proactive_task = asyncio.create_task(salma_proactive_loop())
+            task_worker_task = asyncio.create_task(task_execution_loop())
     try:
         yield
     finally:
-        for task in (scheduler_task, proactive_task, push_task):
+        for task in (scheduler_task, proactive_task, task_worker_task, push_task):
             if task:
                 task.cancel()
                 try:
@@ -498,7 +501,14 @@ async def meeting_respond(body: MeetingRequest, _: str = Depends(require_owner))
 
 @app.get("/api/workspace/overview")
 async def get_workspace_overview(_: str = Depends(require_owner)):
-    return workflow_overview()
+    overview = workflow_overview()
+    autonomous_enabled = os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    overview["task_execution_engine"] = {
+        "enabled": autonomous_enabled,
+        "provider": PROVIDER,
+        "ready": autonomous_enabled and PROVIDER != "demo",
+    }
+    return overview
 
 @app.get("/api/tasks")
 async def get_tasks(limit: int = 100, status: str | None = None, assigned_to: str | None = None,
@@ -555,10 +565,20 @@ async def post_task(body: TaskCreateRequest, background_tasks: BackgroundTasks, 
         raise HTTPException(status_code=400, detail="درجة أولوية غير صحيحة.")
     task = create_task(body.title, body.description, body.assigned_to, "الريّس",
                        body.priority, body.due_at, "owner")
+    assignment_message = ("تم تكليفك بمهمة جديدة من الريّس.\nالمهمة: #" + str(task["id"]) + " · " + body.title +
+        "\nالتفاصيل: " + (body.description or "لا توجد تفاصيل إضافية.") +
+        "\nالأولوية: " + body.priority + "\nالموعد: " + (body.due_at or "غير محدد") +
+        "\nسيجهز محرك التنفيذ نتيجة قابلة للمراجعة عند تفعيل التشغيل التلقائي ومحرك الذكاء الاصطناعي.")
+    assignment_sender = "ابراهيم" if body.assigned_to == "سلمى" else "سلمى"
+    try:
+        send_internal_message(assignment_sender, body.assigned_to, assignment_message)
+    except ValueError as exc:
+        log_activity("النظام", "task_assignment_message_failed", "task", int(task["id"]),
+                     "تعذر إنشاء رسالة التكليف الداخلية", str(exc))
     add_notification("task_created", "مهمة جديدة في المكتب",
-        "تم تسجيل مهمة وتكليف " + body.assigned_to + ".", 
-        "المهمة: " + body.title + "\nالأولوية: " + body.priority + "\nالموعد: " + (body.due_at or "غير محدد"))
-    background_tasks.add_task(_notify_assigned_employee, task, "تم تكليفك بمهمة جديدة من المالك.")
+        "تم تسجيل مهمة وتكليف " + body.assigned_to + ".",
+        "المهمة: " + body.title + "\nالأولوية: " + body.priority + "\nالموعد: " + (body.due_at or "غير محدد"),
+        employee_id=body.assigned_to)
     return {"saved": True, "task": task}
 
 @app.patch("/api/tasks/{task_id}")
@@ -578,6 +598,18 @@ async def patch_task(task_id: int, body: TaskUpdateRequest, background_tasks: Ba
     if "status" in updates or "assigned_to" in updates:
         background_tasks.add_task(_notify_assigned_employee, task, "تم تحديث حالة المهمة أو المسؤول عنها.")
     return {"saved": True, "task": task}
+
+@app.post("/api/tasks/{task_id}/retry")
+async def retry_task(task_id: int, _: str = Depends(require_owner)):
+    if not retry_task_execution(task_id):
+        raise HTTPException(status_code=409, detail="المهمة غير موجودة أو ليست في حالة فشل قابلة لإعادة المحاولة.")
+    task = next((item for item in list_tasks(200) if int(item["id"]) == task_id), None)
+    if task:
+        add_notification("task_requeued", "إعادة تشغيل المهمة #" + str(task_id),
+            "تمت إعادة المهمة إلى طابور التنفيذ.", "الموظف المسؤول: " + task["assigned_to"],
+            employee_id=task["assigned_to"])
+    return {"queued": True, "task_id": task_id}
+
 
 @app.get("/api/meetings")
 async def get_meetings(limit: int = 50, _: str = Depends(require_owner)):

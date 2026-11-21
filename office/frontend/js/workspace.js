@@ -26,6 +26,10 @@
     .ws-form button{grid-column:1/-1}
     .ws-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .ws-report{padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--bg);white-space:pre-wrap;font-size:13px;line-height:1.9}
+    .ws-execution{display:block;margin-top:5px;color:var(--mut);font-size:11px}
+    .ws-result{margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+    .ws-result summary{cursor:pointer;font-size:12px;font-weight:700}
+    .ws-result pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:12px;line-height:1.8;margin:8px 0 0}
     .ws-activity{padding:9px 0;border-bottom:1px solid var(--line);font-size:12px}
     .ws-activity:last-child{border-bottom:0}
     .ws-activity b{display:block}
@@ -106,7 +110,12 @@
   async function renderTasks() {
     const data = await loadOverview();
     const counts = data.task_counts || {};
+    const engine = data.task_execution_engine || {};
+    const engineNotice = engine.ready
+      ? '<div class="ws-muted" style="margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:10px">محرك تنفيذ المهام مفعّل. النتائج تُسلّم للمراجعة ولا تُغلق تلقائيًا.</div>'
+      : '<div class="ws-muted" style="margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:10px">المهام ستُحفظ ويصل التكليف للموظف، لكن التنفيذ الآلي متوقف حاليًا. يلزم تفعيل AUTONOMOUS_OFFICE_ENABLED=true واختيار مزود ذكاء اصطناعي فعلي بدل demo على السيرفر.</div>';
     $w("wsContent").innerHTML = `
+      ${engineNotice}
       <div class="ws-stats">
         <div class="ws-stat"><b>${data.tasks_total || 0}</b><span>كل المهام</span></div>
         <div class="ws-stat"><b>${counts.open || 0}</b><span>جديدة</span></div>
@@ -133,7 +142,16 @@
       const title = document.createElement("strong"); title.textContent = "#" + task.id + " · " + task.title;
       const desc = document.createElement("p"); desc.textContent = task.description || "بدون تفاصيل إضافية.";
       const meta = document.createElement("small"); meta.textContent = "المسؤول: " + task.assigned_to + " · الأولوية: " + task.priority + " · الموعد: " + localDate(task.due_at);
-      details.append(title,desc,meta);
+      const executionLabels = {queued:"في طابور التنفيذ",running:"الموظف بيجهز النتيجة",review:"نتيجة جاهزة للمراجعة",failed:"التنفيذ تعثر",completed:"معتمدة كمكتملة",cancelled:"ملغاة"};
+      const execution = document.createElement("small"); execution.className = "ws-execution";
+      execution.textContent = "حالة التنفيذ: " + (executionLabels[task.execution_status] || "لم يبدأ التنفيذ الآلي");
+      details.append(title,desc,meta,execution);
+      if (task.execution_result || task.execution_error) {
+        const resultBox = document.createElement("details"); resultBox.className = "ws-result";
+        const summary = document.createElement("summary"); summary.textContent = task.execution_error ? "تفاصيل تعثر التنفيذ" : "عرض نتيجة الموظف للمراجعة";
+        const output = document.createElement("pre"); output.textContent = task.execution_error || task.execution_result;
+        resultBox.append(summary,output); details.append(resultBox);
+      }
       const actions = document.createElement("div");
       const select = document.createElement("select");
       select.innerHTML = '<option value="open">جديدة</option><option value="in_progress">قيد التنفيذ</option><option value="review">مراجعة</option><option value="completed">مكتملة</option><option value="cancelled">ملغاة</option>';
@@ -144,7 +162,17 @@
         try { await request("/api/tasks/" + task.id,{method:"PATCH",body:{status:select.value}}); await renderTasks(); }
         catch(error){ alert(error.message); save.disabled=false; }
       });
-      actions.append(select,save); item.append(details,actions); list.append(item);
+      actions.append(select,save);
+      if (task.execution_status === "failed") {
+        const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "إعادة المحاولة";
+        retry.addEventListener("click", async () => {
+          retry.disabled = true;
+          try { await request("/api/tasks/" + task.id + "/retry",{method:"POST"}); await renderTasks(); }
+          catch(error){ alert(error.message); retry.disabled = false; }
+        });
+        actions.append(retry);
+      }
+      item.append(details,actions); list.append(item);
     });
     $w("wsTaskForm").addEventListener("submit", async event => {
       event.preventDefault();
