@@ -439,18 +439,63 @@ function AppInner() {
 
   const header = (title:string, subtitle?:string) => <View style={s.sectionHead}><Text style={s.sectionTitle}>{title}</Text>{!!subtitle&&<Text style={s.muted}>{subtitle}</Text>}</View>;
   const card = (children:React.ReactNode) => <View style={s.card}>{children}</View>;
-  const renderHome = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
-    <View style={s.hero}><Text style={s.heroEyebrow}>VINDORA OFFICE</Text><Text style={s.heroTitle}>صباح الشغل، يا ريس</Text><Text style={s.heroSub}>كل فريقك ومتابعاتك في مكان واحد.</Text><View style={{flexDirection:"row",gap:8,justifyContent:"flex-end",marginTop:14}}><Pressable onPress={askSalma} style={s.logout} disabled={briefingBusy}><Text style={s.logoutText}>{briefingBusy?"سلمى بتراجع...":"اطلبي ملخص من سلمى"}</Text></Pressable><Pressable onPress={logout} style={s.logout}><Text style={s.logoutText}>تسجيل الخروج</Text></Pressable></View></View>
-    <View style={s.stats}>{[[String(employees.length||13),"موظف"],[String(tasks.filter(x=>!["completed","cancelled"].includes(x.status)).length),"مهمة مفتوحة"],[String(meetings.filter(x=>x.status==="scheduled").length),"اجتماع مجدول"]].map(([v,l])=>card(<><Text style={s.statValue}>{v}</Text><Text style={s.statLabel}>{l}</Text></>))}</View>
-    {header("حالة التشغيل","المجدول اليومي والمبادرات التلقائية")}
-    {card(<><Text style={s.rowTitle}>المجدول مفعّل: {status?.enabled?"نعم":"لا"}</Text><Text style={s.muted}>مزود الذكاء الاصطناعي: {status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.muted}>موعد التشغيل: {status?.start_time||"09:00"} · {status?.timezone||"Africa/Cairo"}</Text><Text style={s.muted}>حالة تشغيل اليوم: {status?.today?.status||status?.today_status||"غير متاحة"}</Text></>)}
-    {header("آخر التقارير اليومية")}
-    {reports.slice(0,4).map((r:any,i:number)=>card(<View key={String(r.run_date)+r.employee_id+i}><Text style={s.rowTitle}>{r.employee_id} · {r.department}</Text><Text style={s.muted}>{r.run_date}</Text><Text style={s.bodyText}>{r.content}</Text></View>))}
-    {header("آخر نشاط في المكتب","تحديثات المهام والاجتماعات وردود الموظفين")}
-    {activity.slice(0,6).map((item:any)=>card(<View key={item.id}><Text style={s.rowTitle}>{item.summary}</Text><Text style={s.muted}>{item.actor} · {item.created_at}</Text>{!!item.details&&<Text style={s.bodyText}>{item.details}</Text>}</View>))}
-    {header("آخر الإشعارات")}
-    {notices.slice(0,4).map(n=>card(<Pressable key={n.id} onPress={()=>{if(n.employee_id){const e=employees.find(x=>x.id===n.employee_id);if(e)openEmployee(e);}else setTab("notices");}}><Text style={s.rowTitle}>{n.title}</Text><Text style={s.muted}>{n.message}</Text></Pressable>))}
-  </ScrollView>;
+  const renderHome = () => {
+    const shortcuts: {id:string;label:string;hint:string;glyph:string;action:()=>void}[] = [
+      {id:"team",label:"الفريق",hint:"إدارة الموظفين",glyph:"♙",action:()=>navigate("employees")},
+      {id:"tasks",label:"المهام",hint:"التكليف والمتابعة",glyph:"✓",action:()=>navigate("tasks")},
+      {id:"meetings",label:"الاجتماعات",hint:"الغرف والمواعيد",glyph:"▦",action:()=>navigate("meetings")},
+      {id:"whatsapp",label:"مراسلات المكتب",hint:"WhatsApp داخلي",glyph:"✉",action:()=>openWhatsApp()},
+      {id:"notices",label:"الإشعارات",hint:"التنبيهات الواردة",glyph:"♧",action:()=>navigate("notices")},
+      {id:"settings",label:"الإعدادات",hint:"الحساب والتشغيل",glyph:"⚙",action:()=>navigate("settings")}
+    ];
+    const openTasks=tasks.filter(x=>!["completed","cancelled"].includes(x.status)).length;
+    const unread=notices.filter(x=>!x.is_read).length;
+    const scheduled=meetings.filter(x=>x.status==="scheduled").length;
+    return <ScrollView contentContainerStyle={s.dashboardPage} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
+      <View style={s.dashboardHero}>
+        <View style={s.heroTopLine}><View style={s.onlinePill}><View style={s.onlineDot}/><Text style={s.onlineText}>مساحة العمل</Text></View><Text style={s.heroEyebrow}>VINDORA / OFFICE</Text></View>
+        <Text style={s.heroTitle}>أهلاً بيك في مكتبك</Text>
+        <Text style={s.heroSub}>كل فريقك ومهامك وتحديثات الشغل، في شاشة واحدة.</Text>
+        <View style={s.heroFooter}>
+          <View style={s.heroMiniStat}><Text style={s.heroMiniValue}>{employees.length}</Text><Text style={s.heroMiniLabel}>عضو بالفريق</Text></View>
+          <View style={s.heroMiniDivider}/>
+          <View style={s.heroMiniStat}><Text style={s.heroMiniValue}>{openTasks}</Text><Text style={s.heroMiniLabel}>مهمة نشطة</Text></View>
+          <Pressable onPress={askSalma} style={s.salmaButton} disabled={briefingBusy}><Text style={s.salmaButtonText}>{briefingBusy?"جاري التحضير...":"ملخص سلمى  ↗"}</Text></Pressable>
+        </View>
+      </View>
+      <View style={s.dashboardSectionHead}><View><Text style={s.dashboardSectionTitle}>الوصول السريع</Text><Text style={s.dashboardSectionSub}>اختصارات أهم أقسام المكتب</Text></View><View style={s.sectionAccent}/></View>
+      <View style={s.shortcutGrid}>
+        {shortcuts.map(item=><Pressable key={item.id} onPress={item.action} style={({pressed})=>[s.shortcutTile,pressed&&s.shortcutPressed]}>
+          <View style={s.shortcutIcon}><Text style={s.shortcutGlyph}>{item.glyph}</Text></View><Text style={s.shortcutTitle}>{item.label}</Text><Text style={s.shortcutHint}>{item.hint}</Text>
+        </Pressable>)}
+      </View>
+      <View style={s.dashboardSectionHead}><View><Text style={s.dashboardSectionTitle}>نظرة عامة</Text><Text style={s.dashboardSectionSub}>ملخص سريع لحالة المكتب</Text></View><View style={s.sectionAccent}/></View>
+      <View style={s.overviewGrid}>
+        <View style={s.overviewCard}><View style={[s.overviewIcon,{backgroundColor:"#EEE9FF"}]}><Text style={s.overviewGlyph}>♙</Text></View><Text style={s.overviewValue}>{employees.length}</Text><Text style={s.overviewLabel}>موظف بالفريق</Text></View>
+        <View style={s.overviewCard}><View style={[s.overviewIcon,{backgroundColor:"#E7F6F1"}]}><Text style={[s.overviewGlyph,{color:C.green}]}>✓</Text></View><Text style={s.overviewValue}>{openTasks}</Text><Text style={s.overviewLabel}>مهمة مفتوحة</Text></View>
+        <View style={s.overviewCard}><View style={[s.overviewIcon,{backgroundColor:"#FFF2E5"}]}><Text style={[s.overviewGlyph,{color:"#C47A2C"}]}>▦</Text></View><Text style={s.overviewValue}>{scheduled}</Text><Text style={s.overviewLabel}>اجتماع مجدول</Text></View>
+      </View>
+      <View style={s.dashboardSectionHead}><View><Text style={s.dashboardSectionTitle}>مركز التشغيل الذكي</Text><Text style={s.dashboardSectionSub}>حالة الأتمتة والجدولة</Text></View><View style={s.sectionAccent}/></View>
+      <View style={s.operationPanel}>
+        <View style={s.operationHeader}><View style={[s.operationStatus,{backgroundColor:status?.enabled?"#E4F5EF":"#FFF0F0"}]}><View style={[s.onlineDot,{backgroundColor:status?.enabled?C.green:C.red}]}/><Text style={[s.operationStatusText,{color:status?.enabled?C.green:C.red}]}>{status?.enabled?"النظام مفعّل":"النظام متوقف"}</Text></View><Text style={s.operationTitle}>حالة التشغيل</Text></View>
+        <View style={s.operationRows}>
+          <View style={s.operationRow}><Text style={s.operationValue}>{status?.provider_ready?"جاهز":"غير جاهز"}</Text><Text style={s.operationLabel}>مزود الذكاء الاصطناعي</Text></View><View style={s.operationDivider}/>
+          <View style={s.operationRow}><Text style={s.operationValue}>{status?.start_time||"09:00"}</Text><Text style={s.operationLabel}>موعد المراجعة اليومية</Text></View><View style={s.operationDivider}/>
+          <View style={s.operationRow}><Text style={s.operationValue}>{status?.timezone||"Africa/Cairo"}</Text><Text style={s.operationLabel}>المنطقة الزمنية</Text></View>
+        </View>
+        <Text style={s.operationFoot}>حالة اليوم: {status?.today?.status||status?.today_status||"لا توجد بيانات متاحة بعد"}</Text>
+      </View>
+      <View style={s.dashboardSectionHead}><View><Text style={s.dashboardSectionTitle}>آخر التقارير اليومية</Text><Text style={s.dashboardSectionSub}>ملخصات الموظفين ومتابعة التنفيذ</Text></View><View style={s.sectionAccent}/></View>
+      {reports.slice(0,4).map((r:any,i:number)=><View key={String(r.run_date)+r.employee_id+i} style={s.feedCard}><View style={s.feedAccent}/><View style={s.feedContent}><View style={s.feedTitleRow}><Text style={s.feedDate}>{r.run_date}</Text><Text style={s.feedTitle}>{r.employee_id} · {r.department}</Text></View><Text style={s.feedBody}>{r.content}</Text></View></View>)}
+      {reports.length===0&&<View style={s.emptyPanel}><Text style={s.emptyPanelTitle}>لا توجد تقارير معروضة حاليًا</Text><Text style={s.emptyPanelText}>ستظهر هنا التقارير اليومية فور تسجيلها في المكتب.</Text></View>}
+      <View style={s.dashboardSectionHead}><View><Text style={s.dashboardSectionTitle}>آخر نشاط في المكتب</Text><Text style={s.dashboardSectionSub}>حركة المهام والاجتماعات وردود الفريق</Text></View><View style={s.sectionAccent}/></View>
+      {activity.slice(0,6).map((item:any)=><View key={item.id} style={s.activityRow}><View style={s.activityDot}/><View style={s.activityContent}><Text style={s.activityTitle}>{item.summary}</Text><Text style={s.activityMeta}>{item.actor} · {item.created_at}</Text>{!!item.details&&<Text style={s.activityDetails}>{item.details}</Text>}</View></View>)}
+      {activity.length===0&&<View style={s.emptyPanel}><Text style={s.emptyPanelText}>لا يوجد نشاط حديث مسجل حتى الآن.</Text></View>}
+      <View style={s.dashboardSectionHead}><View><Text style={s.dashboardSectionTitle}>الإشعارات الواردة</Text><Text style={s.dashboardSectionSub}>{unread} إشعار غير مقروء</Text></View><Pressable onPress={()=>navigate("notices")}><Text style={s.viewAllText}>عرض الكل ←</Text></Pressable></View>
+      {notices.slice(0,4).map(n=><Pressable key={n.id} onPress={()=>{if(n.employee_id){const e=employees.find(x=>x.id===n.employee_id);if(e)openEmployee(e);else navigate("notices");}else navigate("notices");}} style={s.noticeFeed}><View style={[s.noticeFeedDot,!n.is_read&&s.noticeFeedDotUnread]}/><View style={s.noticeFeedContent}><Text style={s.noticeFeedTitle}>{n.title}</Text><Text style={s.noticeFeedMessage} numberOfLines={2}>{n.message}</Text></View><Text style={s.noticeFeedArrow}>‹</Text></Pressable>)}
+      {notices.length===0&&<View style={s.emptyPanel}><Text style={s.emptyPanelText}>أنت متابع لكل جديد، لا توجد إشعارات حاليًا.</Text></View>}
+    </ScrollView>;
+  };
   const renderEmployees = () => <FlatList contentContainerStyle={s.page} data={employees} keyExtractor={x=>x.id} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>} renderItem={({item,index})=>card(<Pressable style={s.employeeRow} onPress={()=>openEmployee(item)}><View style={s.avatar}><Text style={s.avatarText}>{item.id.slice(0,1)}</Text></View><View style={{flex:1}}><Text style={s.rowTitle}>{item.id}</Text><Text style={s.muted}>{item.role} · {item.department}</Text></View><Text style={s.arrow}>‹</Text></Pressable>)} ListHeaderComponent={header("فريق المكتب","كل الموظفين")}/>;
   const renderTasks = () => <ScrollView contentContainerStyle={s.page} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh}/>}>
     {header("المهام","إنشاء ومتابعة المهام المسجلة")}
@@ -496,6 +541,18 @@ const s=StyleSheet.create({
   error:{color:C.red,textAlign:"right",marginTop:8},errorInline:{color:C.red,textAlign:"right",paddingHorizontal:14},errorBanner:{backgroundColor:"#FCEBED",padding:8},
   topbar:{backgroundColor:C.card,paddingHorizontal:18,paddingVertical:12,flexDirection:"row",alignItems:"center",justifyContent:"space-between",borderBottomWidth:1,borderColor:C.line},
   topTitle:{fontSize:18,fontWeight:"900",color:C.ink,textAlign:"right"},muted:{fontSize:12,color:C.muted,textAlign:"right",marginTop:2},back:{color:C.purple,fontWeight:"800",paddingRight:12},dangerText:{color:C.red,fontWeight:"800"},
+  dashboardPage:{paddingHorizontal:16,paddingTop:16,paddingBottom:30,gap:13},
+  dashboardHero:{backgroundColor:C.navy,borderRadius:24,padding:20,overflow:"hidden",borderWidth:1,borderColor:"#292F4B"},
+  heroTopLine:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},onlinePill:{flexDirection:"row",alignItems:"center",gap:6,backgroundColor:"#FFFFFF16",paddingVertical:6,paddingHorizontal:10,borderRadius:20},onlineDot:{width:7,height:7,borderRadius:5,backgroundColor:"#55D6A5"},onlineText:{fontSize:10,color:"#E8E8F4",fontWeight:"700"},
+  heroFooter:{flexDirection:"row",alignItems:"center",marginTop:20,gap:12},heroMiniStat:{alignItems:"flex-start",minWidth:48},heroMiniValue:{fontSize:20,fontWeight:"900",color:"#FFFFFF"},heroMiniLabel:{fontSize:9,color:"#C5C8D9",marginTop:2},heroMiniDivider:{width:1,height:32,backgroundColor:"#FFFFFF35"},salmaButton:{marginLeft:"auto",backgroundColor:C.purple,paddingVertical:11,paddingHorizontal:13,borderRadius:12},salmaButtonText:{fontSize:11,color:"#FFFFFF",fontWeight:"900"},
+  dashboardSectionHead:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",paddingTop:8,paddingBottom:1},dashboardSectionTitle:{fontSize:17,fontWeight:"900",color:C.ink,textAlign:"right"},dashboardSectionSub:{fontSize:10,color:C.muted,textAlign:"right",marginTop:3},sectionAccent:{width:4,height:28,borderRadius:4,backgroundColor:C.purple},
+  shortcutGrid:{flexDirection:"row",flexWrap:"wrap",justifyContent:"space-between",gap:9},shortcutTile:{width:"31.5%",minHeight:112,backgroundColor:C.card,borderRadius:17,borderWidth:1,borderColor:C.line,padding:11,alignItems:"flex-end",justifyContent:"space-between"},shortcutPressed:{opacity:0.72,transform:[{scale:0.98}]},shortcutIcon:{width:35,height:35,borderRadius:12,backgroundColor:"#F0ECFF",alignItems:"center",justifyContent:"center"},shortcutGlyph:{fontSize:18,color:C.purple,fontWeight:"900"},shortcutTitle:{fontSize:11,color:C.ink,fontWeight:"900",textAlign:"right",marginTop:8},shortcutHint:{fontSize:9,color:C.muted,textAlign:"right"},
+  overviewGrid:{flexDirection:"row",gap:8},overviewCard:{flex:1,backgroundColor:C.card,borderWidth:1,borderColor:C.line,borderRadius:17,paddingVertical:13,paddingHorizontal:8,alignItems:"center",gap:4},overviewIcon:{width:34,height:34,borderRadius:12,alignItems:"center",justifyContent:"center",marginBottom:3},overviewGlyph:{fontSize:17,color:C.purple,fontWeight:"900"},overviewValue:{fontSize:22,fontWeight:"900",color:C.ink},overviewLabel:{fontSize:9,color:C.muted,textAlign:"center"},
+  operationPanel:{backgroundColor:C.card,borderWidth:1,borderColor:C.line,borderRadius:18,padding:15,gap:13},operationHeader:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},operationTitle:{fontSize:13,fontWeight:"900",color:C.ink},operationStatus:{flexDirection:"row",alignItems:"center",gap:6,paddingVertical:6,paddingHorizontal:9,borderRadius:20},operationStatusText:{fontSize:10,fontWeight:"800"},operationRows:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"},operationRow:{flex:1,alignItems:"center",gap:5},operationValue:{fontSize:11,fontWeight:"900",color:C.ink},operationLabel:{fontSize:8,color:C.muted,textAlign:"center"},operationDivider:{width:1,height:28,backgroundColor:C.line},operationFoot:{fontSize:10,color:C.muted,textAlign:"right",borderTopWidth:1,borderColor:C.line,paddingTop:10},
+  feedCard:{flexDirection:"row",backgroundColor:C.card,borderWidth:1,borderColor:C.line,borderRadius:15,overflow:"hidden"},feedAccent:{width:4,backgroundColor:C.purple},feedContent:{flex:1,padding:12,gap:7},feedTitleRow:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:8},feedTitle:{fontSize:12,fontWeight:"900",color:C.ink,textAlign:"right",flex:1},feedDate:{fontSize:9,color:C.muted},feedBody:{fontSize:11,color:C.ink,textAlign:"right",lineHeight:19},
+  emptyPanel:{backgroundColor:"#FFFFFF",borderWidth:1,borderColor:C.line,borderRadius:14,padding:15,alignItems:"center",gap:5},emptyPanelTitle:{fontSize:12,fontWeight:"800",color:C.ink},emptyPanelText:{fontSize:10,color:C.muted,textAlign:"center"},
+  activityRow:{flexDirection:"row",gap:10,paddingVertical:11,paddingHorizontal:4,borderBottomWidth:1,borderColor:C.line},activityDot:{width:8,height:8,borderRadius:5,backgroundColor:C.purple,marginTop:5},activityContent:{flex:1,gap:4},activityTitle:{fontSize:12,fontWeight:"800",color:C.ink,textAlign:"right"},activityMeta:{fontSize:9,color:C.muted,textAlign:"right"},activityDetails:{fontSize:10,color:C.muted,textAlign:"right",lineHeight:17},viewAllText:{fontSize:10,color:C.purple,fontWeight:"900"},
+  noticeFeed:{flexDirection:"row",alignItems:"center",gap:10,backgroundColor:C.card,borderWidth:1,borderColor:C.line,borderRadius:14,padding:12},noticeFeedDot:{width:7,height:7,borderRadius:5,backgroundColor:"#D9DCE6"},noticeFeedDotUnread:{backgroundColor:C.purple},noticeFeedContent:{flex:1,gap:4},noticeFeedTitle:{fontSize:11,color:C.ink,fontWeight:"900",textAlign:"right"},noticeFeedMessage:{fontSize:10,color:C.muted,textAlign:"right"},noticeFeedArrow:{fontSize:21,color:C.purple},
   page:{padding:15,paddingBottom:28,gap:12},hero:{backgroundColor:C.navy,borderRadius:20,padding:20,marginBottom:4},heroEyebrow:{color:"#B9A8FF",fontWeight:"900",fontSize:11,letterSpacing:2,textAlign:"right"},heroTitle:{color:"#fff",fontSize:24,fontWeight:"900",textAlign:"right",marginTop:10},heroSub:{color:"#D5D7E4",textAlign:"right",marginTop:5},logout:{alignSelf:"flex-start",marginTop:14,padding:7,borderRadius:9,backgroundColor:"#FFFFFF18"},logoutText:{color:"#fff",fontSize:12,fontWeight:"700"},
   stats:{flexDirection:"row",gap:8},card:{backgroundColor:C.card,borderRadius:16,padding:14,borderWidth:1,borderColor:C.line,gap:7},statValue:{fontSize:23,fontWeight:"900",color:C.purple,textAlign:"center"},statLabel:{fontSize:11,color:C.muted,textAlign:"center"},sectionHead:{paddingTop:5,paddingBottom:2},sectionTitle:{fontSize:18,fontWeight:"900",color:C.ink,textAlign:"right"},
   rowTitle:{fontSize:14,fontWeight:"800",color:C.ink,textAlign:"right"},bodyText:{fontSize:13,color:C.ink,textAlign:"right",marginTop:5,lineHeight:21},employeeRow:{flexDirection:"row",alignItems:"center",gap:12},avatar:{width:42,height:42,borderRadius:14,backgroundColor:"#EEE9FF",alignItems:"center",justifyContent:"center"},avatarText:{fontSize:18,fontWeight:"900",color:C.purple},arrow:{fontSize:25,color:C.purple},
