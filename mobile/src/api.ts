@@ -7,6 +7,7 @@ const PUSH_TOKEN_KEY = "vindora_office_push_token";
 
 let token: string | null = null;
 let refreshToken: string | null = null;
+let refreshPromise: Promise<boolean | null> | null = null;
 
 export async function loadToken() {
   token = await SecureStore.getItemAsync(TOKEN_KEY);
@@ -27,25 +28,30 @@ export async function clearToken() {
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
 }
 
-async function renewSession(): Promise<boolean> {
+async function renewSession(): Promise<boolean | null> {
+  if (refreshPromise) return refreshPromise;
   if (!refreshToken) return false;
-  try {
-    const response = await fetch(API_BASE + "/api/auth/refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-    const data: any = await response.json().catch(() => ({}));
-    if (!response.ok || !data.access_token || !data.refresh_token) {
-      await clearToken();
-      return false;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(API_BASE + "/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      const data: any = await response.json().catch(() => ({}));
+      if (!response.ok || !data.access_token || !data.refresh_token) {
+        await clearToken();
+        return false;
+      }
+      await saveToken(data.access_token, data.refresh_token);
+      return true;
+    } catch {
+      // Keep credentials when the failure is only a temporary network problem.
+      return null;
     }
-    await saveToken(data.access_token, data.refresh_token);
-    return true;
-  } catch {
-    // Network failures must not erase a valid refresh token.
-    return false;
-  }
+  })();
+  try { return await refreshPromise; }
+  finally { refreshPromise = null; }
 }
 
 export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
@@ -59,8 +65,10 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   };
   let response = await send();
   if (response.status === 401 && refreshToken && path !== "/api/auth/refresh" && path !== "/api/auth/login") {
-    if (await renewSession()) response = await send();
-    else if (!refreshToken) throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+    const renewed = await renewSession();
+    if (renewed) response = await send();
+    else if (renewed === null) throw new Error("تعذر الاتصال لتجديد الجلسة. تحقق من الإنترنت وحاول مرة أخرى.");
+    else throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
   }
   const data: any = await response.json().catch(() => ({}));
   if (response.status === 401) {
