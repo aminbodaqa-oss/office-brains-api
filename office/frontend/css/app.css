@@ -165,3 +165,45 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
 .send{background:var(--acc);color:var(--accink);border:0;border-radius:14px;padding:0 18px;font:inherit;font-weight:600;cursor:pointer}
 .send:disabled{opacity:.5}
 .note{text-align:center;color:var(--mut);font-size:12px;padding:6px 14px}
+
+
+/* Office Brains unified design system */
+:root{
+ --bg:#0b1020;--card:#131b31;--ink:#f6f7ff;--mut:#aab3ca;--line:#27314b;
+ --acc:#8057ff;--accink:#ffffff;--me:#292044;--bot:#18243a;
+ color-scheme:dark;
+}
+body{background:var(--bg);color:var(--ink)}
+#authGate{background:radial-gradient(ellipse at 15% 15%,#8057ff30 0,transparent 34%),radial-gradient(ellipse at 88% 82%,#43d6c51a 0,transparent 30%),linear-gradient(135deg,#0b1020 0%,#10182d 58%,#171735 100%)}
+.auth-showcase{background:radial-gradient(ellipse at 18% 75%,#8057ff35 0,transparent 42%),radial-gradient(ellipse at 90% 15%,#43d6c51c 0,transparent 34%),linear-gradient(145deg,#101426,#131b31 62%,#1b1b3b)}
+.auth-panel{background:#101426}
+.auth-card h2,.mobile-brand strong{color:#f6f7ff}
+.auth-card p{color:#aab3ca}
+.auth-card label{color:#dce2f3}
+.auth-card input{border-color:#303b58;background:#131b31;color:#f6f7ff}
+.auth-card input::placeholder{color:#7f8ba8}
+.auth-card input:focus{border-color:#8057ff;box-shadow:0 0 0 4px #8057ff2b}
+.auth-card button{background:linear-gradient(110deg,#8057ff,#6540d8);box-shadow:0 12px 24px #8057ff35}
+.auth-card button:hover{box-shadow:0 14px 28px #8057ff50}
+#authGate #loginForm .password-toggle{color:#aab3ca}
+#authGate #loginForm .password-toggle:hover{background:#8057ff1a}
+.auth-foot{border-color:#27314b;color:#8793ad}
+.auth-foot:before{background:#43d6c5;box-shadow:0 0 10px #43d6c577}
+.mobile-brand small{color:#aab3ca}
+.showcase-top span,.showcase-bottom{color:#aab3ca}
+.showcase-copy h1 em{color:#43d6c5}
+.showcase-tag{border-color:#43d6c533;background:#43d6c510;color:#b9fff4}
+.showcase-tag span{background:#43d6c5;box-shadow:0 0 14px #43d6c5}
+.showcase-mark,.auth-logo,.orbit-core{background:linear-gradient(145deg,#8057ff,#4930a9)}
+.orbit-ring{border-color:#8057ff45}
+.orbit-dot{background:#43d6c5;box-shadow:0 0 15px #43d6c5}
+.showcase-bottom b{color:#43d6c5}
+.notification-item.unread{border-right-color:var(--acc)}
+.gm{border-color:var(--acc)}
+.chips button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.send{background:var(--acc);color:#fff}
+@media(max-width:760px){
+ #authGate{background:#101426}
+ .auth-showcase{background:radial-gradient(ellipse at 90% 10%,#43d6c51a 0,transparent 38%),linear-gradient(145deg,#101426,#131b31)}
+ .auth-panel{background:#101426}
+}
