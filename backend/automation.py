@@ -239,6 +239,10 @@ async def _generate_daily_briefing(run_date: str) -> None:
         except Exception:
             # Vindora data is optional; office duties remain available without widening access.
             context = "لا توجد بيانات تجارية إضافية متاحة حاليًا."
+        source_text = "\n".join(task_lines + activity_lines + [
+            f"{m['title']} | {m['scheduled_at']}"
+            for m in overview.get("meetings", []) if m.get("status") == "scheduled"
+        ] + [context or ""])
         prompt = (
             "أنت موظف مستقل المبادرة داخل مكتب Vindora. راجع مسؤولياتك وما هو مسجل عن عملك، "
             "واكتشف فقط أمرًا حقيقيًا يستحق تنبيه المالك: مهمة متأخرة أو عالقة، خطر ظاهر، فرصة مرتبطة "
@@ -249,7 +253,8 @@ async def _generate_daily_briefing(run_date: str) -> None:
             "أعد JSON صالحًا فقط بالمفاتيح: should_message (boolean), category "
             "(task_followup|risk|opportunity|coordination|no_update), content (string), evidence (array of strings). "
             "إذا لم يوجد شيء محدد يستحق رسالة، اجعل should_message=false وcategory=no_update وcontent فارغًا. "
-            "في evidence اذكر أرقام المهام أو سجل النشاط المعروض حرفيًا، أو اتركها فارغة. "
+            "في evidence اذكر علامة مرجعية موجودة حرفيًا في السجلات مثل #رقم المهمة أو #رقم النشاط، "
+            "أو اقتبس جزءًا حرفيًا من بيانات Vindora المتاحة؛ لا تخترع مرجعًا. "
             "إذا كانت البيانات غير كافية فلا تستنتج وجود مشكلة. اجعل الرسالة قصيرة وعملية وبالمصرية المهنية.\n"
             f"التاريخ: {run_date}\nاسمك: {employee_id}\nالوظيفة: {employee['role']}\n"
             f"الإدارة: {employee['department']}\n"
@@ -274,15 +279,19 @@ async def _generate_daily_briefing(run_date: str) -> None:
             except (TypeError, json.JSONDecodeError):
                 decision = {}
             content = str(decision.get("content") or "").strip()[:1400]
-            should_message = decision.get("should_message") is True and bool(content)
+            evidence = decision.get("evidence")
+            if not isinstance(evidence, list):
+                evidence = []
+            valid_evidence = [
+                str(item).strip()[:180] for item in evidence[:5]
+                if str(item).strip() and str(item).strip() in source_text
+            ]
+            should_message = decision.get("should_message") is True and bool(content) and bool(valid_evidence)
             category = str(decision.get("category") or "no_update")
             if category not in {"task_followup", "risk", "opportunity", "coordination"}:
                 should_message = False
                 category = "no_update"
-            evidence = decision.get("evidence")
-            if not isinstance(evidence, list):
-                evidence = []
-            evidence_text = "، ".join(str(item).strip()[:180] for item in evidence[:5] if str(item).strip())
+            evidence_text = "، ".join(valid_evidence)
             report_content = content if content else "لا توجد مبادرة محددة تستحق التصعيد اليوم."
             if evidence_text:
                 report_content += "\nالأدلة المشار إليها: " + evidence_text
