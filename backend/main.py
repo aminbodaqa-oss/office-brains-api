@@ -235,12 +235,13 @@ async def health():
 
 @app.post("/api/platform/admin/login")
 async def platform_admin_login(body: PlatformAdminLoginRequest):
-    expected_user = os.getenv("PLATFORM_ADMIN_USERNAME", "").strip()
-    password_hash = os.getenv("PLATFORM_ADMIN_PASSWORD_HASH", "").strip()
+    # Reuse the existing platform owner account; no second username/password is required.
+    expected_user = os.getenv("OWNER_USERNAME", "").strip()
+    password_hash = get_owner_password_hash(os.getenv("OWNER_PASSWORD_HASH", "").strip())
     if not expected_user or not password_hash:
-        raise HTTPException(status_code=503, detail="إعدادات Super Admin غير مكتملة على السيرفر.")
+        raise HTTPException(status_code=503, detail="إعداد حساب المالك الحالي غير مكتمل على السيرفر.")
     if not hmac.compare_digest(body.username.strip(), expected_user) or not verify_password(body.password, password_hash):
-        raise HTTPException(status_code=401, detail="بيانات دخول مالك المنصة غير صحيحة.")
+        raise HTTPException(status_code=401, detail="اسم المستخدم أو كلمة المرور الحالية غير صحيحة.")
     try:
         token = issue_platform_token(expected_user)
     except RuntimeError as exc:

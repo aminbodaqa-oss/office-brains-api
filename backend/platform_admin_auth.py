@@ -38,7 +38,7 @@ def verify_platform_token(token: str) -> str | None:
         username = str(payload.get("sub", ""))
         if payload.get("aud") != "office-brains-platform-admin" or not username or int(payload.get("exp", 0)) <= int(time.time()):
             return None
-        configured = os.getenv("PLATFORM_ADMIN_USERNAME", "").strip()
+        configured = os.getenv("OWNER_USERNAME", "").strip()
         if not configured or not hmac.compare_digest(username, configured):
             return None
         return username
