@@ -8,6 +8,7 @@ from database import _connect
 
 TASK_STATUSES = {"open", "in_progress", "review", "completed", "cancelled"}
 TASK_PRIORITIES = {"low", "normal", "high", "urgent"}
+EXECUTION_STATUSES = {"queued", "running", "review", "failed", "completed", "cancelled"}
 
 
 def _now() -> str:
@@ -32,6 +33,21 @@ def init_workflow_db() -> None:
         )""")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status_due ON tasks(status,due_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assigned_to,status)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS task_executions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL UNIQUE,
+            employee_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'queued',
+            result TEXT NOT NULL DEFAULT '',
+            error TEXT NOT NULL DEFAULT '',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_task_executions_queue ON task_executions(status,created_at)")
         conn.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -72,15 +88,22 @@ def list_tasks(limit: int = 100, status: str | None = None, assigned_to: str | N
     limit = max(1, min(int(limit), 200))
     clauses, params = [], []
     if status:
-        clauses.append("status=?")
+        clauses.append("t.status=?")
         params.append(status)
     if assigned_to:
-        clauses.append("assigned_to=?")
+        clauses.append("t.assigned_to=?")
         params.append(assigned_to)
     where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM tasks" + where + " ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'review' THEN 2 ELSE 3 END, CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, COALESCE(due_at,'9999'), id DESC LIMIT ?",
+            """SELECT t.*, e.status AS execution_status, e.result AS execution_result,
+                      e.error AS execution_error, e.attempts AS execution_attempts,
+                      e.started_at AS execution_started_at, e.finished_at AS execution_finished_at
+               FROM tasks t LEFT JOIN task_executions e ON e.task_id=t.id"""
+            + where +
+            """ ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'review' THEN 2 ELSE 3 END,
+                      CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+                      COALESCE(t.due_at,'9999'), t.id DESC LIMIT ?""",
             (*params, limit),
         ).fetchall()
     return [dict(row) for row in rows]
@@ -97,9 +120,16 @@ def create_task(title: str, description: str, assigned_to: str, created_by: str,
              due_at, source[:40], now, now),
         )
         task_id = int(cur.lastrowid)
+        conn.execute(
+            """INSERT INTO task_executions(task_id,employee_id,status,created_at,updated_at)
+               VALUES(?,?,'queued',?,?)""",
+            (task_id, assigned_to, now, now),
+        )
         row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
     log_activity(created_by, "task_created", "task", task_id,
                  f"تم إنشاء مهمة جديدة وتكليف {assigned_to}: {title[:150]}", description)
+    log_activity("النظام", "task_queued", "task", task_id,
+                 f"تم وضع المهمة #{task_id} في طابور التنفيذ", "الموظف المسؤول: " + assigned_to)
     return dict(row)
 
 
@@ -121,10 +151,108 @@ def update_task(task_id: int, updates: dict[str, Any], actor: str) -> dict[str, 
         if before is None:
             return None
         conn.execute(sql, [clean[column] for column in columns] + [task_id])
+        if clean.get("status") in {"completed", "cancelled"}:
+            conn.execute(
+                "UPDATE task_executions SET status=?,updated_at=?,finished_at=? WHERE task_id=?",
+                (clean["status"], now, now, task_id),
+            )
+        elif "assigned_to" in clean or clean.get("status") == "open":
+            assigned_to = clean.get("assigned_to", before["assigned_to"])
+            conn.execute(
+                """INSERT INTO task_executions(task_id,employee_id,status,result,error,attempts,created_at,updated_at,started_at,finished_at)
+                   VALUES(?,?,'queued','','',0,?,?,NULL,NULL)
+                   ON CONFLICT(task_id) DO UPDATE SET employee_id=excluded.employee_id,status='queued',
+                   result='',error='',attempts=0,updated_at=excluded.updated_at,started_at=NULL,finished_at=NULL""",
+                (task_id, assigned_to, now, now),
+            )
         row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
     changed = ", ".join(f"{key}: {before[key]!s} ← {clean[key]!s}" for key in columns if key not in {"updated_at", "completed_at"})
     log_activity(actor, "task_updated", "task", task_id, f"تم تحديث المهمة #{task_id}", changed)
     return dict(row)
+
+
+def claim_next_task_execution() -> dict[str, Any] | None:
+    now = _now()
+    with _connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            """SELECT t.*, e.id AS execution_id, e.attempts AS execution_attempts
+               FROM task_executions e JOIN tasks t ON t.id=e.task_id
+               WHERE e.status='queued' AND t.status NOT IN ('completed','cancelled')
+               ORDER BY CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+                        e.created_at ASC, e.id ASC LIMIT 1"""
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "UPDATE task_executions SET status='running',attempts=attempts+1,started_at=?,updated_at=?,error='' WHERE id=? AND status='queued'",
+            (now, now, row["execution_id"]),
+        )
+        conn.execute("UPDATE tasks SET status='in_progress',updated_at=? WHERE id=?", (now, row["id"]))
+        claimed = conn.execute(
+            """SELECT t.*, e.id AS execution_id, e.attempts AS execution_attempts
+               FROM task_executions e JOIN tasks t ON t.id=e.task_id WHERE e.id=?""",
+            (row["execution_id"],),
+        ).fetchone()
+    return dict(claimed) if claimed else None
+
+
+def finish_task_execution(task_id: int, result: str, actor: str) -> dict[str, Any] | None:
+    now = _now()
+    with _connect() as conn:
+        execution = conn.execute("SELECT * FROM task_executions WHERE task_id=?", (task_id,)).fetchone()
+        if execution is None or execution["status"] != "running":
+            return None
+        conn.execute(
+            "UPDATE task_executions SET status='review',result=?,error='',updated_at=?,finished_at=? WHERE task_id=?",
+            (result[:20000], now, now, task_id),
+        )
+        conn.execute("UPDATE tasks SET status='review',updated_at=? WHERE id=?", (now, task_id))
+        task = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    log_activity(actor, "task_result_ready", "task", task_id,
+                 f"الموظف {execution['employee_id']} سلّم نتيجة المهمة #{task_id} للمراجعة", result[:12000])
+    return dict(task) if task else None
+
+
+def fail_task_execution(task_id: int, error: str, actor: str) -> dict[str, Any] | None:
+    now = _now()
+    with _connect() as conn:
+        execution = conn.execute("SELECT * FROM task_executions WHERE task_id=?", (task_id,)).fetchone()
+        if execution is None or execution["status"] != "running":
+            return None
+        conn.execute(
+            "UPDATE task_executions SET status='failed',error=?,updated_at=?,finished_at=? WHERE task_id=?",
+            (error[:5000], now, now, task_id),
+        )
+        conn.execute("UPDATE tasks SET status='open',updated_at=? WHERE id=?", (now, task_id))
+        task = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+    log_activity(actor, "task_execution_failed", "task", task_id,
+                 f"تعذر تنفيذ المهمة #{task_id}", error[:12000])
+    return dict(task) if task else None
+
+
+def retry_task_execution(task_id: int) -> bool:
+    now = _now()
+    with _connect() as conn:
+        task = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if task is None or task["status"] in {"completed", "cancelled"}:
+            return False
+        cur = conn.execute(
+            """UPDATE task_executions SET status='queued',result='',error='',attempts=0,
+               updated_at=?,started_at=NULL,finished_at=NULL WHERE task_id=? AND status='failed'""",
+            (now, task_id),
+        )
+        if cur.rowcount:
+            conn.execute("UPDATE tasks SET status='open',updated_at=? WHERE id=?", (now, task_id))
+    if cur.rowcount:
+        log_activity("الريّس", "task_requeued", "task", task_id, f"تمت إعادة وضع المهمة #{task_id} في طابور التنفيذ")
+    return bool(cur.rowcount)
+
+
+def get_task_execution(task_id: int) -> dict[str, Any] | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM task_executions WHERE task_id=?", (task_id,)).fetchone()
+    return dict(row) if row else None
 
 
 def list_meetings(limit: int = 50) -> list[dict[str, Any]]:
@@ -159,7 +287,6 @@ def create_meeting(title: str, agenda: str, attendees: list[str], scheduled_at: 
     return item
 
 
-
 def update_meeting(meeting_id: int, updates: dict[str, Any], actor: str) -> dict[str, Any] | None:
     allowed = {"status", "minutes"}
     clean = {key: value for key, value in updates.items() if key in allowed}
@@ -183,6 +310,7 @@ def update_meeting(meeting_id: int, updates: dict[str, Any], actor: str) -> dict
     except (TypeError, json.JSONDecodeError):
         item["attendees"] = []
     return item
+
 
 def list_activity(limit: int = 60) -> list[dict[str, Any]]:
     limit = max(1, min(int(limit), 150))
