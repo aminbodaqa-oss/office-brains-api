@@ -39,7 +39,7 @@ def init_workflow_db() -> None:
             "SELECT id,description FROM tasks WHERE source='delegation' AND parent_task_id IS NULL"
         ).fetchall()
         for child in legacy_children:
-            match = re.search(r"مهمة فرعية من المهمة الرئيسية #(\\d+)", child["description"] or "")
+            match = re.search(r"مهمة فرعية من المهمة الرئيسية #(\d+)", child["description"] or "")
             if match:
                 conn.execute("UPDATE tasks SET parent_task_id=? WHERE id=?", (int(match.group(1)), child["id"]))
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id)")
