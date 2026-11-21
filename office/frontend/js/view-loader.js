@@ -19,11 +19,10 @@
       if (!response.ok) throw new Error("تعذر تحميل الواجهة: " + path);
       return response.text();
     }));
-    status.remove();
     fragments.forEach((markup) => {
       const template = document.createElement("template");
       template.innerHTML = markup;
-      mount.appendChild(template.content);
+      mount.insertBefore(template.content, status);
     });
 
     for (const path of [
@@ -41,7 +40,9 @@
         document.body.appendChild(script);
       });
     }
+    status.hidden = true;
   } catch (error) {
+    status.hidden = false;
     status.textContent = "تعذر تجهيز المكتب. حدّث الصفحة، وإذا استمرت المشكلة تواصل مع الدعم.";
     status.setAttribute("data-error", "true");
     console.error("Vindora Office view loader:", error);
