@@ -501,7 +501,14 @@ async def meeting_respond(body: MeetingRequest, _: str = Depends(require_owner))
 
 @app.get("/api/workspace/overview")
 async def get_workspace_overview(_: str = Depends(require_owner)):
-    return workflow_overview()
+    overview = workflow_overview()
+    autonomous_enabled = os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    overview["task_execution_engine"] = {
+        "enabled": autonomous_enabled,
+        "provider": PROVIDER,
+        "ready": autonomous_enabled and PROVIDER != "demo",
+    }
+    return overview
 
 @app.get("/api/tasks")
 async def get_tasks(limit: int = 100, status: str | None = None, assigned_to: str | None = None,
