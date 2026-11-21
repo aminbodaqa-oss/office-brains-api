@@ -2,32 +2,70 @@ import * as SecureStore from "expo-secure-store";
 
 export const API_BASE = "https://9ywu5lapwb.apps.bot-hosting.cloud";
 const TOKEN_KEY = "vindora_office_access_token";
+const REFRESH_TOKEN_KEY = "vindora_office_refresh_token";
 const PUSH_TOKEN_KEY = "vindora_office_push_token";
 
 let token: string | null = null;
+let refreshToken: string | null = null;
+
 export async function loadToken() {
   token = await SecureStore.getItemAsync(TOKEN_KEY);
-  return token;
+  refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  // Keep the signed-in UI available when only a refresh token remains.
+  return token || (refreshToken ? "refresh-pending" : null);
 }
-export async function saveToken(value: string) {
+export async function saveToken(value: string, refreshValue: string) {
   token = value;
+  refreshToken = refreshValue;
   await SecureStore.setItemAsync(TOKEN_KEY, value);
+  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshValue);
 }
 export async function clearToken() {
   token = null;
+  refreshToken = null;
   await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
 }
+
+async function renewSession(): Promise<boolean> {
+  if (!refreshToken) return false;
+  try {
+    const response = await fetch(API_BASE + "/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok || !data.access_token || !data.refresh_token) {
+      await clearToken();
+      return false;
+    }
+    await saveToken(data.access_token, data.refresh_token);
+    return true;
+  } catch {
+    // Network failures must not erase a valid refresh token.
+    return false;
+  }
+}
+
 export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(API_BASE + path, {
-    method: options.method || "GET", headers,
-    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
-  });
+  const send = () => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch(API_BASE + path, {
+      method: options.method || "GET", headers,
+      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+    });
+  };
+  let response = await send();
+  if (response.status === 401 && refreshToken && path !== "/api/auth/refresh" && path !== "/api/auth/login") {
+    if (await renewSession()) response = await send();
+    else if (!refreshToken) throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+  }
   const data: any = await response.json().catch(() => ({}));
   if (response.status === 401) {
-    await clearToken();
-    throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+    if (token || refreshToken) await clearToken();
+    throw new Error(data.detail || "انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
   }
   if (!response.ok) throw new Error(data.detail || `خطأ في الاتصال (${response.status})`);
   return data as T;
