@@ -146,6 +146,38 @@
       const execution = document.createElement("small"); execution.className = "ws-execution";
       execution.textContent = "حالة التنفيذ: " + (executionLabels[task.execution_status] || "لم يبدأ التنفيذ الآلي");
       details.append(title,desc,meta,execution);
+      if (task.delegation_plan_json) {
+        try {
+          const plan = JSON.parse(task.delegation_plan_json);
+          if (Array.isArray(plan) && plan.length) {
+            const proposalBox = document.createElement("div"); proposalBox.className = "ws-result";
+            const heading = document.createElement("strong");
+            heading.textContent = task.delegation_plan_status === "approved" ? "تم اعتماد توزيع المهام" : "مقترحات إبراهيم لتوزيع المهام";
+            proposalBox.append(heading);
+            plan.forEach((entry, index) => {
+              const line = document.createElement("p");
+              line.textContent = (index + 1) + ". " + entry.title + " — " + entry.assigned_to + " · " + entry.priority;
+              proposalBox.append(line);
+            });
+            if (task.delegation_plan_status === "proposed") {
+              const approve = document.createElement("button"); approve.type = "button";
+              approve.textContent = "موافقة وإرسال التكليفات";
+              approve.addEventListener("click", async () => {
+                approve.disabled = true;
+                try {
+                  await request("/api/tasks/" + task.id + "/delegations/approve", {method:"POST"});
+                  await renderTasks();
+                } catch(error) { alert(error.message); approve.disabled = false; }
+              });
+              proposalBox.append(approve);
+            } else if (task.delegation_plan_status === "approved") {
+              const note = document.createElement("small"); note.textContent = "تم إنشاء المهام الفرعية وإرسال التكليفات المسجلة.";
+              proposalBox.append(note);
+            }
+            details.append(proposalBox);
+          }
+        } catch (_) {}
+      }
       if (task.execution_result || task.execution_error) {
         const resultBox = document.createElement("details"); resultBox.className = "ws-result";
         const summary = document.createElement("summary"); summary.textContent = task.execution_error ? "تفاصيل تعثر التنفيذ" : "عرض نتيجة الموظف للمراجعة";
