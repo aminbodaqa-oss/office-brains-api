@@ -22,7 +22,7 @@ from auth import issue_token, require_owner, verify_password, hash_password, has
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
-from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan)
+from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan, manager_delegation_context)
 from task_runner import task_execution_loop
 
 @asynccontextmanager
@@ -444,6 +444,10 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
             system += f"\n- محادثة مع {other} | الرسالة: {item['content']} | الوقت: {item['created_at']}"
         system += "\nإذا سُئلت عما وصلك عبر واتساب المكتب، اعتمد فقط على هذه السجلات ولا تخترع رسائل أو محادثات."
 
+    if body.employee_id == "ابراهيم":
+        delegation_context = manager_delegation_context(body.employee_id)
+        if delegation_context:
+            system += "\n\nسجل التفويض ونتائج الفريق المحفوظة في قاعدة البيانات (مصدر موثوق؛ راجعها قبل الإجابة عن استلام النتائج أو تجميعها):\n" + delegation_context
     if inbox:
         system += "\n\nرسائل واردة مسجلة فعليًا في صندوقك الداخلي (الأحدث أولًا):\n" + "\n".join(
             f"- رقم الرسالة #{item['id']} | من: {item['sender_id']} | الحالة: {'مقروءة' if item['status'] == 'read' else 'مستلمة'} | التاريخ: {item['created_at']}\nالمحتوى: {item['content']}"
