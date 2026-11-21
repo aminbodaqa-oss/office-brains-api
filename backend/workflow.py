@@ -514,3 +514,47 @@ def pending_delegation_groups(limit: int = 10) -> list[int]:
             (max(1, min(int(limit), 50)),),
         ).fetchall()
     return [int(row["parent_task_id"]) for row in rows]
+
+
+def manager_delegation_context(manager_id: str, limit: int = 8) -> str:
+    """Provide the manager with persisted team results and consolidated reports in chat context."""
+    if manager_id != "ابراهيم":
+        return ""
+    limit = max(1, min(int(limit), 20))
+    with _connect() as conn:
+        reports = conn.execute(
+            """SELECT r.parent_task_id,r.report,r.created_at,t.title
+               FROM task_delegation_reports r
+               LEFT JOIN tasks t ON t.id=r.parent_task_id
+               ORDER BY r.created_at DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        children = conn.execute(
+            """SELECT t.id,t.parent_task_id,t.title,t.assigned_to,t.status,
+                      e.status AS execution_status,e.result,e.error
+               FROM tasks t LEFT JOIN task_executions e ON e.task_id=t.id
+               WHERE t.parent_task_id IS NOT NULL
+               ORDER BY t.parent_task_id DESC,t.id DESC LIMIT ?""",
+            (limit * 5,),
+        ).fetchall()
+    sections = []
+    if reports:
+        sections.append("تقارير الفريق النهائية المسجلة فعليًا:")
+        for row in reports:
+            sections.append(
+                f"\nالمهمة الرئيسية #{row['parent_task_id']} — {row['title'] or ''} "
+                f"({row['created_at']})\n{row['report']}"
+            )
+    if children:
+        sections.append("\nسجل نتائج المهام الفرعية المسجل فعليًا:")
+        for row in children:
+            state = row["execution_status"] or row["status"]
+            sections.append(
+                f"\nالمهمة الفرعية #{row['id']} التابعة للمهمة الرئيسية #{row['parent_task_id']} "
+                f"| {row['title']} | المسؤول: {row['assigned_to']} | الحالة: {state}"
+            )
+            if row["result"]:
+                sections.append(f"\nالنتيجة المسجلة:\n{row['result']}")
+            elif row["error"]:
+                sections.append(f"\nالخطأ المسجل: {row['error']}")
+    return "\n".join(sections)
