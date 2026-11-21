@@ -123,10 +123,12 @@ def list_tasks(limit: int = 100, status: str | None = None, assigned_to: str | N
             """SELECT t.*, e.status AS execution_status, e.result AS execution_result,
                       e.error AS execution_error, e.attempts AS execution_attempts,
                       e.started_at AS execution_started_at, e.finished_at AS execution_finished_at,
-                      p.status AS delegation_plan_status, p.plan_json AS delegation_plan_json, d.status AS delegation_diagnostic_status, d.error AS delegation_diagnostic_error
+                      p.status AS delegation_plan_status, p.plan_json AS delegation_plan_json, d.status AS delegation_diagnostic_status, d.error AS delegation_diagnostic_error,
+                      r.report AS delegation_final_report
                FROM tasks t LEFT JOIN task_executions e ON e.task_id=t.id
                LEFT JOIN task_delegation_plans p ON p.task_id=t.id
-               LEFT JOIN task_delegation_diagnostics d ON d.task_id=t.id"""
+               LEFT JOIN task_delegation_diagnostics d ON d.task_id=t.id
+               LEFT JOIN task_delegation_reports r ON r.parent_task_id=t.id"""
             + where +
             """ ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'review' THEN 2 ELSE 3 END,
                       CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
