@@ -15,7 +15,12 @@ from workflow import (claim_next_task_execution, fail_task_execution, finish_tas
 
 
 
+_delegation_report_failures: set[int] = set()
+
+
 async def finalize_delegation_group(parent_task_id: int) -> bool:
+    if parent_task_id in _delegation_report_failures:
+        return False
     children = delegation_children(parent_task_id)
     if not children or not all(item.get("execution_status") in {"review", "completed"} for item in children):
         return False
@@ -47,6 +52,7 @@ async def finalize_delegation_group(parent_task_id: int) -> bool:
             )
         return True
     except Exception as exc:
+        _delegation_report_failures.add(parent_task_id)
         add_notification(
             "delegation_team_report_failed",
             f"اكتملت المهام الفرعية لكن تعذر تجميع التقرير · #{parent_task_id}",
