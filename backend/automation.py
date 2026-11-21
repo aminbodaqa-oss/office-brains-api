@@ -268,7 +268,8 @@ async def _generate_daily_briefing(run_date: str) -> None:
         )
         try:
             raw = await employee_reply(
-                "أنت موظف حقيقي افتراضيًا في بيئة عمل منظمة. كن مبادرًا لكن لا تختلق معلومات. أعد JSON فقط.",
+                "أنت موظف حقيقي افتراضيًا في بيئة عمل منظمة. كن مبادرًا لكن لا تختلق معلومات. أعد JSON فقط.\\n\\n"
+                + management_context_for(employee_id),
                 [{"role": "user", "content": prompt}],
             )
             decision = {}
