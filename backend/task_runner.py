@@ -5,9 +5,61 @@ import json
 
 from brains import PROVIDER, employee_reply
 from database import add_notification, log_interaction
+from internal_messaging import send_internal_message
 from employees import EMPLOYEES, management_context_for
 from vindora_client import employee_context
-from workflow import claim_next_task_execution, fail_task_execution, finish_task_execution, save_delegation_plan, update_delegation_diagnostic
+from workflow import (claim_next_task_execution, fail_task_execution, finish_task_execution,
+                      save_delegation_plan, update_delegation_diagnostic,
+                      delegation_children, save_delegation_report_once,
+                      pending_delegation_groups)
+
+
+
+_delegation_report_failures: set[int] = set()
+
+
+async def finalize_delegation_group(parent_task_id: int) -> bool:
+    if parent_task_id in _delegation_report_failures:
+        return False
+    children = delegation_children(parent_task_id)
+    if not children or not all(item.get("execution_status") in {"review", "completed"} for item in children):
+        return False
+    team_report_prompt = (
+        f"المهمة الرئيسية: #{parent_task_id}\n"
+        "اجمع النتائج المسجلة التالية في تقرير تنفيذي موحد. لا تضف حقائق غير موجودة، "
+        "واشرح أي تعارض أو نقص، وافصل بين النتائج المؤكدة والتوصيات.\n\n"
+        + json.dumps(children, ensure_ascii=False)
+    )
+    try:
+        team_report = (await employee_reply(
+            "أنت إبراهيم المدير العام في مكتب Vindora. أعدد تقريرًا موحدًا من نتائج فريقك المسجلة فقط. "
+            "لا تدّعِ تنفيذ شيء لم يرد في النتائج. اكتب بالعربية المصرية المهنية مع ملخص، نتائج كل موظف، "
+            "النواقص والمخاطر، والخطوات التالية المقترحة.",
+            [{"role": "user", "content": team_report_prompt}]
+        )).strip()
+        if not team_report:
+            raise RuntimeError("لم يُرجع المحرك تقريرًا موحدًا.")
+        if save_delegation_report_once(parent_task_id, team_report):
+            log_interaction("ابراهيم", "delegation_team_report", {
+                "parent_task_id": parent_task_id, "report": team_report,
+                "child_task_ids": [item["id"] for item in children]
+            })
+            add_notification(
+                "delegation_team_report_ready",
+                f"إبراهيم جمع التقرير النهائي للمهمة الرئيسية #{parent_task_id}",
+                "اكتملت نتائج المهام الفرعية وتم تجميعها في تقرير واحد.",
+                team_report
+            )
+        return True
+    except Exception as exc:
+        _delegation_report_failures.add(parent_task_id)
+        add_notification(
+            "delegation_team_report_failed",
+            f"اكتملت المهام الفرعية لكن تعذر تجميع التقرير · #{parent_task_id}",
+            "النتائج الفردية محفوظة ووصلت لإبراهيم، لكن تجميع التقرير النهائي تعثر.",
+            str(exc)[:1200]
+        )
+        return False
 
 
 async def task_execution_loop() -> None:
@@ -23,6 +75,8 @@ async def task_execution_loop() -> None:
             await asyncio.sleep(10)
             continue
         if not task:
+            for parent_id in pending_delegation_groups(limit=5):
+                await finalize_delegation_group(parent_id)
             await asyncio.sleep(5)
             continue
 
@@ -77,6 +131,24 @@ async def task_execution_loop() -> None:
                 "result": result,
                 "submitted_for_review": True,
             })
+            parent_task_id = task.get("parent_task_id")
+            if parent_task_id:
+                parent_task_id = int(parent_task_id)
+                parent = next((item for item in EMPLOYEES if item["id"] == "ابراهيم"), None)
+                try:
+                    send_internal_message(
+                        employee_id, "ابراهيم",
+                        f"تم تجهيز نتيجة المهمة الفرعية #{task_id} وإرسالها للمدير العام.\n"
+                        f"المهمة: {task['title']}\nالنتيجة المسجلة للمراجعة:\n{result[:4500]}"
+                    )
+                except Exception as exc:
+                    add_notification(
+                        "delegation_result_message_failed", f"تعذر إرسال نتيجة المهمة #{task_id} لإبراهيم",
+                        f"النتيجة محفوظة في النظام لكن تعذر إرسال رسالة داخلية من {employee_id}.",
+                        str(exc)[:1000], employee_id="ابراهيم"
+                    )
+                await finalize_delegation_group(parent_task_id)
+
             if employee_id == "ابراهيم" and task.get("source") != "delegation":
                 update_delegation_diagnostic(task_id, "generating")
                 try:

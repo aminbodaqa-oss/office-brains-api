@@ -190,6 +190,13 @@
           }
         } catch (_) {}
       }
+      if (task.delegation_final_report) {
+        const finalBox = document.createElement("details"); finalBox.className = "ws-result";
+        finalBox.open = true;
+        const finalTitle = document.createElement("summary"); finalTitle.textContent = "تقرير إبراهيم النهائي بعد تجميع نتائج الفريق";
+        const finalOutput = document.createElement("pre"); finalOutput.textContent = task.delegation_final_report;
+        finalBox.append(finalTitle, finalOutput); details.append(finalBox);
+      }
       if (task.execution_result || task.execution_error) {
         const resultBox = document.createElement("details"); resultBox.className = "ws-result";
         const summary = document.createElement("summary"); summary.textContent = task.execution_error ? "تفاصيل تعثر التنفيذ" : "عرض نتيجة الموظف للمراجعة";
