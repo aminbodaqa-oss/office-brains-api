@@ -558,18 +558,19 @@ async def post_task(body: TaskCreateRequest, background_tasks: BackgroundTasks, 
         raise HTTPException(status_code=400, detail="درجة أولوية غير صحيحة.")
     task = create_task(body.title, body.description, body.assigned_to, "الريّس",
                        body.priority, body.due_at, "owner")
-    assignment_message = ("تم تكليفك بمهمة جديدة من الريّس.\\nالمهمة: #" + str(task["id"]) + " · " + body.title +
-        "\\nالتفاصيل: " + (body.description or "لا توجد تفاصيل إضافية.") +
-        "\\nالأولوية: " + body.priority + "\\nالموعد: " + (body.due_at or "غير محدد") +
-        "\\nسيجهز محرك التنفيذ نتيجة قابلة للمراجعة عند تفعيل التشغيل التلقائي ومحرك الذكاء الاصطناعي.")
+    assignment_message = ("تم تكليفك بمهمة جديدة من الريّس.\nالمهمة: #" + str(task["id"]) + " · " + body.title +
+        "\nالتفاصيل: " + (body.description or "لا توجد تفاصيل إضافية.") +
+        "\nالأولوية: " + body.priority + "\nالموعد: " + (body.due_at or "غير محدد") +
+        "\nسيجهز محرك التنفيذ نتيجة قابلة للمراجعة عند تفعيل التشغيل التلقائي ومحرك الذكاء الاصطناعي.")
+    assignment_sender = "ابراهيم" if body.assigned_to == "سلمى" else "سلمى"
     try:
-        send_internal_message("سلمى", body.assigned_to, assignment_message)
+        send_internal_message(assignment_sender, body.assigned_to, assignment_message)
     except ValueError as exc:
         log_activity("النظام", "task_assignment_message_failed", "task", int(task["id"]),
                      "تعذر إنشاء رسالة التكليف الداخلية", str(exc))
     add_notification("task_created", "مهمة جديدة في المكتب",
         "تم تسجيل مهمة وتكليف " + body.assigned_to + ".",
-        "المهمة: " + body.title + "\\nالأولوية: " + body.priority + "\\nالموعد: " + (body.due_at or "غير محدد"),
+        "المهمة: " + body.title + "\nالأولوية: " + body.priority + "\nالموعد: " + (body.due_at or "غير محدد"),
         employee_id=body.assigned_to)
     return {"saved": True, "task": task}
 
