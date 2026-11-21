@@ -1,5 +1,5 @@
-:root{--bg:#0b1020;--card:#131b31;--ink:#f6f7ff;--mut:#aab3ca;--line:#27314b;--acc:#00A884;--accink:#fff;--me:#203b43;--bot:#F2B84B;color-scheme:dark}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1020;--card:#131b31;--ink:#f6f7ff;--mut:#aab3ca;--line:#27314b;--acc:#00A884;--accink:#fff;--me:#203b43;--bot:#F2B84B;color-scheme:dark}}
+:root{--bg:#0b1020;--card:#131b31;--ink:#f6f7ff;--mut:#aab3ca;--line:#27314b;--acc:#00A884;--accink:#fff;--me:#203b43;--bot:#203b43;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1020;--card:#131b31;--ink:#f6f7ff;--mut:#aab3ca;--line:#27314b;--acc:#00A884;--accink:#fff;--me:#203b43;--bot:#203b43;color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.6}
@@ -170,7 +170,7 @@ textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:14px;padd
 /* Office Brains unified design system */
 :root{
  --bg:#0b1020;--card:#131b31;--ink:#f6f7ff;--mut:#aab3ca;--line:#27314b;
- --acc:#00A884;--accink:#ffffff;--me:#203b43;--bot:#F2B84B;
+ --acc:#00A884;--accink:#ffffff;--me:#203b43;--bot:#203b43;
  color-scheme:dark;
 }
 body{background:var(--bg);color:var(--ink)}
