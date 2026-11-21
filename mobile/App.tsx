@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pre
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
+import * as SecureStore from "expo-secure-store";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import { api, clearToken, loadToken, saveToken, savePushToken, loadPushToken, clearPushToken } from "./src/api";
 
@@ -143,8 +144,8 @@ function AppInner() {
   const login = async () => {
     setBusy(true); setError("");
     try {
-      const result = await api<{access_token:string}>("/api/auth/login", { method:"POST", body:{username,password} });
-      await saveToken(result.access_token); setLoggedIn(true); setPassword("");
+      const result = await api<{access_token:string;refresh_token:string}>("/api/auth/login", { method:"POST", body:{username,password} });
+      await saveToken(result.access_token, result.refresh_token); setLoggedIn(true); setPassword("");
     } catch(e:any) { setError(e.message || "تعذر تسجيل الدخول"); }
     finally { setBusy(false); }
   };
@@ -154,6 +155,7 @@ function AppInner() {
       try { await api("/api/push/unregister",{method:"POST",body:{token:pushToken,platform:"android"}}); } catch {}
       await clearPushToken();
     }
+    try { const storedRefresh = await SecureStore.getItemAsync("vindora_office_refresh_token"); if (storedRefresh) await api("/api/auth/logout", {method:"POST", body:{refresh_token:storedRefresh}}); } catch {}
     await clearToken(); setLoggedIn(false); setSelected(null); setChat([]);
   };
 
