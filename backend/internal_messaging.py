@@ -116,6 +116,27 @@ def detect_send_request(value: str) -> dict[str, str] | None:
     return {"recipient_id": recipient, "content": body}
 
 
+
+def detect_contact_request(value: str) -> str | None:
+    """Recognize an owner's explicit request for an employee to contact them."""
+    normalized, _ = _normalize_with_positions(value)
+    names = sorted(EMPLOYEE_IDS, key=len, reverse=True)
+    aliases = {}
+    for name in names:
+        key, _ = _normalize_with_positions(name)
+        aliases[key] = name
+    alternatives = "|".join(re.escape(name) for name in aliases)
+    patterns = (
+        rf"(?:خلي|خللي|اطلبي\s+من|اطلب\s+من|كلمي)\s+(?:يا\s*)?(?P<name>{alternatives})\s+(?:يكلمني|يتواصل\s+معايا|يتصل\s+بيا|يبعتلي)",
+        rf"(?:عايز|عاوز|محتاج)\s+(?P<name>{alternatives})\s+(?:يكلمني|يتواصل\s+معايا|يتصل\s+بيا|يبعتلي)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, normalized)
+        if match:
+            return aliases.get(match.group("name"))
+    return None
+
+
 def has_send_intent(value: str) -> bool:
     normalized, _ = _normalize_with_positions(value)
     return bool(re.search(r"(?:^|\s)(?:ابعتي|ابعت|ابعثي|ابعث|ارسلي|ارسل|تبعتي|تبعت|تبعثي|تبعث|بلغي|بلغ|راسلي|راسل|كلمي|كلم)\s+", normalized))
