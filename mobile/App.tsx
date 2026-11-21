@@ -188,7 +188,9 @@ function AppInner() {
       await loadPushDeliveryStatus();
     } catch(e:any) { Alert.alert("تعذر إرسال الاختبار",e.message || "تحقق من اتصالك بالسيرفر."); }
   };
-  const registerPushNotifications = async () => {
+  const registerPushNotifications = async (options: {showSuccessAlert?: boolean; requestPermission?: boolean} = {}) => {
+    const showSuccessAlert = options.showSuccessAlert ?? true;
+    const requestPermission = options.requestPermission ?? true;
     if (pushRegistering) return;
     if (Platform.OS !== "android") {
       Alert.alert("غير مدعوم", "تسجيل إشعارات الهاتف متاح حاليًا على أندرويد فقط.");
@@ -208,8 +210,11 @@ function AppInner() {
       });
       setPushStatus("جارٍ التحقق من إذن الإشعارات...");
       let permission = await Notifications.getPermissionsAsync();
-      if (permission.status !== "granted") permission = await Notifications.requestPermissionsAsync();
+      if (permission.status !== "granted" && requestPermission) {
+        permission = await Notifications.requestPermissionsAsync();
+      }
       if (permission.status !== "granted") {
+        if (!requestPermission) return;
         throw new Error(permission.canAskAgain === false
           ? "إذن الإشعارات مرفوض نهائيًا. افتح إعدادات الهاتف ثم التطبيقات ثم Vindora Office ثم الإشعارات وفعّلها."
           : "لم يتم منح إذن الإشعارات. وافق على الرسالة التي تظهر من أندرويد ثم أعد المحاولة.");
@@ -217,11 +222,17 @@ function AppInner() {
       setPushStatus("تم منح الإذن، جارٍ تسجيل الجهاز على السيرفر...");
       const tokenResult = await Notifications.getExpoPushTokenAsync({projectId});
       if (!tokenResult.data) throw new Error("لم يتمكن Expo من إنشاء رمز الإشعارات لهذا الجهاز.");
+      const savedToken = await loadPushToken();
+      if (savedToken === tokenResult.data) {
+        setPushStatus("الإشعارات مفعّلة وهذا الهاتف مسجّل بالفعل");
+        await loadPushDeliveryStatus();
+        return;
+      }
       await api("/api/push/register", {method:"POST",body:{token:tokenResult.data,platform:"android",device_id:Constants.installationId || "android-device"}});
       await savePushToken(tokenResult.data);
       setPushStatus("تم تفعيل الإشعارات وتسجيل هذا الهاتف بنجاح");
       await loadPushDeliveryStatus();
-      Alert.alert("تم بنجاح", "تم تسجيل هاتفك لاستقبال إشعارات Vindora Office.");
+      if (showSuccessAlert) Alert.alert("تم بنجاح", "تم تسجيل هاتفك لاستقبال إشعارات Vindora Office.");
     } catch (e:any) {
       const message = e?.message || "حدث خطأ غير معروف أثناء تسجيل الجهاز.";
       setPushStatus("فشل تسجيل الجهاز: " + message);
@@ -230,7 +241,7 @@ function AppInner() {
       setPushRegistering(false);
     }
   };
-  useEffect(() => { if (loggedIn) { registerPushNotifications(); loadPushDeliveryStatus(); } }, [loggedIn]);
+  useEffect(() => { if (loggedIn) { registerPushNotifications({showSuccessAlert:false,requestPermission:false}); loadPushDeliveryStatus(); } }, [loggedIn]);
   const openEmployee = async (employee: Employee) => {
     setSelected(employee); setChat([]); setDraft(""); setShowMemories(false); setMemories([]); loadMemories(employee.id);
     try { const r = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(employee.id)); setChat(r.messages || []); }
