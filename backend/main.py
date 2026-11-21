@@ -281,6 +281,9 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
                     f"اسمك: {employee['id']}\nوظيفتك: {employee['role']}\nالإدارة: {employee['department']}\n"
                     "المتحدث الآخر هو مالك المكتب (الريّس)."
                 )
+                legal_instructions = employee.get("instructions", "")
+                if legal_instructions:
+                    system += "\n\nتعليمات التخصص الإضافية:\n" + legal_instructions
                 try:
                     system += await employee_context(body.recipient_id)
                 except Exception:
@@ -419,6 +422,9 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     memories = get_memories(body.employee_id, 12)
     assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
     system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    employee_profile = next((item for item in EMPLOYEES if item["id"] == body.employee_id), None)
+    if employee_profile and employee_profile.get("instructions"):
+        system += "\n\nتعليمات التخصص الإضافية:\n" + employee_profile["instructions"]
     wa_number = virtual_number(body.employee_id)
     wa_inbox = list_whatsapp_inbox(body.employee_id, 15)
     system += f"\nرقم واتساب المكتب الافتراضي الخاص بك هو {wa_number}. هذا رقم داخلي غير قابل للاتصال الهاتفي ولا يمثل رقم واتساب حقيقيًا."
