@@ -177,7 +177,7 @@ const T=[
 ];
 let hist={};try{hist=JSON.parse(localStorage.getItem('vo_hist')||'{}')}catch(e){}
 const saveH=()=>{try{localStorage.setItem('vo_hist',JSON.stringify(hist))}catch(e){}};
-let cur=null,busy=false;
+let cur=null,busy=false,chatRefreshTimer=null;
 const $=id=>document.getElementById(id);
 const AV=[{s:'#d9a47a',h:'#8a8a8a',st:'short',b:1,o:'#2b3a55',t:'#8b1e2d'},{s:'#e0b48f',h:'#8a4f7d',st:'hijab',o:'#6b4a63'},{s:'#e0b48f',h:'#3a2417',st:'long',o:'#3f8fb0'},{s:'#c68c62',h:'#1d1510',st:'short',b:1,o:'#e07b4f'},{s:'#d9a47a',h:'#2a1c14',st:'short',g:1,o:'#5b4fb0',t:'#222'},{s:'#d9a47a',h:'#1d1510',st:'curly',o:'#3f8f5a'},{s:'#b97a56',h:'#8a8a8a',st:'short',g:1,b:1,o:'#3a3a44',t:'#555'},{s:'#c68c62',h:'#1d1510',st:'short',g:1,o:'#3f6f8f'},{s:'#b97a56',h:'#1d1510',st:'curly',b:1,o:'#b03a3a'},{s:'#d9a47a',h:'#2e6f6a',st:'hijab',o:'#c76fb3'},{s:'#c68c62',h:'#2a1c14',st:'short',b:1,o:'#4a5a6a',t:'#1d6f5c'},{s:'#e0b48f',h:'#6a4a2e',st:'hijab',o:'#d9a24f'},{s:'#b97a56',h:'#1d1510',st:'short',o:'#3b6fb0'},{s:'#c68c62',h:'#1d1510',st:'short',b:1,o:'#7047F5'},{s:'#b97a56',h:'#1d1510',st:'short',b:1,o:'#23866D'},{s:'#c68c62',h:'#241a16',st:'short',b:1,o:'#9A6B45'}];
 function avSVG(i){const a=AV[i],c=T[i].c,hj=a.st==='hijab';let s='<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="'+c+'" opacity=".28"/><path d="M10 100Q12 72 50 70Q88 72 90 100Z" fill="'+a.o+'"/>';
@@ -196,7 +196,7 @@ const AVATAR_FILES=["ibrahim.jpg","leila.jpg","nour.jpg","karim.jpg","islam.jpg"
 function avatarPhoto(i){const file=AVATAR_FILES[i];return file?`<img src="../vindora_employee_portraits/${file}" alt="${T[i].n}" loading="lazy">`:avSVG(i)}
 $("grid").innerHTML=T.map((x,i)=>`<button class="desk ${x.gm?"gm":""}" data-i="${i}"><div class="av">${avatarPhoto(i)}</div><b>${x.n}</b><span>${x.r}</span></button>`).join("");
 $("grid").onclick=e=>{const b=e.target.closest(".desk");if(b)openChat(+b.dataset.i)};
-$("back").onclick=()=>{$("chat").classList.remove("on");cur=null};
+$("back").onclick=()=>{$("chat").classList.remove("on");cur=null;if(chatRefreshTimer){clearInterval(chatRefreshTimer);chatRefreshTimer=null}};
 async function openChat(i){
   cur=i;const x=T[i];hist[i]=hist[i]||[];
   $("cav").innerHTML=avatarPhoto(i);$("cname").textContent=x.n;$("crole").textContent=x.r;
@@ -213,6 +213,23 @@ async function openChat(i){
       }
     }
   }catch(e){}
+  if(chatRefreshTimer)clearInterval(chatRefreshTimer);
+  chatRefreshTimer=setInterval(async()=>{
+    if(cur!==i||busy||!ownerToken)return;
+    try{
+      const base=(window.OFFICE_API_URL||"").replace(/\/$/,"");
+      const response=await fetch(base+"/api/chat/history?employee_id="+encodeURIComponent(x.n),{headers:{Authorization:"Bearer "+ownerToken}});
+      if(!response.ok)return;
+      const data=await response.json();
+      if(cur===i&&Array.isArray(data.messages)){
+        const current=hist[i]||[];
+        const server=data.messages;
+        if(server.length!==current.length||server.some((m,index)=>m.role!==current[index]?.role||m.content!==current[index]?.content)){
+          hist[i]=server;saveH();draw();
+        }
+      }
+    }catch(e){}
+  },10000);
 }
 $("chips").onclick=e=>{if(e.target.tagName==="BUTTON"){$("t").value=e.target.textContent;send()}};
 function draw(){
