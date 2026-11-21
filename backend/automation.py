@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from database import _connect, add_notification, log_interaction
-from employees import EMPLOYEES
+from employees import EMPLOYEES, management_context_for
 from workflow import workflow_overview, log_activity, list_tasks, list_activity, list_meetings
 from vindora_client import VindoraUnavailable, employee_context
 
@@ -75,9 +75,10 @@ async def _run_autonomous_meeting(run_date: str, reason: str, agenda: list[str],
             prompt = (
                 "أنت مشارك في اجتماع داخلي حقيقي لفريق Vindora. تحدث بالعربية المصرية المهنية وباختصار. "
                 "ناقش جدول الأعمال من تخصصك، استند فقط إلى البيانات المتاحة، وميّز الحقائق عن المقترحات. "
-                "لا تدّعِ تنفيذ مهام. اذكر قرارًا أو خطوة عملية ومسؤولًا وموعدًا مقترحًا عند توفر أساس لذلك.\n"
-                f"اسمك: {employee_id}\nوظيفتك: {employee['role']}\nإدارتك: {employee['department']}\n"
-                f"بيانات الإدارة المجمعة: {context or 'لا توجد بيانات إضافية متاحة.'}"
+                "لا تدّعِ تنفيذ مهام. اذكر قرارًا أو خطوة عملية ومسؤولًا وموعدًا مقترحًا عند توفر أساس لذلك.\n\n"
+                + management_context_for(employee_id) + "\n\n"
+                + f"اسمك: {employee_id}\nوظيفتك: {employee['role']}\nإدارتك: {employee['department']}\n"
+                + f"بيانات الإدارة المجمعة: {context or 'لا توجد بيانات إضافية متاحة.'}"
             )
             response = await employee_reply(
                 prompt,
@@ -98,7 +99,8 @@ async def _run_autonomous_meeting(run_date: str, reason: str, agenda: list[str],
     manager_context = await employee_context("ابراهيم", days=30)
     manager_result = await employee_reply(
         "أنت إبراهيم المدير العام لـ Vindora. راجع نقاش الاجتماع، واكتب خلاصة قرارات وتوصيات واضحة. "
-        "افصل القرارات المتفق عليها عن المقترحات، وحدد المسؤول والموعد فقط إذا ورد أساس لهما. لا تخترع تنفيذًا.",
+        "افصل القرارات المتفق عليها عن المقترحات، وحدد المسؤول والموعد فقط إذا ورد أساس لهما. لا تخترع تنفيذًا.\n\n"
+        + management_context_for("ابراهيم"),
         [{"role": "user", "content": "بيانات الإدارة: " + manager_context + "\n\nنقاش الاجتماع:\n" + discussion}]
     )
     secretary = next(item for item in EMPLOYEES if item["id"] == "سلمى")
@@ -130,7 +132,8 @@ async def _manager_meeting_decision(run_date: str, summary: str, reports: list[s
         ("\n\nتعثرات التقارير:\n" + "\n".join(failures) if failures else "")
     )
     raw = await employee_reply(
-        "أنت إبراهيم. مهمتك إصدار قرار اجتماع آلي قابل للقراءة البرمجية. أعد JSON فقط.",
+        "أنت إبراهيم. مهمتك إصدار قرار اجتماع آلي قابل للقراءة البرمجية. أعد JSON فقط.\n\n"
+        + management_context_for("ابراهيم"),
         [{"role": "user", "content": prompt}]
     )
     start, end = raw.find("{"), raw.rfind("}")
@@ -190,7 +193,8 @@ async def _generate_secretary_digest(run_date: str, manager_summary: str) -> Non
         "شخصيتك مصرية نغشة وخفيفة الدم باعتدال، لكن دقيقة جدًا في المواعيد والمتابعة. "
         "استخدمي المهام والاجتماعات المسجلة فقط. اذكري المتأخرات والأولويات والاجتماعات القادمة. "
         "لو لا توجد مهام أو اجتماعات مسجلة فقولي ذلك بوضوح. لا تنشئي مهام ولا تدّعي إرسال تذكيرات أو تكليف موظفين. "
-        "افصلي بين الواقع المسجل وأي اقتراح منك، واختتمي بأهم شيء يحتاج قرار الريّس."
+        "افصلي بين الواقع المسجل وأي اقتراح منك، واختتمي بأهم شيء يحتاج قرار الريّس.\n\n"
+        + management_context_for("سلمى")
     )
     prompt = (
         f"تاريخ اليوم: {run_date}\n"
@@ -265,7 +269,8 @@ async def _generate_daily_briefing(run_date: str) -> None:
         )
         try:
             raw = await employee_reply(
-                "أنت موظف حقيقي افتراضيًا في بيئة عمل منظمة. كن مبادرًا لكن لا تختلق معلومات. أعد JSON فقط.",
+                "أنت موظف حقيقي افتراضيًا في بيئة عمل منظمة. كن مبادرًا لكن لا تختلق معلومات. أعد JSON فقط.\\n\\n"
+                + management_context_for(employee_id),
                 [{"role": "user", "content": prompt}],
             )
             decision = {}
@@ -337,7 +342,8 @@ async def _generate_daily_briefing(run_date: str) -> None:
         + ("\n\nتعذر إعداد بعض التقارير:\n" + "\n".join(failures) if failures else "")
     )
     summary = await employee_reply(
-        "أنت المدير العام إبراهيم. كن دقيقًا، لا تخترع بيانات، واكتب تقريرًا تنفيذيًا موجزًا للمالك.",
+        "أنت المدير العام إبراهيم. كن دقيقًا، لا تخترع بيانات، واكتب تقريرًا تنفيذيًا موجزًا للمالك.\n\n"
+        + management_context_for("ابراهيم"),
         [{"role": "user", "content": manager_prompt}],
     )
     _save_report(run_date, manager["id"], manager["department"], summary)
@@ -421,7 +427,8 @@ async def salma_proactive_loop() -> None:
             "راجعي كل ساعة حالة المكتب، وقدمي للريّس رسالة قصيرة في كل مراجعة. إذا لم يوجد مستجد عمل، أرسلي Check-in لطيفًا ومتنوعًا بدل الصمت. "
             "لا تكرري صياغة الرسائل السابقة، ولا تختلقي أحداثًا أو مهامًا أو إنجازات أو مشاعر بشرية حقيقية أو أفعالًا لم تحدث. "
             "استخدمي فقط السياق المتاح، وميّزي بوضوح بين المعلومة المسجلة والاقتراح. "
-            "أعيدي JSON صالحًا فقط بالمفاتيح should_message (boolean), category (work|idea|personal), content (string). اجعلي should_message=true عندما تكون هناك رسالة صالحة."
+            "أعيدي JSON صالحًا فقط بالمفاتيح should_message (boolean), category (work|idea|personal), content (string). اجعلي should_message=true عندما تكون هناك رسالة صالحة.\n\n"
+            + management_context_for("سلمى")
         )
         prompt = (
             "الوقت الحالي في القاهرة: " + datetime.now(CAIRO).isoformat() +

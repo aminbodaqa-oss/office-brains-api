@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 from database import add_memory, get_memories, init_db, log_interaction, get_chat_history, add_notification, get_notifications, mark_notifications_read, delete_notifications, delete_chat_interactions, get_owner_password_hash, set_owner_password_hash, register_push_device, unregister_push_device, get_push_status, create_auth_session, rotate_auth_session, revoke_auth_session, revoke_user_auth_sessions
-from employees import EMPLOYEES, EMPLOYEE_IDS
+from employees import EMPLOYEES, EMPLOYEE_IDS, management_context_for
 from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent)
 from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
 from brains import PROVIDER, BrainUnavailable, employee_reply
@@ -281,6 +281,9 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
                     f"اسمك: {employee['id']}\nوظيفتك: {employee['role']}\nالإدارة: {employee['department']}\n"
                     "المتحدث الآخر هو مالك المكتب (الريّس)."
                 )
+                manager_team_context = management_context_for(body.recipient_id)
+                if manager_team_context:
+                    system += "\n\nمعرفة المدير بالفريق والتنسيق مع المختصين:\n" + manager_team_context
                 legal_instructions = employee.get("instructions", "")
                 if legal_instructions:
                     system += "\n\nتعليمات التخصص الإضافية:\n" + legal_instructions
@@ -422,6 +425,9 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     memories = get_memories(body.employee_id, 12)
     assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
     system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    manager_team_context = management_context_for(body.employee_id)
+    if manager_team_context:
+        system += "\n\nمعرفة المدير بالفريق والتنسيق مع المختصين:\n" + manager_team_context
     employee_profile = next((item for item in EMPLOYEES if item["id"] == body.employee_id), None)
     if employee_profile and employee_profile.get("instructions"):
         system += "\n\nتعليمات التخصص الإضافية:\n" + employee_profile["instructions"]
@@ -472,6 +478,9 @@ async def meeting_respond(body: MeetingRequest, _: str = Depends(require_owner))
     if body.employee_id not in EMPLOYEE_IDS:
         raise HTTPException(status_code=404, detail="الموظف غير موجود")
     system = "أنت موظف في اجتماع عمل. اتكلم بالعامية المصرية، بإيجاز، ولا تخترع معلومات.\n" + body.employee_prompt + "\n" + body.personality + "\n" + body.company_context + "\n" + body.rules
+    manager_team_context = management_context_for(body.employee_id)
+    if manager_team_context:
+        system += "\n\nمعرفة المدير بالفريق والتنسيق مع المختصين:\n" + manager_team_context
     prompt = "الوقت: " + body.time + "\nسياق الاجتماع حتى الآن:\n" + body.transcript + "\n\nالمطلوب منك:\n" + body.instruction
     try:
         system += await employee_context(body.employee_id)
