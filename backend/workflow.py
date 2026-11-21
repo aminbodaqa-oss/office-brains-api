@@ -178,7 +178,7 @@ def claim_next_task_execution() -> dict[str, Any] | None:
         row = conn.execute(
             """SELECT t.*, e.id AS execution_id, e.attempts AS execution_attempts
                FROM task_executions e JOIN tasks t ON t.id=e.task_id
-               WHERE e.status='queued' AND t.status NOT IN ('completed','cancelled')
+               WHERE e.status='queued' AND t.status IN ('open','in_progress')
                ORDER BY CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
                         e.created_at ASC, e.id ASC LIMIT 1"""
         ).fetchone()
