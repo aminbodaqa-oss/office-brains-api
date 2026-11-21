@@ -48,6 +48,16 @@ def init_workflow_db() -> None:
             FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
         )""")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_task_executions_queue ON task_executions(status,created_at)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS task_delegation_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'proposed',
+            plan_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            approved_at TEXT,
+            FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -98,8 +108,10 @@ def list_tasks(limit: int = 100, status: str | None = None, assigned_to: str | N
         rows = conn.execute(
             """SELECT t.*, e.status AS execution_status, e.result AS execution_result,
                       e.error AS execution_error, e.attempts AS execution_attempts,
-                      e.started_at AS execution_started_at, e.finished_at AS execution_finished_at
-               FROM tasks t LEFT JOIN task_executions e ON e.task_id=t.id"""
+                      e.started_at AS execution_started_at, e.finished_at AS execution_finished_at,
+                      p.status AS delegation_plan_status, p.plan_json AS delegation_plan_json
+               FROM tasks t LEFT JOIN task_executions e ON e.task_id=t.id
+               LEFT JOIN task_delegation_plans p ON p.task_id=t.id"""
             + where +
             """ ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'review' THEN 2 ELSE 3 END,
                       CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
@@ -340,3 +352,78 @@ def workflow_overview() -> dict[str, Any]:
         "meetings": list_meetings(10),
         "activity": list_activity(30),
     }
+
+
+def save_delegation_plan(task_id: int, plan: list[dict[str, Any]]) -> bool:
+    """Persist an AI-proposed manager delegation plan; inert until owner approval."""
+    now = _now()
+    payload = json.dumps(plan[:8], ensure_ascii=False)
+    with _connect() as conn:
+        task = conn.execute("SELECT assigned_to FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if task is None or task["assigned_to"] != "ابراهيم":
+            return False
+        conn.execute(
+            """INSERT INTO task_delegation_plans(task_id,status,plan_json,created_at,updated_at)
+               VALUES(?,'proposed',?,?,?)
+               ON CONFLICT(task_id) DO UPDATE SET status='proposed',plan_json=excluded.plan_json,
+               updated_at=excluded.updated_at,approved_at=NULL""",
+            (task_id, payload, now, now),
+        )
+    log_activity("ابراهيم", "delegation_plan_proposed", "task", task_id,
+                 f"إبراهيم اقترح توزيع {len(plan[:8])} مهام فرعية للمراجعة", payload)
+    return True
+
+
+def approve_delegation_plan(task_id: int, allowed_employee_ids: set[str]) -> list[dict[str, Any]] | None:
+    """Atomically create approved child tasks once; repeated approvals cannot duplicate them."""
+    now = _now()
+    created: list[dict[str, Any]] = []
+    with _connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        plan_row = conn.execute("SELECT * FROM task_delegation_plans WHERE task_id=?", (task_id,)).fetchone()
+        if plan_row is None or plan_row["status"] != "proposed":
+            return None
+        parent = conn.execute("SELECT title FROM tasks WHERE id=?", (task_id,)).fetchone()
+        if parent is None:
+            return None
+        try:
+            plan = json.loads(plan_row["plan_json"])
+        except (TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(plan, list) or not plan or len(plan) > 8:
+            return None
+        normalized = []
+        for item in plan:
+            if not isinstance(item, dict):
+                return None
+            title = str(item.get("title", "")).strip()[:180]
+            description = str(item.get("description", "")).strip()[:5000]
+            assigned_to = str(item.get("assigned_to", "")).strip()[:120]
+            priority = str(item.get("priority", "normal")).strip()
+            if not title or assigned_to not in allowed_employee_ids or priority not in TASK_PRIORITIES:
+                return None
+            normalized.append((title, description, assigned_to, priority))
+        for title, description, assigned_to, priority in normalized:
+            cur = conn.execute(
+                """INSERT INTO tasks(title,description,assigned_to,created_by,status,priority,due_at,source,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (title, f"مهمة فرعية من المهمة الرئيسية #{task_id}: {parent['title']}\n\n{description}",
+                 assigned_to, "ابراهيم", "open", priority, None, "delegation", now, now),
+            )
+            child_id = int(cur.lastrowid)
+            conn.execute(
+                """INSERT INTO task_executions(task_id,employee_id,status,created_at,updated_at)
+                   VALUES(?,?,'queued',?,?)""",
+                (child_id, assigned_to, now, now),
+            )
+            created.append({"id": child_id, "title": title, "description": description,
+                            "assigned_to": assigned_to, "priority": priority})
+        conn.execute(
+            "UPDATE task_delegation_plans SET status='approved',updated_at=?,approved_at=? WHERE task_id=? AND status='proposed'",
+            (now, now, task_id),
+        )
+    for child in created:
+        log_activity("ابراهيم", "delegated_task_created", "task", child["id"],
+                     f"تم إنشاء مهمة فرعية من المهمة الرئيسية #{task_id} وتكليف {child['assigned_to']}",
+                     child["title"] + "\n" + child["description"])
+    return created

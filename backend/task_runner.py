@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from brains import PROVIDER, employee_reply
 from database import add_notification, log_interaction
 from employees import EMPLOYEES, management_context_for
 from vindora_client import employee_context
-from workflow import claim_next_task_execution, fail_task_execution, finish_task_execution
+from workflow import claim_next_task_execution, fail_task_execution, finish_task_execution, save_delegation_plan
 
 
 async def task_execution_loop() -> None:
@@ -76,6 +77,55 @@ async def task_execution_loop() -> None:
                 "result": result,
                 "submitted_for_review": True,
             })
+            if employee_id == "ابراهيم" and task.get("source") != "delegation":
+                try:
+                    team = [
+                        {"id": item["id"], "role": item.get("role", ""), "department": item.get("department", "")}
+                        for item in EMPLOYEES if item["id"] != "ابراهيم"
+                    ]
+                    delegation_system = (
+                        "أنت إبراهيم المدير العام في مكتب Vindora. حوّل توصيات المهمة الرئيسية إلى خطة مهام فرعية عملية. "
+                        "لا تنفذ أي إجراء ولا تدّعِ أنك أرسلت التكليفات. أخرج JSON فقط بالشكل "
+                        '{"delegations":[{"title":"...","description":"...","assigned_to":"اسم الموظف حرفيًا من القائمة","priority":"normal"}]}. '
+                        "اختر من 1 إلى 5 مهام فقط، ولا تكرر التوصيات، ولا تسند عملًا خارج اختصاص الموظف. "
+                        'إذا لم توجد مهام قابلة للتفويض فأخرج {"delegations":[]}.'
+                    )
+                    delegation_prompt = (
+                        "التقرير المنجز:\n" + result[:14000] + "\n\n"
+                        "قائمة الفريق المسموح بالتكليف إليه:\n" +
+                        json.dumps(team, ensure_ascii=False) +
+                        "\n\nاقترح المهام الفرعية. استخدم assigned_to من id فقط، والأولوية واحدة من low/normal/high/urgent."
+                    )
+                    raw_plan = (await employee_reply(
+                        delegation_system, [{"role": "user", "content": delegation_prompt}]
+                    )).strip()
+                    start, end = raw_plan.find("{"), raw_plan.rfind("}")
+                    parsed = json.loads(raw_plan[start:end + 1]) if start >= 0 and end > start else {}
+                    allowed = {item["id"] for item in team}
+                    proposals = parsed.get("delegations", [])
+                    clean_plan = []
+                    if isinstance(proposals, list):
+                        for item in proposals[:5]:
+                            if not isinstance(item, dict):
+                                continue
+                            assignee = str(item.get("assigned_to", "")).strip()
+                            title = str(item.get("title", "")).strip()
+                            description = str(item.get("description", "")).strip()
+                            priority = str(item.get("priority", "normal")).strip()
+                            if assignee in allowed and title and priority in {"low", "normal", "high", "urgent"}:
+                                clean_plan.append({"title": title[:180], "description": description[:5000],
+                                                   "assigned_to": assignee, "priority": priority})
+                    if clean_plan and save_delegation_plan(task_id, clean_plan):
+                        add_notification(
+                            "delegation_plan_ready",
+                            f"خطة توزيع إبراهيم جاهزة للموافقة · #{task_id}",
+                            f"إبراهيم اقترح {len(clean_plan)} مهام فرعية. لم تُرسل التكليفات بعد.",
+                            "راجع المقترحات ثم اعتمد توزيعها من لوحة مهام الشركة."
+                        )
+                except Exception:
+                    # The employee's main deliverable remains valid even if delegation planning fails.
+                    pass
+
             add_notification(
                 "task_ready_for_review",
                 f"نتيجة مهمة جاهزة للمراجعة · #{task_id}",
