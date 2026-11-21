@@ -141,6 +141,22 @@ function AppInner() {
   };
   useEffect(() => { if (loggedIn) refresh(); }, [loggedIn]);
 
+  // Keep employee-initiated messages and notifications visible while the app is open.
+  useEffect(() => {
+    if (!loggedIn) return;
+    const timer = setInterval(async () => {
+      try {
+        const n = await api<{notifications:Notice[]}>("/api/notifications?limit=60");
+        setNotices(n.notifications || []);
+        if (selected) {
+          const h = await api<{messages:Message[]}>("/api/chat/history?employee_id="+encodeURIComponent(selected.id));
+          setChat(h.messages || []);
+        }
+      } catch {}
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [loggedIn, selected?.id]);
+
   const login = async () => {
     setBusy(true); setError("");
     try {

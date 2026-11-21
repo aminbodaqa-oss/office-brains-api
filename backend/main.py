@@ -616,19 +616,16 @@ async def get_activity(limit: int = 60, _: str = Depends(require_owner)):
 
 
 
-async def _employee_contact_owner(employee_id: str, owner_request: str) -> None:
-    """Generate and record a direct, employee-initiated message to the owner."""
+async def _employee_contact_owner(employee_id: str, owner_request: str) -> dict:
+    """Generate and persist an employee-initiated message before confirming success."""
     employee = next((item for item in EMPLOYEES if item["id"] == employee_id), None)
     if not employee:
-        return
+        return {"sent": False, "error": "الموظف المطلوب غير موجود."}
     if PROVIDER == "demo":
-        log_activity("سلمى", "contact_request_failed", "employee", None,
-                     "تعذر تنفيذ طلب التواصل لأن مزود الذكاء الاصطناعي في وضع التجربة",
-                     "الموظف المطلوب: " + employee_id)
-        add_notification("contact_request_failed", "تعذر بدء التواصل",
-                         "طلب التواصل مع " + employee_id + " لم يُنفذ لأن محرك الذكاء الاصطناعي في وضع التجربة.",
-                         "لم يتم إرسال رسالة من الموظف.")
-        return
+        error = "محرك الذكاء الاصطناعي مضبوط على وضع التجربة، ولم يتم إنشاء رسالة."
+        log_activity("سلمى", "contact_request_failed", "employee", None, error, "الموظف المطلوب: " + employee_id)
+        add_notification("contact_request_failed", "تعذر بدء التواصل", error, "لم يتم إرسال رسالة من الموظف.")
+        return {"sent": False, "error": error}
     try:
         system = (
             "أنت موظف افتراضي متخصص داخل مكتب Vindora. المالك طلب منك أن تبدأ التواصل معه بنفسك الآن. "
@@ -666,12 +663,15 @@ async def _employee_contact_owner(employee_id: str, owner_request: str) -> None:
             "طلبك الأصلي: " + owner_request[:1500] + "\n\nرسالة " + employee_id + ":\n" + content,
             employee_id=employee_id,
         )
+        return {"sent": True, "content": content}
     except Exception as exc:
+        error = str(exc)[:1200] or "حدث خطأ غير معروف أثناء إنشاء الرسالة."
         log_activity("سلمى", "contact_request_failed", "employee", None,
-                     "تعذر إكمال طلب التواصل مع " + employee_id, str(exc)[:1000])
+                     "تعذر إكمال طلب التواصل مع " + employee_id, error)
         add_notification("contact_request_failed", "تعذر إكمال طلب التواصل",
                          "سلمى لم تتمكن من الحصول على رسالة من " + employee_id + ".",
-                         "السبب: " + str(exc)[:1200] + "\nالطلب: " + owner_request[:1000])
+                         "السبب: " + error + "\nالطلب: " + owner_request[:1000])
+        return {"sent": False, "error": error}
 
 @app.post("/api/secretary/briefing")
 async def secretary_briefing(body: SecretaryRequest, background_tasks: BackgroundTasks, _: str = Depends(require_owner)):
@@ -679,13 +679,21 @@ async def secretary_briefing(body: SecretaryRequest, background_tasks: Backgroun
     if requested_employee:
         log_activity("سلمى", "contact_request_created", "employee", None,
                      "سلمى سجلت طلب تواصل من الريّس مع " + requested_employee, body.message)
-        add_notification("contact_request", "سلمى بدأت تنسيق التواصل",
-                         "سلمى أحالت طلبك إلى " + requested_employee + "، وهيوصلك إشعار لما يبدأ التواصل.",
-                         body.message, employee_id=requested_employee)
-        background_tasks.add_task(_employee_contact_owner, requested_employee, body.message)
-        answer = "حاضر يا ريس. سجلت طلبك ووجّهته لـ" + requested_employee + "، وطلبت منه يبدأ هو المحادثة معاك. هتابع النتيجة، وهيوصلك إشعار أول ما رسالته تتسجل."
-        log_interaction("سلمى", "secretary", {"request": body.message, "response": answer, "contact_request": requested_employee})
-        return {"employee_id": "سلمى", "content": answer, "contact_requested": True, "contact_employee": requested_employee}
+        contact_result = await _employee_contact_owner(requested_employee, body.message)
+        if contact_result.get("sent"):
+            answer = "تمام يا ريس. " + requested_employee + " بدأ التواصل معاك بالفعل، وسجّلت رسالته في محادثته. هتلاقيها هناك وكمان في الإشعارات."
+        else:
+            answer = "يا ريس، حاولت أوصل طلبك لـ" + requested_employee + " لكن مقدرتش أطلع رسالة منه، فمش هقولك إنه كلمك. السبب: " + str(contact_result.get("error") or "غير محدد")
+        log_interaction("سلمى", "secretary", {
+            "request": body.message, "response": answer, "contact_request": requested_employee,
+            "contact_success": bool(contact_result.get("sent"))
+        })
+        return {
+            "employee_id": "سلمى", "content": answer, "contact_requested": True,
+            "contact_employee": requested_employee, "contact_success": bool(contact_result.get("sent")),
+            "employee_message": contact_result.get("content") if contact_result.get("sent") else None,
+            "error": contact_result.get("error") if not contact_result.get("sent") else None
+        }
     overview = workflow_overview()
     reports = recent_reports(12)
     tasks_text = "\n".join(
