@@ -1,13 +1,8 @@
 /* Loads independent interface fragments before initializing the shared Office runtime. */
 (async function loadOfficeViews() {
-  const mount = document.createElement("div");
-  mount.id = "officeViews";
-  document.body.appendChild(mount);
-  const status = document.createElement("p");
-  status.id = "officeLoadStatus";
-  status.setAttribute("role", "status");
-  status.textContent = "جاري تجهيز واجهات المكتب...";
-  mount.appendChild(status);
+  const mount = document.getElementById("officeViews");
+  const status = document.getElementById("officeLoadStatus");
+  if (!mount || !status) return;
 
   const viewFiles = [
     "views/login.html",
