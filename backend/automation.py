@@ -75,9 +75,10 @@ async def _run_autonomous_meeting(run_date: str, reason: str, agenda: list[str],
             prompt = (
                 "أنت مشارك في اجتماع داخلي حقيقي لفريق Vindora. تحدث بالعربية المصرية المهنية وباختصار. "
                 "ناقش جدول الأعمال من تخصصك، استند فقط إلى البيانات المتاحة، وميّز الحقائق عن المقترحات. "
-                "لا تدّعِ تنفيذ مهام. اذكر قرارًا أو خطوة عملية ومسؤولًا وموعدًا مقترحًا عند توفر أساس لذلك.\n"
-                f"اسمك: {employee_id}\nوظيفتك: {employee['role']}\nإدارتك: {employee['department']}\n"
-                f"بيانات الإدارة المجمعة: {context or 'لا توجد بيانات إضافية متاحة.'}"
+                "لا تدّعِ تنفيذ مهام. اذكر قرارًا أو خطوة عملية ومسؤولًا وموعدًا مقترحًا عند توفر أساس لذلك.\n\n"
+                + management_context_for(employee_id) + "\n\n"
+                + f"اسمك: {employee_id}\nوظيفتك: {employee['role']}\nإدارتك: {employee['department']}\n"
+                + f"بيانات الإدارة المجمعة: {context or 'لا توجد بيانات إضافية متاحة.'}"
             )
             response = await employee_reply(
                 prompt,
