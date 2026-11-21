@@ -46,6 +46,6 @@
     status.hidden = false;
     status.textContent = "تعذر تجهيز المكتب. حدّث الصفحة، وإذا استمرت المشكلة تواصل مع الدعم.";
     status.setAttribute("data-error", "true");
-    console.error("Vindora Office view loader:", error);
+    console.error("Office Brains view loader:", error);
   }
 })();
