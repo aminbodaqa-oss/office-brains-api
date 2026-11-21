@@ -19,6 +19,7 @@ from internal_messaging import (init_internal_messaging_db, send_internal_messag
 from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password, hash_refresh_token
+from platform_admin_auth import issue_platform_token, require_platform_admin
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -61,6 +62,11 @@ app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=Fals
 _login_attempts: dict[str, list[float]] = {}
 
 class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1, max_length=512)
+
+
+class PlatformAdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=1, max_length=512)
 
@@ -225,6 +231,37 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "office-brains-api", "provider": os.getenv("BRAIN_PROVIDER", "demo")}
+
+
+@app.post("/api/platform/admin/login")
+async def platform_admin_login(body: PlatformAdminLoginRequest):
+    expected_user = os.getenv("PLATFORM_ADMIN_USERNAME", "").strip()
+    password_hash = os.getenv("PLATFORM_ADMIN_PASSWORD_HASH", "").strip()
+    if not expected_user or not password_hash:
+        raise HTTPException(status_code=503, detail="إعدادات Super Admin غير مكتملة على السيرفر.")
+    if not hmac.compare_digest(body.username.strip(), expected_user) or not verify_password(body.password, password_hash):
+        raise HTTPException(status_code=401, detail="بيانات دخول مالك المنصة غير صحيحة.")
+    try:
+        token = issue_platform_token(expected_user)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"access_token": token, "token_type": "bearer", "expires_in": 900}
+
+
+@app.get("/api/platform/admin/overview")
+async def platform_admin_overview(_: str = Depends(require_platform_admin)):
+    # Deliberately aggregate-only: this first console slice exposes no customer,
+    # conversation, task-detail, memory, or Vindora business records.
+    from database import _connect
+    with _connect() as conn:
+        tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+        task_total = int(conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]) if "tasks" in tables else 0
+    return {
+        "api": {"status": "ok", "provider": PROVIDER},
+        "operations": {"tasks_total": task_total},
+        "catalog": {"employee_templates": len(EMPLOYEES)},
+        "scope": "aggregate_only"
+    }
 
 @app.get("/api/employees")
 async def employees(_: str = Depends(require_owner)):
