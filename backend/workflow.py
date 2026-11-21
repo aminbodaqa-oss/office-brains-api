@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -34,6 +35,13 @@ def init_workflow_db() -> None:
         task_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()}
         if "parent_task_id" not in task_columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN parent_task_id INTEGER REFERENCES tasks(id)")
+        legacy_children = conn.execute(
+            "SELECT id,description FROM tasks WHERE source='delegation' AND parent_task_id IS NULL"
+        ).fetchall()
+        for child in legacy_children:
+            match = re.search(r"مهمة فرعية من المهمة الرئيسية #(\\d+)", child["description"] or "")
+            if match:
+                conn.execute("UPDATE tasks SET parent_task_id=? WHERE id=?", (int(match.group(1)), child["id"]))
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status_due ON tasks(status,due_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assigned_to,status)")
@@ -487,3 +495,22 @@ def save_delegation_report_once(parent_task_id: int, report: str) -> bool:
                      f"إبراهيم جمع نتائج المهام الفرعية للمهمة الرئيسية #{parent_task_id}", report[:12000])
         return True
     return False
+
+
+def pending_delegation_groups(limit: int = 10) -> list[int]:
+    """Find parent tasks whose linked child results are all ready but not yet consolidated."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT t.parent_task_id
+               FROM tasks t JOIN task_executions e ON e.task_id=t.id
+               WHERE t.parent_task_id IS NOT NULL
+               GROUP BY t.parent_task_id
+               HAVING COUNT(*) = SUM(CASE WHEN e.status IN ('review','completed') THEN 1 ELSE 0 END)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM task_delegation_reports r
+                      WHERE r.parent_task_id=t.parent_task_id
+                  )
+               ORDER BY t.parent_task_id LIMIT ?""",
+            (max(1, min(int(limit), 50)),),
+        ).fetchall()
+    return [int(row["parent_task_id"]) for row in rows]
