@@ -91,10 +91,10 @@ async def task_execution_loop() -> None:
                         'إذا لم توجد مهام قابلة للتفويض فأخرج {"delegations":[]}.'
                     )
                     delegation_prompt = (
-                        "التقرير المنجز:\\n" + result[:14000] + "\\n\\n"
-                        "قائمة الفريق المسموح بالتكليف إليه:\\n" +
+                        "التقرير المنجز:\n" + result[:14000] + "\n\n"
+                        "قائمة الفريق المسموح بالتكليف إليه:\n" +
                         json.dumps(team, ensure_ascii=False) +
-                        "\\n\\nاقترح المهام الفرعية. استخدم assigned_to من id فقط، والأولوية واحدة من low/normal/high/urgent."
+                        "\n\nاقترح المهام الفرعية. استخدم assigned_to من id فقط، والأولوية واحدة من low/normal/high/urgent."
                     )
                     raw_plan = (await employee_reply(
                         delegation_system, [{"role": "user", "content": delegation_prompt}]
