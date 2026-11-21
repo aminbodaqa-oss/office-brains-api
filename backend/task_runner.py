@@ -16,7 +16,11 @@ async def task_execution_loop() -> None:
             await asyncio.sleep(15)
             continue
 
-        task = claim_next_task_execution()
+        try:
+            task = claim_next_task_execution()
+        except Exception:
+            await asyncio.sleep(10)
+            continue
         if not task:
             await asyncio.sleep(5)
             continue
