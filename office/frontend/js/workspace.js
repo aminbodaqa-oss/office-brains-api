@@ -146,6 +146,18 @@
       const execution = document.createElement("small"); execution.className = "ws-execution";
       execution.textContent = "حالة التنفيذ: " + (executionLabels[task.execution_status] || "لم يبدأ التنفيذ الآلي");
       details.append(title,desc,meta,execution);
+      if (task.delegation_diagnostic_status && !["proposed","approved"].includes(task.delegation_diagnostic_status)) {
+        const diagnostic = document.createElement("div"); diagnostic.className = "ws-result";
+        const state = document.createElement("strong");
+        state.textContent = task.delegation_diagnostic_status === "generating" ? "إبراهيم بيجهز خطة توزيع المهام..." : "تعذر تجهيز خطة توزيع المهام";
+        diagnostic.append(state);
+        if (task.delegation_diagnostic_status === "failed") {
+          const reason = document.createElement("p");
+          reason.textContent = task.delegation_diagnostic_error || "لم يسجل النظام سببًا تفصيليًا. راجع سجل النشاط.";
+          diagnostic.append(reason);
+        }
+        details.append(diagnostic);
+      }
       if (task.delegation_plan_json) {
         try {
           const plan = JSON.parse(task.delegation_plan_json);
