@@ -31,6 +31,10 @@ def init_workflow_db() -> None:
             updated_at TEXT NOT NULL,
             completed_at TEXT
         )""")
+        task_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()}
+        if "parent_task_id" not in task_columns:
+            conn.execute("ALTER TABLE tasks ADD COLUMN parent_task_id INTEGER REFERENCES tasks(id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks(parent_task_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status_due ON tasks(status,due_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assigned_to,status)")
         conn.execute("""CREATE TABLE IF NOT EXISTS task_executions (
@@ -62,6 +66,11 @@ def init_workflow_db() -> None:
             task_id INTEGER PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending',
             error TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
             FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS task_delegation_reports (
+            parent_task_id INTEGER PRIMARY KEY, report TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE
         )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -425,10 +434,10 @@ def approve_delegation_plan(task_id: int, allowed_employee_ids: set[str]) -> lis
             normalized.append((title, description, assigned_to, priority))
         for title, description, assigned_to, priority in normalized:
             cur = conn.execute(
-                """INSERT INTO tasks(title,description,assigned_to,created_by,status,priority,due_at,source,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                """INSERT INTO tasks(title,description,assigned_to,created_by,status,priority,due_at,source,created_at,updated_at,parent_task_id)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                 (title, f"مهمة فرعية من المهمة الرئيسية #{task_id}: {parent['title']}\n\n{description}",
-                 assigned_to, "ابراهيم", "open", priority, None, "delegation", now, now),
+                 assigned_to, "ابراهيم", "open", priority, None, "delegation", now, now, task_id),
             )
             child_id = int(cur.lastrowid)
             conn.execute(
@@ -447,3 +456,32 @@ def approve_delegation_plan(task_id: int, allowed_employee_ids: set[str]) -> lis
                      f"تم إنشاء مهمة فرعية من المهمة الرئيسية #{task_id} وتكليف {child['assigned_to']}",
                      child["title"] + "\n" + child["description"])
     return created
+
+
+def delegation_children(parent_task_id: int) -> list[dict[str, Any]]:
+    """Return child task execution results for a delegated parent task."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT t.id,t.title,t.assigned_to,t.status,e.status AS execution_status,
+                      e.result,e.error,e.finished_at
+               FROM tasks t LEFT JOIN task_executions e ON e.task_id=t.id
+               WHERE t.parent_task_id=? ORDER BY t.id""",
+            (parent_task_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def save_delegation_report_once(parent_task_id: int, report: str) -> bool:
+    """Persist the consolidated team report once, after all child results are ready."""
+    now = _now()
+    with _connect() as conn:
+        cur = conn.execute(
+            """INSERT OR IGNORE INTO task_delegation_reports(parent_task_id,report,created_at)
+               VALUES(?,?,?)""",
+            (parent_task_id, report[:20000], now),
+        )
+    if cur.rowcount:
+        log_activity("ابراهيم", "delegation_report_ready", "task", parent_task_id,
+                     f"إبراهيم جمع نتائج المهام الفرعية للمهمة الرئيسية #{parent_task_id}", report[:12000])
+        return True
+    return False
