@@ -22,7 +22,7 @@ from auth import issue_token, require_owner, verify_password, hash_password, has
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
-from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution)
+from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan)
 from task_runner import task_execution_loop
 
 @asynccontextmanager
@@ -610,6 +610,37 @@ async def retry_task(task_id: int, _: str = Depends(require_owner)):
             employee_id=task["assigned_to"])
     return {"queued": True, "task_id": task_id}
 
+
+
+
+@app.post("/api/tasks/{task_id}/delegations/approve")
+async def approve_task_delegations(task_id: int, _: str = Depends(require_owner)):
+    children = approve_delegation_plan(task_id)
+    if children is None:
+        raise HTTPException(status_code=409, detail="لا توجد خطة مقترحة قابلة للاعتماد، أو سبق اعتمادها.")
+    for child in children:
+        message = (
+            "تم تكليفك بمهمة فرعية من إبراهيم المدير العام بعد موافقة الريّس.\\n"
+            f"المهمة: #{child['id']} · {child['title']}\\n"
+            f"التفاصيل: {child['description']}\\nالأولوية: {child['priority']}"
+        )
+        try:
+            send_internal_message("ابراهيم", child["assigned_to"], message)
+        except ValueError as exc:
+            log_activity("النظام", "delegation_message_failed", "task", child["id"],
+                         "تم إنشاء المهمة لكن تعذر إنشاء رسالة التكليف الداخلية", str(exc))
+        add_notification(
+            "delegated_task_assigned", "تكليف جديد من إبراهيم",
+            f"إبراهيم كلفك بالمهمة: {child['title']}",
+            f"المهمة الرئيسية: #{task_id}\\n{message}", employee_id=child["assigned_to"]
+        )
+    add_notification(
+        "delegations_approved", "تم اعتماد توزيع المهام",
+        f"تم إنشاء {len(children)} مهام فرعية بعد موافقتك.",
+        "المهمة الرئيسية: #" + str(task_id) + "\\n" +
+        "\\n".join(f"#{item['id']} · {item['title']} — {item['assigned_to']}" for item in children)
+    )
+    return {"approved": True, "parent_task_id": task_id, "created_tasks": children}
 
 @app.get("/api/meetings")
 async def get_meetings(limit: int = 50, _: str = Depends(require_owner)):
