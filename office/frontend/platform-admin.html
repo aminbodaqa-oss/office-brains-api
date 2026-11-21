@@ -35,15 +35,37 @@
     <header class="topbar"><div><p class="eyebrow">PLATFORM OVERVIEW</p><h1>صباح السيطرة على التفاصيل.</h1><p class="muted">نظرة تشغيلية آمنة على خدمة Office Brains.</p></div><button id="refreshBtn" class="ghost">تحديث البيانات ↻</button></header>
     <div id="loadError" class="error"></div>
     <section class="metrics">
-      <article class="metric"><span>حالة واجهة API</span><strong id="apiState">—</strong><small>اتصال الخدمة</small></article>
-      <article class="metric"><span>محرك الذكاء</span><strong id="provider">—</strong><small>المزوّد الحالي</small></article>
-      <article class="metric"><span>المهام المسجلة</span><strong id="tasks">—</strong><small>إجمالي سجل المهام الحالي</small></article>
-      <article class="metric"><span>الموظفون المعرفة</span><strong id="employees">—</strong><small>قوالب الموظفين الحالية</small></article>
+      <article class="metric"><span>واجهة API</span><strong id="apiState">—</strong><small>حالة الخدمة</small></article>
+      <article class="metric"><span>قاعدة البيانات</span><strong id="dbState">—</strong><small>فحص الاتصال</small></article>
+      <article class="metric"><span>مزود الذكاء</span><strong id="provider">—</strong><small>المحرك الحالي</small></article>
+      <article class="metric"><span>محرك التنفيذ</span><strong id="engineState">—</strong><small>التشغيل التلقائي</small></article>
+      <article class="metric"><span>إجمالي المهام</span><strong id="tasks">—</strong><small>كل الحالات</small></article>
+      <article class="metric"><span>المهام قيد الانتظار</span><strong id="queuedTasks">—</strong><small>في طابور التنفيذ</small></article>
+      <article class="metric"><span>الاجتماعات المجدولة</span><strong id="meetings">—</strong><small>إجمالي المجدول</small></article>
+      <article class="metric"><span>إشعارات غير مقروءة</span><strong id="unreadNotifications">—</strong><small>عداد فقط دون محتوى</small></article>
     </section>
-    <section class="panel"><div class="panel-head"><div><p class="eyebrow">FOUNDATION STATUS</p><h2>المنصة في مرحلة التأسيس</h2></div><span class="pill">قراءة فقط</span></div>
-      <div class="status-row"><span class="status-dot"></span><div><b>بوابة Super Admin</b><p>مصادقة مستقلة عن تسجيل دخول المكتب.</p></div><strong class="good">مفعّلة</strong></div>
-      <div class="status-row"><span class="status-dot warn"></span><div><b>عزل الشركات والعملاء</b><p>لم يتم تفعيله بعد؛ لا توجد إدارة عملاء في هذه المرحلة.</p></div><strong class="pending">قيد البناء</strong></div>
-      <div class="status-row"><span class="status-dot warn"></span><div><b>Website Studio والاشتراكات</b><p>ستضاف بعد تأسيس الهوية والصلاحيات متعددة الشركات.</p></div><strong class="pending">قيد البناء</strong></div>
+    <div class="panel-grid">
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">SYSTEM HEALTH</p><h2>سلامة مكونات المنصة</h2></div><span class="pill">مراقبة مباشرة</span></div>
+        <div class="status-row"><span class="status-dot" id="apiHealthDot"></span><div><b>واجهة API</b><p>استجابة الخدمة الأساسية</p></div><strong class="good" id="apiHealthText">—</strong></div>
+        <div class="status-row"><span class="status-dot" id="dbHealthDot"></span><div><b>قاعدة البيانات</b><p>تنفيذ استعلامات القراءة</p></div><strong class="good" id="dbHealthText">—</strong></div>
+        <div class="status-row"><span class="status-dot" id="aiHealthDot"></span><div><b>مزود الذكاء الاصطناعي</b><p>جاهزية المحرك المتصل</p></div><strong id="aiHealthText">—</strong></div>
+        <div class="status-row"><span class="status-dot" id="authHealthDot"></span><div><b>مصادقة السوبر أدمن</b><p>بوابة منفصلة عن مكتب العمل</p></div><strong class="good" id="authHealthText">—</strong></div>
+      </section>
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">TASK PIPELINE</p><h2>توزيع حالات المهام</h2></div><span class="pill">أرقام مجمعة</span></div>
+        <div class="count-row"><span>مفتوحة</span><b id="taskOpen">0</b></div>
+        <div class="count-row"><span>قيد التنفيذ</span><b id="taskProgress">0</b></div>
+        <div class="count-row"><span>بانتظار المراجعة</span><b id="taskReview">0</b></div>
+        <div class="count-row"><span>مكتملة</span><b id="taskCompleted">0</b></div>
+        <div class="count-row"><span>ملغاة</span><b id="taskCancelled">0</b></div>
+        <div class="count-row"><span>أجهزة إشعارات نشطة</span><b id="pushDevices">0</b></div>
+        <div class="count-row"><span>قوالب الموظفين</span><b id="employees">0</b></div>
+      </section>
+    </div>
+    <section class="panel roadmap-panel"><div class="panel-head"><div><p class="eyebrow">PLATFORM ROADMAP</p><h2>مراحل بناء المنتج</h2></div><span class="pill">خريطة التنفيذ</span></div>
+      <div class="status-row"><span class="status-dot"></span><div><b>هوية Office Brains وبوابة المالك</b><p>تم فصل واجهة المكتب ومصادقة السوبر أدمن.</p></div><strong class="good">مكتمل</strong></div>
+      <div class="status-row"><span class="status-dot warn"></span><div><b>عزل الشركات ومساحات العمل</b><p>تأسيس هوية مستقلة وبيانات منفصلة لكل عميل.</p></div><strong class="pending">التالي</strong></div>
+      <div class="status-row"><span class="status-dot warn"></span><div><b>العملاء والباقات والاشتراكات</b><p>إدارة الحسابات والخطط وحدود الاستخدام.</p></div><strong class="pending">قيد التخطيط</strong></div>
+      <div class="status-row"><span class="status-dot warn"></span><div><b>Website Studio</b><p>إدارة الموقع العام والمحتوى من لوحة التحكم.</p></div><strong class="pending">قيد التخطيط</strong></div>
     </section>
     <footer>Office Brains · Platform Control · لا تعرض هذه الصفحة بيانات عملاء أو تفاصيل تشغيل خاصة.</footer>
   </section>
