@@ -58,6 +58,11 @@ def init_workflow_db() -> None:
             approved_at TEXT,
             FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
         )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS task_delegation_diagnostics (
+            task_id INTEGER PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending',
+            error TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+            FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -109,9 +114,10 @@ def list_tasks(limit: int = 100, status: str | None = None, assigned_to: str | N
             """SELECT t.*, e.status AS execution_status, e.result AS execution_result,
                       e.error AS execution_error, e.attempts AS execution_attempts,
                       e.started_at AS execution_started_at, e.finished_at AS execution_finished_at,
-                      p.status AS delegation_plan_status, p.plan_json AS delegation_plan_json
+                      p.status AS delegation_plan_status, p.plan_json AS delegation_plan_json, d.status AS delegation_diagnostic_status, d.error AS delegation_diagnostic_error
                FROM tasks t LEFT JOIN task_executions e ON e.task_id=t.id
-               LEFT JOIN task_delegation_plans p ON p.task_id=t.id"""
+               LEFT JOIN task_delegation_plans p ON p.task_id=t.id
+               LEFT JOIN task_delegation_diagnostics d ON d.task_id=t.id"""
             + where +
             """ ORDER BY CASE t.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'review' THEN 2 ELSE 3 END,
                       CASE t.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
@@ -354,6 +360,19 @@ def workflow_overview() -> dict[str, Any]:
     }
 
 
+def update_delegation_diagnostic(task_id: int, status: str, error: str = "") -> None:
+    """Persist owner-visible progress for manager delegation."""
+    if status not in {"generating", "failed", "proposed", "approved"}:
+        raise ValueError("حالة تشخيص التفويض غير صحيحة.")
+    with _connect() as conn:
+        conn.execute(
+            """INSERT INTO task_delegation_diagnostics(task_id,status,error,updated_at)
+               VALUES(?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET
+               status=excluded.status,error=excluded.error,updated_at=excluded.updated_at""",
+            (task_id, status, str(error)[:4000], _now()),
+        )
+
+
 def save_delegation_plan(task_id: int, plan: list[dict[str, Any]]) -> bool:
     """Persist an AI-proposed manager delegation plan; inert until owner approval."""
     now = _now()
@@ -369,6 +388,7 @@ def save_delegation_plan(task_id: int, plan: list[dict[str, Any]]) -> bool:
                updated_at=excluded.updated_at,approved_at=NULL""",
             (task_id, payload, now, now),
         )
+    update_delegation_diagnostic(task_id, "proposed")
     log_activity("ابراهيم", "delegation_plan_proposed", "task", task_id,
                  f"إبراهيم اقترح توزيع {len(plan[:8])} مهام فرعية للمراجعة", payload)
     return True

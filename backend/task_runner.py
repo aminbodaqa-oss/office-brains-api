@@ -7,7 +7,7 @@ from brains import PROVIDER, employee_reply
 from database import add_notification, log_interaction
 from employees import EMPLOYEES, management_context_for
 from vindora_client import employee_context
-from workflow import claim_next_task_execution, fail_task_execution, finish_task_execution, save_delegation_plan
+from workflow import claim_next_task_execution, fail_task_execution, finish_task_execution, save_delegation_plan, update_delegation_diagnostic
 
 
 async def task_execution_loop() -> None:
@@ -78,6 +78,7 @@ async def task_execution_loop() -> None:
                 "submitted_for_review": True,
             })
             if employee_id == "ابراهيم" and task.get("source") != "delegation":
+                update_delegation_diagnostic(task_id, "generating")
                 try:
                     team = [
                         {"id": item["id"], "role": item.get("role", ""), "department": item.get("department", "")}
@@ -139,6 +140,7 @@ async def task_execution_loop() -> None:
                         )
                     else:
                         detail = last_error or "تعذر حفظ خطة التفويض."
+                        update_delegation_diagnostic(task_id, "failed", detail)
                         log_interaction("ابراهيم", "delegation_plan_failed", {
                             "task_id": task_id, "error": detail, "report": result[:4000]
                         })
@@ -150,6 +152,7 @@ async def task_execution_loop() -> None:
                         )
                 except Exception as exc:
                     detail = str(exc)[:900] or "خطأ غير معروف في مرحلة التفويض."
+                    update_delegation_diagnostic(task_id, "failed", detail)
                     log_interaction("ابراهيم", "delegation_plan_failed", {
                         "task_id": task_id, "error": detail
                     })
