@@ -15,11 +15,19 @@ export async function loadToken() {
   // Keep the signed-in UI available when only a refresh token remains.
   return token || (refreshToken ? "refresh-pending" : null);
 }
-export async function saveToken(value: string, refreshValue: string) {
-  token = value;
-  refreshToken = refreshValue;
+export async function saveToken(value: unknown, refreshValue: unknown) {
+  // SecureStore accepts strings only. Validate the API response before writing
+  // either credential so a partial/old backend response cannot corrupt a session.
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("السيرفر لم يُرجع رمز الدخول بصيغة نصية صحيحة. تأكد من تحديث خدمة المكتب ثم حاول مرة أخرى.");
+  }
+  if (typeof refreshValue !== "string" || !refreshValue.trim()) {
+    throw new Error("السيرفر لم يُرجع رمز تجديد الجلسة. أعد تشغيل خدمة Backend لتفعيل تحديث الجلسات ثم حاول تسجيل الدخول مجددًا.");
+  }
   await SecureStore.setItemAsync(TOKEN_KEY, value);
   await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshValue);
+  token = value;
+  refreshToken = refreshValue;
 }
 export async function clearToken() {
   token = null;
@@ -79,6 +87,11 @@ export async function api<T>(path: string, options: { method?: string; body?: un
   return data as T;
 }
 
-export async function savePushToken(value: string) { await SecureStore.setItemAsync(PUSH_TOKEN_KEY, value); }
+export async function savePushToken(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("رمز إشعارات الهاتف غير صالح؛ لم يتم حفظه على الجهاز.");
+  }
+  await SecureStore.setItemAsync(PUSH_TOKEN_KEY, value);
+}
 export async function loadPushToken() { return SecureStore.getItemAsync(PUSH_TOKEN_KEY); }
 export async function clearPushToken() { await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY); }
