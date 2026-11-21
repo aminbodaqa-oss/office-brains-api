@@ -9,6 +9,7 @@
     "views/dashboard.html",
     "views/settings.html",
     "views/notifications.html",
+    "views/employees.html",
     "views/meetings.html",
     "views/employee-chat.html"
   ];
