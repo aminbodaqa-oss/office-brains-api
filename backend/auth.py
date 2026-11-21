@@ -33,6 +33,10 @@ def _secret() -> bytes:
         raise RuntimeError("OFFICE_AUTH_SECRET must contain at least 32 characters")
     return value.encode("utf-8")
 
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def issue_token(username: str) -> str:
     payload = {"sub": username, "exp": int(time.time()) + TOKEN_TTL_SECONDS}
     body = _b64e(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
