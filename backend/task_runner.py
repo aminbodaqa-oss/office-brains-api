@@ -7,7 +7,6 @@ from brains import PROVIDER, employee_reply
 from database import add_notification, log_interaction
 from internal_messaging import send_internal_message
 from employees import EMPLOYEES, management_context_for
-from vindora_client import employee_context
 from workflow import (claim_next_task_execution, fail_task_execution, finish_task_execution,
                       save_delegation_plan, update_delegation_diagnostic,
                       delegation_children, save_delegation_report_once,
@@ -32,7 +31,7 @@ async def finalize_delegation_group(parent_task_id: int) -> bool:
     )
     try:
         team_report = (await employee_reply(
-            "أنت إبراهيم المدير العام في مكتب Vindora. أعدد تقريرًا موحدًا من نتائج فريقك المسجلة فقط. "
+            "أنت إبراهيم المدير العام في مكتب مساحة العمل. أعدد تقريرًا موحدًا من نتائج فريقك المسجلة فقط. "
             "لا تدّعِ تنفيذ شيء لم يرد في النتائج. اكتب بالعربية المصرية المهنية مع ملخص، نتائج كل موظف، "
             "النواقص والمخاطر، والخطوات التالية المقترحة.",
             [{"role": "user", "content": team_report_prompt}]
@@ -94,13 +93,10 @@ async def task_execution_loop() -> None:
             continue
 
         try:
-            try:
-                context = await employee_context(employee_id, days=7)
-            except Exception:
-                context = "لا تتوفر بيانات خارجية إضافية. اعتمد على تفاصيل المهمة فقط."
+            context = "لا توجد بيانات إضافية متصلة بمساحة العمل حاليًا. اعتمد على تفاصيل المهمة والسجلات المصرح بها فقط."
 
             system = (
-                "أنت موظف متخصص داخل مكتب Vindora، ومطلوب منك إعداد مخرج عملي للمهمة المسندة إليك. "
+                "أنت موظف متخصص داخل مكتب مساحة العمل، ومطلوب منك إعداد مخرج عملي للمهمة المسندة إليك. "
                 "حلل المطلوب وفق اختصاصك، وقدّم نتيجة منظمة قابلة للمراجعة، مع توضيح الافتراضات والنواقص والخطوات التالية. "
                 "لا تدّعِ إرسال رسائل أو إجراء مكالمات أو تعديل أنظمة أو تنفيذ عمليات خارجية أو الوصول إلى بيانات لم تُتح لك. "
                 "إذا كان المطلوب يتضمن إجراءً خارج قدراتك أو يحتاج موافقة المالك، فاذكر بوضوح أنه لم يُنفذ وما المطلوب لإتمامه. "
@@ -157,7 +153,7 @@ async def task_execution_loop() -> None:
                         for item in EMPLOYEES if item["id"] != "ابراهيم"
                     ]
                     delegation_system = (
-                        "أنت إبراهيم المدير العام في مكتب Vindora. حوّل توصيات المهمة الرئيسية إلى خطة مهام فرعية عملية. "
+                        "أنت إبراهيم المدير العام في مكتب مساحة العمل. حوّل توصيات المهمة الرئيسية إلى خطة مهام فرعية عملية. "
                         "لا تنفذ أي إجراء ولا تدّعِ أنك أرسلت التكليفات. أخرج JSON فقط بالشكل "
                         '{"delegations":[{"title":"...","description":"...","assigned_to":"اسم الموظف حرفيًا من القائمة","priority":"normal"}]}. '
                         "اختر من 1 إلى 5 مهام فقط، ولا تكرر التوصيات، ولا تسند عملًا خارج اختصاص الموظف. "
