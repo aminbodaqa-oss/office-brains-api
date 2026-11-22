@@ -14,7 +14,7 @@
     });
     const primary = settings.brand_primary;
     const accent = settings.brand_accent;
-    const highlight = settings.brand_highlight;
+    const highlight = accent;
     if (validColor(primary)) document.documentElement.style.setProperty("--brand-primary", primary);
     if (validColor(accent)) {
       document.documentElement.style.setProperty("--brand-accent", accent);
@@ -28,7 +28,7 @@
       const style = document.createElement("style");
       style.id = "saved-brand-overrides";
       const a = validColor(accent) ? accent : "#00A884";
-      const h = validColor(highlight) ? highlight : "#F2B84B";
+      const h = validColor(highlight) ? highlight : "#00A884";
       const p = validColor(primary) ? primary : "#172A3A";
       style.textContent = ".primary{background:linear-gradient(120deg," + a + "," + a + ")!important;box-shadow:0 10px 30px " + a + "55!important}.btn:hover{border-color:" + h + "!important}.tag{border-color:" + a + "66!important;color:" + h + "!important;background:" + a + "15!important}.eyebrow,.step b,.avatar{color:" + h + "!important}.step{border-top-color:" + a + "88!important}.visual{background:linear-gradient(145deg," + p + "dd," + p + "bb)!important}.card{background:linear-gradient(145deg," + p + "," + p + ")!important}";
       document.getElementById("saved-brand-overrides")?.remove();
@@ -40,7 +40,7 @@
     const theme = config.theme || {};
     const vars = {
       primary:["--brand-primary","--primary"], accent:["--brand-accent","--emerald","--acc"],
-      highlight:["--brand-highlight","--gold"], background:["--bg"],
+      background:["--bg"],
       surface:["--card","--panel"], text:["--ink","--text"]
     };
     Object.entries(vars).forEach(([key, variables]) => {
@@ -51,7 +51,7 @@
     applySettings({
       brand_primary:theme.primary,
       brand_accent:theme.accent,
-      brand_highlight:theme.highlight
+      brand_highlight:theme.accent
     });
     const fields = {
       site_name:config.site_name, page_title:config.page_title, meta_description:config.meta_description,
