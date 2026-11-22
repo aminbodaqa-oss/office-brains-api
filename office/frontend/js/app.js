@@ -19,6 +19,7 @@ loginForm.addEventListener("submit", async (event) => {
     ownerToken = data.access_token;
     sessionStorage.setItem(TOKEN_STORAGE_KEY, ownerToken);
     authGate.classList.add("hidden");
+    if (window.applyOfficeExperience) window.applyOfficeExperience("office_workspace");
     document.getElementById("ownerPassword").value = "";
     startNotificationUpdates();
   } catch (err) { error.textContent = err.message || "تعذر الاتصال بالسيرفر."; }
