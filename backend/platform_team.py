@@ -42,7 +42,7 @@ def get_platform_employee_profile(employee_id: str) -> dict[str, Any] | None:
             base_instructions = profile.get("instructions", "")
             profile["instructions"] = (
                 base_instructions
-                + "\\n\\nتعليمات إضافية معتمدة من مالك المنصة:\\n"
+                + "\n\nتعليمات إضافية معتمدة من مالك المنصة:\n"
                 + row["instructions"]
             )
     return profile
