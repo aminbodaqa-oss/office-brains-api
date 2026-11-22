@@ -695,6 +695,45 @@
   });
   $("subscriptionStatusFilter")?.addEventListener("change", loadSubscriptions);
 
+  async function loadWebsiteSettings() {
+    const form = $("websiteSettingsForm");
+    if (!form || !token) return;
+    try {
+      const data = await platformRequest("/api/platform/admin/branding/settings");
+      Object.entries(data.settings || {}).forEach(([key,value]) => {
+        if (form.elements[key]) form.elements[key].value = value;
+      });
+      $("websiteSettingsMessage").textContent = "تم تحميل إعدادات الموقع الحالية.";
+    } catch (error) {
+      $("websiteSettingsMessage").textContent = error.message || "تعذر تحميل إعدادات الموقع.";
+    }
+  }
+
+  $("websiteSettingsForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const message = $("websiteSettingsMessage");
+    button.disabled = true;
+    message.textContent = "جاري حفظ إعدادات الموقع...";
+    try {
+      const settings = Object.fromEntries(new FormData(form).entries());
+      const data = await platformRequest("/api/platform/admin/branding/settings", {
+        method:"PUT", body:JSON.stringify({settings})
+      });
+      Object.entries(data.settings || {}).forEach(([key,value]) => {
+        if (form.elements[key]) form.elements[key].value = value;
+      });
+      message.textContent = "تم حفظ إعدادات الموقع. ستظهر التعديلات عند تحديث صفحة الموقع العامة.";
+    } catch (error) {
+      message.textContent = error.message || "تعذر حفظ إعدادات الموقع.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("refreshWebsiteSettings")?.addEventListener("click", loadWebsiteSettings);
+
   $("refreshTenantReadiness")?.addEventListener("click", loadTenantReadiness);
   $("siteLogoForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -728,6 +767,7 @@
     }
     if (target === "subscriptions" && token) { loadBillingPlans(); loadSubscriptionCustomers(); loadSubscriptions(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
+    if (target === "website" && token) { loadWebsiteSettings(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "customers" && token) {
       loadCustomers();
