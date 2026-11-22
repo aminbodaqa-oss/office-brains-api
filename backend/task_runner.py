@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from brains import PROVIDER, employee_reply
+from brains import get_provider, employee_reply
 from database import add_notification, log_interaction
 from internal_messaging import send_internal_message
 from employees import EMPLOYEES, management_context_for
@@ -64,7 +64,7 @@ async def finalize_delegation_group(parent_task_id: int) -> bool:
 async def task_execution_loop() -> None:
     """Process queued AI-capable office tasks and leave every deliverable for owner review."""
     while True:
-        if PROVIDER == "demo":
+        if get_provider() == "demo":
             await asyncio.sleep(15)
             continue
 
