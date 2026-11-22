@@ -215,6 +215,8 @@ def create_platform_subscription(customer_id: str, plan_code: str, billing_cycle
              end_dt.isoformat(), notes[:2000], now, now))
         conn.execute("""INSERT INTO platform_billing_events(subscription_id,actor,event_type,details,created_at)
             VALUES(?,?, 'subscription_created', ?, ?)""", (sub_id, actor, "بانتظار تأكيد الدفع اليدوي", now))
+        conn.execute("""INSERT INTO platform_audit_log(actor,action,entity_type,entity_id,created_at)
+            VALUES(?,?,?,?,?)""", (actor, "subscription_created", "subscription", sub_id, now))
         row = conn.execute("SELECT * FROM platform_subscriptions WHERE id=?", (sub_id,)).fetchone()
     return dict(row)
 
