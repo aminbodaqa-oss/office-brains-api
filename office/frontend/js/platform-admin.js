@@ -757,7 +757,9 @@
         ["واجهة API",health.api === "ok" ? "تعمل" : "تحتاج مراجعة",health.api === "ok"],
         ["قاعدة البيانات",health.database === "ok" ? "متصلة" : "تحتاج مراجعة",health.database === "ok"],
         ["محرك الذكاء",health.ai_ready ? "مزود فعلي: " + health.ai_provider : "وضع التجربة",health.ai_ready],
-        ["التشغيل التلقائي",health.automation_enabled ? "مفعّل" : "متوقف",health.automation_enabled]
+        ["التشغيل التلقائي",health.automation_enabled ? "مفعّل" : "متوقف",health.automation_enabled],
+        ["الموقع العام",health.public_site_enabled ? "متاح للزوار" : "وضع الصيانة",health.public_site_enabled],
+        ["إنشاء العملاء",health.allow_customer_creation ? "مسموح" : "متوقف",health.allow_customer_creation]
       ];
       healthItems.forEach(([label,value,ok]) => {
         const card = document.createElement("article");
