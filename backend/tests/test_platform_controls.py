@@ -17,6 +17,8 @@ from platform_team import (
     get_platform_employee_profile,
     save_platform_employee_profile,
 )
+from platform_settings import init_platform_settings_db, get_platform_settings, save_platform_settings
+from platform_branding import init_platform_branding_db, get_site_settings, save_site_settings
 
 
 class PlatformControlsTests(unittest.TestCase):
@@ -27,6 +29,8 @@ class PlatformControlsTests(unittest.TestCase):
         os.environ.pop("GEMINI_API_KEY", None)
         init_platform_ai_db()
         init_platform_team_db()
+        init_platform_settings_db()
+        init_platform_branding_db()
 
     def tearDown(self):
         os.environ.pop("PLATFORM_SECRETS_KEY", None)
@@ -70,6 +74,29 @@ class PlatformControlsTests(unittest.TestCase):
         saved = get_platform_employee_profile("ابراهيم")
         self.assertEqual(saved["department"], "الإدارة التنفيذية")
         self.assertEqual(saved["additional_instructions"], "التعليمات التجريبية")
+
+    def test_platform_settings_control_customer_creation_and_public_site(self):
+        updated = save_platform_settings({
+            "public_site_enabled": False,
+            "allow_customer_creation": False,
+            "site_notice_enabled": True,
+            "site_notice_text": "تحديثات مجدولة"
+        }, "owner")
+        self.assertFalse(updated["public_site_enabled"])
+        self.assertFalse(updated["allow_customer_creation"])
+        self.assertTrue(updated["site_notice_enabled"])
+        self.assertEqual(get_platform_settings()["site_notice_text"], "تحديثات مجدولة")
+
+    def test_website_branding_settings_are_persisted_and_validated(self):
+        updated = save_site_settings({
+            "site_name": "Office Brains Test",
+            "brand_accent": "#123456",
+            "primary_cta_url": "frontend/"
+        }, "owner")
+        self.assertEqual(updated["site_name"], "Office Brains Test")
+        self.assertEqual(get_site_settings()["brand_accent"], "#123456")
+        with self.assertRaises(ValueError):
+            save_site_settings({"primary_cta_url": "javascript:alert(1)"}, "owner")
 
     def test_unknown_employee_cannot_be_created_through_profile_editor(self):
         self.assertIsNone(
