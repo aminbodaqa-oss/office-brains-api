@@ -143,7 +143,7 @@
       const data = await response.json();
       if (data.logo_data_url) {
         document.querySelectorAll("[data-brand-logo]").forEach(img => { img.src = data.logo_data_url; });
-        document.querySelectorAll("[data-brand-icon]").forEach(icon => { icon.href = data.logo_data_url; });
+        document.querySelectorAll("[data-brand-icon]").forEach(icon => { icon.href = data.logo_data_url; icon.type = data.logo_data_url.slice(5, data.logo_data_url.indexOf(";")) || "image/svg+xml"; });
       }
       applySettings(data.settings || {});
       const surface = location.pathname.includes("platform-admin.html") ? "super_admin" : (location.pathname.includes("/frontend/") ? "office_login" : "platform_site");
