@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import copy
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -171,7 +172,7 @@ def get_experience(surface: str, workspace_id: str | None = None) -> dict[str, A
                            (surface, workspace_id)).fetchone()
     if not row:
         return {"surface": surface, "workspace_id": workspace_id or None,
-                "draft": dict(DEFAULT_CONFIG), "published": None, "version": 0, "status": "default"}
+                "draft": copy.deepcopy(DEFAULT_CONFIG), "published": None, "version": 0, "status": "default"}
     return {"surface": surface, "workspace_id": workspace_id or None,
             "draft": json.loads(row["draft_json"]),
             "published": json.loads(row["published_json"]) if row["published_json"] else None,
