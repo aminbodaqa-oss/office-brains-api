@@ -45,6 +45,19 @@
         document.querySelectorAll("[data-brand-icon]").forEach(icon => { icon.href = data.logo_data_url; });
       }
       applySettings(data.settings || {});
+      const platform = data.platform || {};
+      const notice = document.getElementById("siteNotice");
+      if (notice && platform.site_notice_enabled && platform.site_notice_text) {
+        notice.textContent = platform.site_notice_text;
+        notice.hidden = false;
+      }
+      if (platform.public_site_enabled === false) {
+        const unavailable = document.getElementById("publicSiteUnavailable");
+        if (unavailable) unavailable.hidden = false;
+        Array.from(document.body.children).forEach(node => {
+          if (node.id !== "publicSiteUnavailable" && node.tagName !== "SCRIPT") node.hidden = true;
+        });
+      }
     } catch (error) {
       /* Keep the static brand defaults when the API is offline. */
     }
