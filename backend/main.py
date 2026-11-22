@@ -406,6 +406,16 @@ async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admi
     return tenant_migration_preflight()
 
 
+@app.get("/api/platform/admin/team")
+async def platform_admin_team(_: str = Depends(require_platform_admin)):
+    return {"employees": [
+        {"id": item["id"], "role": item.get("role", ""),
+         "department": item.get("department", ""),
+         "specialties": item.get("specialties", [])}
+        for item in EMPLOYEES
+    ]}
+
+
 @app.get("/api/platform/admin/ai-settings")
 async def platform_admin_ai_settings(_: str = Depends(require_platform_admin)):
     return get_platform_ai_settings()
