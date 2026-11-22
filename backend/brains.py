@@ -101,11 +101,7 @@ def _demo_message() -> str:
     return "محرك الذكاء الاصطناعي مضبوط على وضع التجربة. اختر مزودًا فعليًا من إعدادات المنصة لتفعيل الردود الذكية."
 
 
-async def generate(messages: list[dict[str, str]]) -> str:
-    try:
-        config = get_runtime_ai_config()
-    except RuntimeError as exc:
-        raise BrainUnavailable(str(exc)) from exc
+async def _generate_with_config(messages: list[dict[str, str]], config: dict) -> str:
     provider = str(config.get("provider", "demo")).strip().lower()
     if provider == "demo":
         return _demo_message()
@@ -114,6 +110,33 @@ async def generate(messages: list[dict[str, str]]) -> str:
     if provider == "gemini":
         return await asyncio.to_thread(_gemini_chat, messages, config)
     raise BrainUnavailable("مزود الذكاء الاصطناعي غير مدعوم. استخدم demo أو ollama أو gemini.")
+
+
+async def generate(messages: list[dict[str, str]]) -> str:
+    try:
+        config = get_runtime_ai_config()
+    except RuntimeError as exc:
+        raise BrainUnavailable(str(exc)) from exc
+    try:
+        return await _generate_with_config(messages, config)
+    except BrainUnavailable as primary_error:
+        fallback_provider = str(config.get("fallback_provider", "demo")).strip().lower()
+        if fallback_provider == "demo" or fallback_provider == str(config.get("provider", "demo")).strip().lower():
+            raise
+        fallback_config = {
+            "provider": fallback_provider,
+            "model": str(config.get("fallback_model") or ""),
+            "base_url": str(config.get("fallback_base_url") or config.get("base_url") or ""),
+            "timeout_seconds": int(config.get("timeout_seconds") or 90),
+            "api_key": str(config.get("api_key") or ""),
+        }
+        try:
+            return await _generate_with_config(messages, fallback_config)
+        except BrainUnavailable as fallback_error:
+            raise BrainUnavailable(
+                "تعذر الرد من المزود الأساسي والاحتياطي. الأساسي: "
+                + str(primary_error)[:220] + " | الاحتياطي: " + str(fallback_error)[:220]
+            ) from fallback_error
 
 
 async def employee_reply(system_prompt: str, history: list[dict[str, str]]) -> str:
