@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Office Brains API", version="0.2.0", lifespan=lifespan)
 origins = [x.strip() for x in os.getenv("CORS_ORIGINS", "https://aminbodaqa-oss.github.io").split(",") if x.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=False,
-                   allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+                   allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
                    allow_headers=["Content-Type", "Authorization"])
 
 _login_attempts: dict[str, list[float]] = {}
