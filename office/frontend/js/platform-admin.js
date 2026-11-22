@@ -319,6 +319,91 @@
     customerSearchTimer = setTimeout(loadCustomers, 250);
   });
 
+  async function loadAISettings() {
+    const form = $("aiSettingsForm");
+    if (!form || !token) return;
+    const data = await platformRequest("/api/platform/admin/ai-settings");
+    form.elements.provider.value = data.provider || "demo";
+    form.elements.model.value = data.model || "";
+    form.elements.base_url.value = data.base_url || "";
+    form.elements.timeout_seconds.value = data.timeout_seconds || 90;
+    form.elements.api_key.value = "";
+    form.elements.clear_api_key.checked = false;
+    const keyStatus = $("aiKeyStatus");
+    keyStatus.textContent = data.has_api_key
+      ? "مفتاح محفوظ · " + (data.key_source === "database" ? "مشفّر على السيرفر" : "من متغيرات السيرفر")
+      : "لا يوجد مفتاح محفوظ";
+    keyStatus.className = data.has_api_key ? "billing-active" : "billing-inactive";
+  }
+
+  async function loadPlatformTeam() {
+    const list = $("platformTeamList");
+    if (!list || !token) return;
+    const data = await platformRequest("/api/platform/admin/team");
+    list.replaceChildren();
+    (data.employees || []).forEach((employee) => {
+      const card = document.createElement("article");
+      card.className = "platform-team-card";
+      const name = document.createElement("strong");
+      name.textContent = employee.id;
+      const role = document.createElement("span");
+      role.textContent = employee.role;
+      const department = document.createElement("small");
+      department.textContent = employee.department;
+      card.append(name,role,department);
+      if (employee.specialties?.length) {
+        const specialties = document.createElement("small");
+        specialties.textContent = employee.specialties.join(" · ");
+        card.append(specialties);
+      }
+      list.append(card);
+    });
+  }
+
+  $("aiSettingsForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const message = $("aiSettingsMessage");
+    button.disabled = true;
+    message.textContent = "جاري حفظ إعدادات المحرك...";
+    try {
+      const payload = {
+        provider:form.elements.provider.value,
+        model:form.elements.model.value.trim(),
+        base_url:form.elements.base_url.value.trim(),
+        timeout_seconds:Number(form.elements.timeout_seconds.value),
+        api_key:form.elements.api_key.value || null,
+        clear_api_key:form.elements.clear_api_key.checked
+      };
+      const data = await platformRequest("/api/platform/admin/ai-settings", {
+        method:"PUT",body:JSON.stringify(payload)
+      });
+      form.elements.api_key.value = "";
+      form.elements.clear_api_key.checked = false;
+      message.textContent = "تم حفظ الإعدادات. المزود الحالي: " + data.provider;
+      await loadAISettings();
+    } catch (error) { message.textContent = error.message || "تعذر حفظ الإعدادات."; }
+    finally { button.disabled = false; }
+  });
+
+  $("testAIConnection")?.addEventListener("click", async () => {
+    const button = $("testAIConnection");
+    const message = $("aiSettingsMessage");
+    button.disabled = true;
+    message.textContent = "جاري اختبار اتصال المزود...";
+    try {
+      const result = await platformRequest("/api/platform/admin/ai-settings/test", {method:"POST"});
+      message.textContent = "الاتصال يعمل · " + result.provider + " · " + (result.response || "تم استلام رد.");
+    } catch (error) { message.textContent = error.message || "فشل اختبار الاتصال."; }
+    finally { button.disabled = false; }
+  });
+
+  $("refreshTeamBtn")?.addEventListener("click", async () => {
+    try { await loadPlatformTeam(); }
+    catch (error) { $("platformTeamList").textContent = error.message || "تعذر تحميل الفريق."; }
+  });
+
   const billingStatusNames = {
     pending_payment:"بانتظار الدفع", active:"نشط", past_due:"متأخر",
     cancelled:"ملغي", expired:"منتهي"
@@ -563,6 +648,7 @@
       if (activeLink) history.replaceState(null, "", activeLink.getAttribute("href"));
     }
     if (target === "subscriptions" && token) { loadBillingPlans(); loadSubscriptionCustomers(); loadSubscriptions(); }
+    if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "customers" && token) {
       loadCustomers();
       loadTenantReadiness();
