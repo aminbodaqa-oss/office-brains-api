@@ -29,7 +29,8 @@
       style.id = "saved-brand-overrides";
       const a = validColor(accent) ? accent : "#00A884";
       const h = validColor(highlight) ? highlight : "#F2B84B";
-      style.textContent = ".primary{background:linear-gradient(120deg," + a + "," + a + ")!important;box-shadow:0 10px 30px " + a + "55!important}.btn:hover{border-color:" + h + "!important}.tag{border-color:" + a + "66!important;color:" + h + "!important;background:" + a + "15!important}.eyebrow,.step b,.avatar{color:" + h + "!important}.step{border-top-color:" + a + "88!important}";
+      const p = validColor(primary) ? primary : "#172A3A";
+      style.textContent = ".primary{background:linear-gradient(120deg," + a + "," + a + ")!important;box-shadow:0 10px 30px " + a + "55!important}.btn:hover{border-color:" + h + "!important}.tag{border-color:" + a + "66!important;color:" + h + "!important;background:" + a + "15!important}.eyebrow,.step b,.avatar{color:" + h + "!important}.step{border-top-color:" + a + "88!important}.visual{background:linear-gradient(145deg," + p + "dd," + p + "bb)!important}.card{background:linear-gradient(145deg," + p + "," + p + ")!important}";
       document.getElementById("saved-brand-overrides")?.remove();
       document.head.append(style);
     }
