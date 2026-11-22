@@ -373,6 +373,9 @@
         model:form.elements.model.value.trim(),
         base_url:form.elements.base_url.value.trim(),
         timeout_seconds:Number(form.elements.timeout_seconds.value),
+        fallback_provider:form.elements.fallback_provider.value,
+        fallback_model:form.elements.fallback_model.value.trim(),
+        fallback_base_url:form.elements.fallback_base_url.value.trim(),
         api_key:form.elements.api_key.value || null,
         clear_api_key:form.elements.clear_api_key.checked
       };
@@ -414,6 +417,9 @@
       form.elements.model.value = data.model || "gemini-3.8-flash";
       form.elements.base_url.value = data.base_url || "";
       form.elements.timeout_seconds.value = data.timeout_seconds || 90;
+      form.elements.fallback_provider.value = data.fallback_provider || "demo";
+      form.elements.fallback_model.value = data.fallback_model || "";
+      form.elements.fallback_base_url.value = data.fallback_base_url || "";
       form.elements.api_key.value = "";
       form.elements.clear_api_key.checked = false;
       $("aiKeyStatus").textContent = data.has_api_key
