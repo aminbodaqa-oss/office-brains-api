@@ -435,11 +435,14 @@ async def platform_admin_save_ai_settings(body: PlatformAISettingsRequest,
 @app.post("/api/platform/admin/ai-settings/test")
 async def platform_admin_test_ai_settings(_: str = Depends(require_platform_admin)):
     try:
+        provider = get_provider()
+        if provider == "demo":
+            raise HTTPException(status_code=400, detail="وضع التجربة لا يتصل بمزود ذكاء اصطناعي فعلي. اختر Gemini أو Ollama أولًا.")
         sample = await employee_reply(
             "أجب بكلمة واحدة فقط لإثبات أن الاتصال يعمل.",
             [{"role": "user", "content": "اكتب: متصل"}],
         )
-        return {"success": True, "provider": get_provider(), "response": sample[:120]}
+        return {"success": True, "provider": provider, "response": sample[:120]}
     except BrainUnavailable as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
