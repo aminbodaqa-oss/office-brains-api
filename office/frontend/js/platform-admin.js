@@ -318,14 +318,11 @@
   });
   sidebarBackdrop?.addEventListener("click", closeSidebar);
   window.addEventListener("resize", () => {
-    if (!isMobileSidebar()) {
-      $("appView").classList.remove("sidebar-open");
-      sidebarToggle?.setAttribute("aria-expanded", String(!$("appView").classList.contains("sidebar-collapsed")));
-    } else {
-      $("appView").classList.remove("sidebar-collapsed");
-      closeSidebar();
-    }
+    if (!isMobileSidebar()) openSidebar();
+    else closeSidebar();
   });
+  if (isMobileSidebar()) closeSidebar();
+  else openSidebar();
 
   pageLinks.forEach((link) => link.addEventListener("click", () => { if (isMobileSidebar()) closeSidebar(); }));
   $("refreshBtn").addEventListener("click", loadOverview);
