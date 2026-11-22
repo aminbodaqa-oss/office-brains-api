@@ -35,6 +35,17 @@ from push import push_delivery_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan, manager_delegation_context)
 from task_runner import task_execution_loop
 
+async def platform_billing_expiry_loop():
+    """Expire trial and paid subscriptions promptly without relying on server restarts."""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            expire_due_platform_subscriptions()
+        except Exception:
+            # Keep the API process alive; the next interval retries the expiry sweep.
+            continue
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -53,6 +64,7 @@ async def lifespan(app: FastAPI):
     proactive_task = None
     task_worker_task = None
     push_task = asyncio.create_task(push_delivery_loop())
+    billing_expiry_task = asyncio.create_task(platform_billing_expiry_loop())
     if os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
         scheduler_task = asyncio.create_task(scheduler_loop())
         if get_provider() != "demo":
@@ -62,7 +74,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        for task in (scheduler_task, proactive_task, task_worker_task, push_task):
+        for task in (scheduler_task, proactive_task, task_worker_task, push_task, billing_expiry_task):
             if task:
                 task.cancel()
                 try:
