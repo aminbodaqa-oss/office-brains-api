@@ -69,6 +69,46 @@ def init_platform_billing_db() -> None:
             )
 
 
+def expire_due_platform_subscriptions() -> int:
+    """Mark elapsed paid subscriptions expired and suspend customers with no remaining coverage."""
+    now = _now()
+    with _connect() as conn:
+        due = conn.execute(
+            """SELECT id,customer_id FROM platform_subscriptions
+               WHERE status='active' AND ends_at<=?""", (now,)
+        ).fetchall()
+        for item in due:
+            conn.execute(
+                "UPDATE platform_subscriptions SET status='expired',updated_at=? WHERE id=?",
+                (now, item["id"]),
+            )
+            replacement = conn.execute(
+                """SELECT plan_code FROM platform_subscriptions
+                   WHERE customer_id=? AND id<>? AND status='active'
+                     AND payment_status='paid' AND ends_at>? ORDER BY ends_at DESC LIMIT 1""",
+                (item["customer_id"], item["id"], now),
+            ).fetchone()
+            if replacement:
+                conn.execute(
+                    "UPDATE platform_customers SET plan_code=?,status='active',updated_at=? WHERE id=?",
+                    (replacement["plan_code"], now, item["customer_id"]),
+                )
+                conn.execute(
+                    "UPDATE platform_workspaces SET status='active',updated_at=? WHERE customer_id=?",
+                    (now, item["customer_id"]),
+                )
+            else:
+                conn.execute(
+                    "UPDATE platform_customers SET status='suspended',updated_at=? WHERE id=?",
+                    (now, item["customer_id"]),
+                )
+                conn.execute(
+                    "UPDATE platform_workspaces SET status='suspended',updated_at=? WHERE customer_id=?",
+                    (now, item["customer_id"]),
+                )
+    return len(due)
+
+
 def _plan(row: sqlite3.Row) -> dict[str, Any]:
     item = dict(row)
     try:
@@ -197,6 +237,8 @@ def update_platform_subscription(subscription_id: str, payment_status: str | Non
         next_status = status or str(row["status"])
         if next_payment == "paid" and next_status == "pending_payment":
             next_status = "active"
+        elif next_payment != "paid" and next_status == "active":
+            next_status = "pending_payment"
         if next_payment == "refunded":
             next_status = "cancelled"
         paid_at = now if next_payment == "paid" and not row["paid_at"] else row["paid_at"]
