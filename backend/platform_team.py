@@ -33,10 +33,18 @@ def get_platform_employee_profile(employee_id: str) -> dict[str, Any] | None:
             "SELECT role,department,instructions FROM platform_employee_overrides WHERE employee_id=?",
             (employee_id,),
         ).fetchone()
+    profile["additional_instructions"] = ""
     if row:
         profile["role"] = row["role"]
         profile["department"] = row["department"]
-        profile["instructions"] = row["instructions"]
+        profile["additional_instructions"] = row["instructions"]
+        if row["instructions"]:
+            base_instructions = profile.get("instructions", "")
+            profile["instructions"] = (
+                base_instructions
+                + "\\n\\nتعليمات إضافية معتمدة من مالك المنصة:\\n"
+                + row["instructions"]
+            )
     return profile
 
 
