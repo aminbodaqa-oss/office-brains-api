@@ -25,6 +25,10 @@ jobs:
           python-version: "3.12"
       - name: Compile backend modules
         run: python -m compileall -q backend
+      - name: Run platform billing tests
+        env:
+          PYTHONPATH: backend
+        run: python -m unittest discover -s backend/tests -v
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
