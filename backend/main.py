@@ -25,7 +25,7 @@ from platform_admin_auth import issue_platform_token, require_platform_admin
 from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer, get_platform_customer)
 from tenant_migration_preflight import tenant_migration_preflight
 from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
-from platform_billing import (init_platform_billing_db, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
+from platform_billing import (init_platform_billing_db, expire_due_platform_subscriptions, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
     init_platform_tenants_db()
     init_platform_branding_db()
     init_platform_billing_db()
+    expire_due_platform_subscriptions()
     init_workflow_db()
     init_internal_messaging_db()
     init_whatsapp_db()
