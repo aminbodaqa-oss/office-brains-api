@@ -19,6 +19,7 @@ from platform_team import (
 )
 from platform_settings import init_platform_settings_db, get_platform_settings, save_platform_settings
 from platform_branding import init_platform_branding_db, get_site_settings, save_site_settings
+from platform_experiences import (init_platform_experiences_db, get_experience, save_experience_draft, publish_experience, list_experience_revisions)
 
 
 class PlatformControlsTests(unittest.TestCase):
@@ -31,6 +32,7 @@ class PlatformControlsTests(unittest.TestCase):
         init_platform_team_db()
         init_platform_settings_db()
         init_platform_branding_db()
+        init_platform_experiences_db()
 
     def tearDown(self):
         os.environ.pop("PLATFORM_SECRETS_KEY", None)
@@ -97,6 +99,21 @@ class PlatformControlsTests(unittest.TestCase):
         self.assertEqual(get_site_settings()["brand_accent"], "#123456")
         with self.assertRaises(ValueError):
             save_site_settings({"primary_cta_url": "javascript:alert(1)"}, "owner")
+
+    def test_website_experience_draft_is_not_published_until_explicit_publish(self):
+        initial = get_experience("platform_site")
+        self.assertIsNone(initial["published"])
+        draft = save_experience_draft(
+            "platform_site", None,
+            {"site_name": "مسودة غير منشورة", "headline": "عنوان تجريبي"},
+            "owner"
+        )
+        self.assertEqual(draft["draft"]["site_name"], "مسودة غير منشورة")
+        self.assertIsNone(draft["published"])
+        published = publish_experience("platform_site", None, "owner")
+        self.assertEqual(published["published"]["site_name"], "مسودة غير منشورة")
+        self.assertEqual(published["version"], 1)
+        self.assertEqual(len(list_experience_revisions("platform_site")), 1)
 
     def test_unknown_employee_cannot_be_created_through_profile_editor(self):
         self.assertIsNone(
