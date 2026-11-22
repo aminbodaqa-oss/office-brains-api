@@ -56,6 +56,8 @@
     const fields = {
       site_name:config.site_name, page_title:config.page_title, meta_description:config.meta_description,
       hero_title:config.headline, hero_emphasis:config.headline_emphasis, hero_subtitle:config.subtitle,
+      about_title:config.headline, about_description:config.subtitle,
+      cta_title:config.welcome_title, cta_description:config.welcome_message,
       primary_cta_text:config.primary_cta_text, footer_text:config.footer_text
     };
     Object.entries(fields).forEach(([key,value]) => {
@@ -74,17 +76,37 @@
       document.querySelectorAll('[data-brand-href="primary_cta_url"]').forEach(node => node.setAttribute("href", config.primary_cta_url));
     }
     if (config.login_title) {
-      const node = document.querySelector("#loginForm [data-brand-login-title]");
+      const node = document.querySelector("#loginForm [data-brand-login-title], #loginView [data-brand-login-title]");
       if (node) node.textContent = config.login_title;
     }
     if (config.login_message) {
-      const node = document.querySelector("#loginForm [data-brand-login-message]");
+      const node = document.querySelector("#loginForm [data-brand-login-message], #loginView [data-brand-login-message]");
       if (node) node.textContent = config.login_message;
+    }
+    if (config.welcome_title) {
+      const node = document.querySelector("[data-brand-workspace-title]");
+      if (node) node.textContent = config.welcome_title;
+    }
+    if (config.welcome_message) {
+      const node = document.querySelector("[data-brand-workspace-message]");
+      if (node) node.textContent = config.welcome_message;
+    }
+    if (Array.isArray(config.navigation) && config.navigation.length) {
+      const nav = document.querySelector("nav[data-brand-navigation]");
+      if (nav) {
+        nav.replaceChildren();
+        config.navigation.forEach(item => {
+          const link = document.createElement("a");
+          link.textContent = item.label;
+          link.setAttribute("href", item.url);
+          nav.append(link);
+        });
+      }
     }
     const fonts = {system:'system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif',
       tajawal:'"Tajawal",Tahoma,Arial,sans-serif',cairo:'"Cairo",Tahoma,Arial,sans-serif',
       inter:'"Inter",Arial,sans-serif'};
-    if (fonts[config.font_family]) document.documentElement.style.setProperty("--office-font", fonts[config.font_family]);
+    if (fonts[config.font_family]) { document.documentElement.style.setProperty("--office-font", fonts[config.font_family]); if (document.body) document.body.style.fontFamily = fonts[config.font_family]; }
   }
   async function applyOfficeExperience(surface) {
     if (!base) return null;
@@ -108,7 +130,7 @@
         document.querySelectorAll("[data-brand-icon]").forEach(icon => { icon.href = data.logo_data_url; });
       }
       applySettings(data.settings || {});
-      const surface = location.pathname.includes("/frontend/") ? "office_login" : "platform_site";
+      const surface = location.pathname.includes("platform-admin.html") ? "super_admin" : (location.pathname.includes("/frontend/") ? "office_login" : "platform_site");
       await applyOfficeExperience(surface);
       const platform = data.platform || {};
       const notice = document.getElementById("siteNotice");
