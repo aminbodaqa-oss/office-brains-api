@@ -504,6 +504,50 @@ async def platform_admin_restore_experience(body: ExperienceRestoreRequest,
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get("/api/platform/admin/operations")
+async def platform_admin_operations(_: str = Depends(require_platform_admin)):
+    from database import _connect
+    with _connect() as conn:
+        conn.execute("SELECT 1").fetchone()
+        tables = {row["name"] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        customers = {}
+        if "platform_customers" in tables:
+            customers = {
+                str(row["status"]): int(row["total"])
+                for row in conn.execute(
+                    "SELECT status,COUNT(*) AS total FROM platform_customers GROUP BY status"
+                ).fetchall()
+            }
+        subscriptions = {}
+        if "platform_subscriptions" in tables:
+            subscriptions = {
+                str(row["status"]): int(row["total"])
+                for row in conn.execute(
+                    "SELECT status,COUNT(*) AS total FROM platform_subscriptions GROUP BY status"
+                ).fetchall()
+            }
+        audit = []
+        if "platform_audit_log" in tables:
+            audit = [dict(row) for row in conn.execute(
+                """SELECT actor,action,entity_type,entity_id,created_at
+                   FROM platform_audit_log ORDER BY id DESC LIMIT 50"""
+            ).fetchall()]
+    provider = get_provider()
+    return {
+        "health": {
+            "api": "ok", "database": "ok", "ai_provider": provider,
+            "ai_ready": provider != "demo",
+            "automation_enabled": os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower()
+                in {"1", "true", "yes", "on"},
+        },
+        "customers_by_status": customers,
+        "subscriptions_by_status": subscriptions,
+        "audit_log": audit,
+    }
+
+
 @app.get("/api/platform/admin/tenant-readiness")
 async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admin)):
     """Read-only schema and row-count audit before tenant data migration."""
