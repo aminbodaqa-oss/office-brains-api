@@ -54,7 +54,7 @@ def init_platform_billing_db() -> None:
             created_at TEXT NOT NULL
         )""")
         defaults = [
-            ("trial", "تجريبية", "باقة تجريبية لفترة محدودة"),
+            ("trial", "التجربة المجانية", "جرّب Office Brains لمدة 3 أيام مجانًا."),
             ("starter", "بداية", "للأعمال الناشئة"),
             ("professional", "احترافية", "للأعمال النامية"),
             ("business", "أعمال", "لفرق العمل والشركات"),
@@ -67,9 +67,19 @@ def init_platform_billing_db() -> None:
                    VALUES(?,?,?,0,0,'EGP','{}',0,?,?)""",
                 (code, name, description, _now(), _now()),
             )
-        # Seed launch-display prices only when no public plan has been configured yet.
-        # The owner can change every amount and visibility from Super Admin > Plans.
-        active_count = int(conn.execute("SELECT COUNT(*) FROM platform_plans WHERE active=1").fetchone()[0])
+        # Enable the built-in trial when it still has untouched defaults.
+        conn.execute(
+            """UPDATE platform_plans
+               SET name='التجربة المجانية',
+                   description='جرّب Office Brains لمدة 3 أيام مجانًا.',
+                   limits_json='{"duration_days":3,"trial":true}',
+                   active=1,updated_at=?
+               WHERE code='trial' AND active=0
+                 AND monthly_price_minor=0 AND yearly_price_minor=0 AND limits_json='{}'""",
+            (_now(),),
+        )
+        # Seed launch-display prices only when no paid public plan is configured yet.
+        active_count = int(conn.execute("SELECT COUNT(*) FROM platform_plans WHERE active=1 AND code<>'trial'").fetchone()[0])
         if active_count == 0:
             launch_prices = {
                 "starter": (29900, 299000),
@@ -216,19 +226,37 @@ def create_platform_subscription(customer_id: str, plan_code: str, billing_cycle
             raise ValueError("العميل غير موجود.")
         if not plan:
             raise ValueError("الباقة غير موجودة أو غير مفعّلة.")
-        price = int(plan["monthly_price_minor"] if billing_cycle == "monthly" else plan["yearly_price_minor"])
-        duration = 30 if billing_cycle == "monthly" else 365
+        if plan_code == "trial":
+            previous_trial = conn.execute(
+                "SELECT 1 FROM platform_subscriptions WHERE customer_id=? AND plan_code='trial' LIMIT 1",
+                (customer_id,),
+            ).fetchone()
+            if previous_trial:
+                raise ValueError("تم استخدام الفترة التجريبية لهذا العميل من قبل.")
+        price = 0 if plan_code == "trial" else int(
+            plan["monthly_price_minor"] if billing_cycle == "monthly" else plan["yearly_price_minor"]
+        )
+        duration = 3 if plan_code == "trial" else (30 if billing_cycle == "monthly" else 365)
         end_dt = start_dt + timedelta(days=duration)
         now = _now()
         sub_id = str(uuid.uuid4())
+        trial_active = plan_code == "trial"
         conn.execute("""INSERT INTO platform_subscriptions
             (id,customer_id,plan_code,billing_cycle,status,payment_status,amount_minor,currency,
              starts_at,ends_at,notes,created_at,updated_at)
-            VALUES(?,?,?,?,'pending_payment','unpaid',?,'EGP',?,?,?,?,?)""",
-            (sub_id, customer_id, plan_code, billing_cycle, price, start_dt.isoformat(),
-             end_dt.isoformat(), notes[:2000], now, now))
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (sub_id, customer_id, plan_code, billing_cycle,
+             "active" if trial_active else "pending_payment", "unpaid", price, "EGP",
+             start_dt.isoformat(), end_dt.isoformat(), notes[:2000], now, now))
+        if trial_active:
+            conn.execute("UPDATE platform_customers SET plan_code='trial',status='trial',updated_at=? WHERE id=?",
+                         (now, customer_id))
+            conn.execute("UPDATE platform_workspaces SET status='trial',updated_at=? WHERE customer_id=?",
+                         (now, customer_id))
         conn.execute("""INSERT INTO platform_billing_events(subscription_id,actor,event_type,details,created_at)
-            VALUES(?,?, 'subscription_created', ?, ?)""", (sub_id, actor, "بانتظار تأكيد الدفع اليدوي", now))
+            VALUES(?,?,?,?,?)""",
+            (sub_id, actor, "trial_started" if trial_active else "subscription_created",
+             "بدأت الفترة التجريبية المجانية لمدة 3 أيام" if trial_active else "بانتظار تأكيد الدفع اليدوي", now))
         conn.execute("""INSERT INTO platform_audit_log(actor,action,entity_type,entity_id,created_at)
             VALUES(?,?,?,?,?)""", (actor, "subscription_created", "subscription", sub_id, now))
         row = conn.execute("SELECT * FROM platform_subscriptions WHERE id=?", (sub_id,)).fetchone()
