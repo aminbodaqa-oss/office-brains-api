@@ -214,3 +214,6 @@ body{background:var(--bg);color:var(--ink)}
 
 /* Remove decorative dots beside text throughout the workspace and sign-in screens */
 .dot,.orbit-dot,.showcase-tag span,.auth-kicker:before,.auth-foot:before{display:none!important;content:none!important}
+
+/* Keep buttons clean: no decorative arrow marks beside button labels. */
+button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after{content:none!important;display:none!important}
