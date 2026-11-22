@@ -77,3 +77,37 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 .readiness-row .readiness-warn{color:#F2B84B}
 #refreshTenantReadiness:disabled{opacity:.6;cursor:wait}
 @media(max-width:700px){.readiness-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.readiness-row{grid-template-columns:1fr 1fr}.readiness-row strong{grid-column:1/-1}}
+
+/* Super Admin section navigation */
+.app{grid-template-columns:268px minmax(0,1fr);align-items:start}
+.sidebar{z-index:5;right:0;overflow-y:auto;box-shadow:-18px 0 48px #0002}
+.nav-label{margin:17px 0 7px;font-size:10px;letter-spacing:.4px;color:#8492ae}
+.nav-item{position:relative;min-height:44px;margin:3px 0;padding:11px 13px;border:1px solid transparent;transition:background .18s,border-color .18s,color .18s}
+.nav-item:hover{background:#ffffff08;color:#fff}
+.nav-item.active{background:linear-gradient(100deg,#00A88425,#00A8840b);border-color:#00A88455;color:#fff;box-shadow:inset -3px 0 0 var(--emerald)}
+.nav-item span{flex:1}
+.nav-item small{font-size:9px;color:#8793ad;background:#ffffff0a;padding:4px 7px;border-radius:20px;white-space:nowrap}
+.admin-page{display:none;animation:pageIn .2s ease}
+.admin-page.active{display:block}
+@keyframes pageIn{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.coming-soon{min-height:300px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:12px}
+.coming-soon h2{font-size:24px}
+.coming-soon>span{display:inline-flex;padding:7px 12px;border:1px solid #F2B84B55;border-radius:30px;color:var(--gold);font-size:11px}
+.topbar{padding-bottom:20px;border-bottom:1px solid var(--line)}
+@media(max-width:900px){
+ .app{display:block}
+ .sidebar{position:sticky;top:0;height:auto;padding:12px 14px;border-left:0;border-bottom:1px solid var(--line);box-shadow:0 12px 28px #0003;overflow-x:auto;overflow-y:hidden;display:flex;flex-direction:row;align-items:center;gap:8px}
+ .side-brand{flex:0 0 auto;padding:0}
+ .side-brand b{font-size:10px}
+ .side-brand small{display:none}
+ .sidebar .nav-label{display:none}
+ .sidebar .nav-item{display:inline-flex;flex:0 0 auto;width:auto;min-height:39px;margin:0 2px;padding:9px 11px;font-size:11px;white-space:nowrap}
+ .side-bottom{display:none}
+ .main{padding:22px 15px}
+}
+@media(max-width:560px){
+ .sidebar{align-items:flex-start;flex-direction:column;gap:9px;padding:10px 12px}
+ .side-brand{padding-bottom:2px}
+ .sidebar .nav-item{font-size:10px;padding:8px 10px}
+ .main{padding:18px 12px}
+}
