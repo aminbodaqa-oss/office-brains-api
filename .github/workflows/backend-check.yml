@@ -27,7 +27,7 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: Compile backend modules
         run: python -m compileall -q backend
-      - name: Run platform billing tests
+      - name: Run platform unit tests
         env:
           PYTHONPATH: backend
         run: python -m unittest discover -s backend/tests -v
