@@ -1036,7 +1036,7 @@
       });
       const result=await platformRequest("/api/platform/admin/branding/logo",{method:"POST",body:JSON.stringify({data_url:dataUrl})});
       document.querySelectorAll("[data-brand-logo]").forEach(img=>{img.src=result.logo_data_url;});
-      document.querySelectorAll("[data-brand-icon]").forEach(icon=>{icon.href=result.logo_data_url;});
+      document.querySelectorAll("[data-brand-icon]").forEach(icon=>{icon.href=result.logo_data_url;icon.type=result.logo_data_url.slice(5,result.logo_data_url.indexOf(";"))||"image/svg+xml";});
       status.textContent="تم حفظ الشعار الموحد.";
       $("studioLogoFile").value="";
     }catch(error){status.textContent=error.message||"تعذر حفظ الشعار.";}
