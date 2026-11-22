@@ -16,3 +16,7 @@
 
 /* Office Brains unified three-color palette */
 :root{--brand-primary:#172A3A;--brand-accent:#00A884;--brand-highlight:#F2B84B;--emerald:var(--brand-accent);--gold:var(--brand-highlight)}
+
+
+/* Keep status labels clear without decorative dots beside them */
+.status-dot{display:none!important}
