@@ -22,6 +22,14 @@ def _fernet() -> Fernet:
 
 def init_platform_ai_db() -> None:
     with _connect() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS platform_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor TEXT NOT NULL,
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS platform_ai_settings (
             id INTEGER PRIMARY KEY CHECK(id=1),
             provider TEXT NOT NULL DEFAULT 'demo',
