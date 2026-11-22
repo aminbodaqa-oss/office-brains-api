@@ -482,7 +482,7 @@
         instructions.name = "instructions";
         instructions.maxLength = 6000;
         instructions.rows = 5;
-        instructions.value = employee.instructions || "";
+        instructions.value = employee.additional_instructions || "";
         instructions.placeholder = "تعليمات تخصصية إضافية توجه سلوك الموظف";
         instructionsLabel.append(instructions);
         const save = document.createElement("button");
