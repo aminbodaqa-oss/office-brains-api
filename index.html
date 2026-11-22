@@ -115,7 +115,7 @@ button::after,a.btn::after,.btn::after,.button::after,[role="button"]::after{con
       empty.textContent="الباقات غير متاحة حاليًا. تواصل معنا لمعرفة تفاصيل الاشتراك.";
       list.append(empty);return;
     }
-    plans.forEach(plan=>{
+    plans.filter(plan=>cycle!=="yearly"||plan.code!=="trial").forEach(plan=>{
       const card=document.createElement("article");
       card.className="pricing-card"+(plan.code==="professional"?" featured":"");
       if(plan.code==="professional"){
