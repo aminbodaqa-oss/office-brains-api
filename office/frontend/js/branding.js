@@ -38,10 +38,20 @@
   function applyExperienceConfig(config) {
     if (!config || typeof config !== "object") return;
     const theme = config.theme || {};
-    const vars = {primary:"--brand-primary",accent:"--brand-accent",highlight:"--brand-highlight",
-      background:"--bg",surface:"--card",text:"--ink"};
-    Object.entries(vars).forEach(([key, variable]) => {
-      if (validColor(theme[key])) document.documentElement.style.setProperty(variable, theme[key]);
+    const vars = {
+      primary:["--brand-primary"], accent:["--brand-accent","--emerald"],
+      highlight:["--brand-highlight","--gold"], background:["--bg"],
+      surface:["--card","--panel"], text:["--ink","--text"]
+    };
+    Object.entries(vars).forEach(([key, variables]) => {
+      if (validColor(theme[key])) variables.forEach(variable =>
+        document.documentElement.style.setProperty(variable, theme[key])
+      );
+    });
+    applySettings({
+      brand_primary:theme.primary,
+      brand_accent:theme.accent,
+      brand_highlight:theme.highlight
     });
     const fields = {
       site_name:config.site_name, page_title:config.page_title, meta_description:config.meta_description,
