@@ -154,3 +154,45 @@ def update_platform_customer(customer_id: str, status: str | None, plan_code: st
         conn.execute("""INSERT INTO platform_audit_log(actor,action,entity_type,entity_id,created_at)
             VALUES(?,?,?,?,?)""", (actor, "customer_updated", "customer", customer_id, now))
         return {"id": customer_id, "status": next_status, "plan_code": next_plan}
+
+def get_platform_customer(customer_id: str) -> dict[str, Any] | None:
+    """Return one customer's platform identity, workspace and recent platform audit events."""
+    with _connect() as conn:
+        row = conn.execute(
+            """SELECT c.id,c.company_name,c.contact_name,c.email,c.phone,c.plan_code,
+                      c.status,c.created_at,c.updated_at,
+                      w.id AS workspace_id,w.workspace_name,w.status AS workspace_status,
+                      w.created_at AS workspace_created_at,w.updated_at AS workspace_updated_at
+               FROM platform_customers c
+               LEFT JOIN platform_workspaces w ON w.customer_id=c.id
+               WHERE c.id=?""",
+            (customer_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        audit = conn.execute(
+            """SELECT actor,action,entity_type,entity_id,created_at
+               FROM platform_audit_log
+               WHERE entity_type='customer' AND entity_id=?
+               ORDER BY id DESC LIMIT 25""",
+            (customer_id,),
+        ).fetchall()
+        membership_count = 0
+        if row["workspace_id"]:
+            membership_count = int(conn.execute(
+                "SELECT COUNT(*) FROM tenant_memberships WHERE workspace_id=?",
+                (row["workspace_id"],),
+            ).fetchone()[0])
+    return {
+        "customer": dict(row),
+        "workspace": {
+            "id": row["workspace_id"],
+            "name": row["workspace_name"],
+            "status": row["workspace_status"],
+            "created_at": row["workspace_created_at"],
+            "updated_at": row["workspace_updated_at"],
+            "memberships": membership_count,
+            "customer_access_enabled": False,
+        },
+        "audit": [dict(item) for item in audit],
+    }
