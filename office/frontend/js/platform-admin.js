@@ -1,5 +1,5 @@
 (() => {
-  const API = "https://9ywu5lapwb.apps.bot-hosting.cloud";
+  const API = (window.OFFICE_API_URL || "").replace(/\/$/, "");
   const $ = (id) => document.getElementById(id);
   let token = sessionStorage.getItem("office_platform_admin_token") || "";
   const saveToken = (value) => {
@@ -40,6 +40,7 @@
       await loadOverview();
       await loadCustomers();
       await loadTenantReadiness();
+      if (location.hash === "#website-studio") await loadExperienceStudio();
     } catch (error) {
       $("loginError").textContent = error.message || "حدث خطأ غير متوقع.";
     } finally {
@@ -841,6 +842,155 @@
 
 
 
+
+  const experienceSurfaceNames = {
+    platform_site:"الموقع التعريفي العام", office_login:"صفحات الدخول",
+    office_workspace:"المكتب ومساحة العمل", super_admin:"مركز السوبر أدمن",
+    customer_workspace:"مكتب عميل محدد"
+  };
+  function experienceScope() {
+    const surface = $("experienceSurface")?.value || "platform_site";
+    const workspaceId = surface === "customer_workspace" ? $("experienceWorkspaceId")?.value.trim() || "" : "";
+    return {surface, workspace_id:workspaceId};
+  }
+  function experienceFormConfig() {
+    const form = $("experienceForm");
+    const value = name => form.elements[name]?.value ?? "";
+    let navigation, pages;
+    try { navigation = JSON.parse(value("navigation_json") || "[]"); }
+    catch (_) { throw new Error("صيغة القائمة الرئيسية JSON غير صحيحة."); }
+    try { pages = JSON.parse(value("pages_json") || "{}"); }
+    catch (_) { throw new Error("صيغة تعريف الصفحات JSON غير صحيحة."); }
+    return {
+      site_name:value("site_name"), page_title:value("page_title"), meta_description:value("meta_description"),
+      headline:value("headline"), headline_emphasis:value("headline_emphasis"), subtitle:value("subtitle"),
+      primary_cta_text:value("primary_cta_text"), primary_cta_url:value("primary_cta_url"),
+      footer_text:value("footer_text"), welcome_title:value("welcome_title"), welcome_message:value("welcome_message"),
+      login_title:value("login_title"), login_message:value("login_message"), sidebar_title:value("sidebar_title"),
+      theme:{primary:value("color_primary"),accent:value("color_accent"),highlight:value("color_highlight"),
+        background:value("color_background"),surface:value("color_surface"),text:value("color_text")},
+      font_family:value("font_family"),density:value("density"),corner_style:value("corner_style"),
+      navigation,pages
+    };
+  }
+  function paintExperiencePreview() {
+    const form = $("experienceForm");
+    if (!form) return;
+    const config = experienceFormConfig();
+    const scope = experienceScope();
+    put("previewSiteName",config.site_name || "Office Brains");
+    put("previewSurfaceName",experienceSurfaceNames[scope.surface] || scope.surface);
+    put("previewHeadline",config.headline || config.login_title || config.welcome_title || "عنوان الواجهة يظهر هنا");
+    put("previewEmphasis",config.headline_emphasis || config.sidebar_title || "");
+    put("previewSubtitle",config.subtitle || config.login_message || config.welcome_message || "وصف الواجهة سيظهر هنا عند الكتابة.");
+    put("previewFooter",config.footer_text || "Office Brains");
+    const preview=$("experiencePreview");
+    preview.style.setProperty("--preview-accent",config.theme.accent || "#00A884");
+    preview.style.setProperty("--preview-bg",config.theme.background || "#0B1020");
+    preview.style.setProperty("--preview-surface",config.theme.surface || "#131B31");
+    preview.style.setProperty("--preview-text",config.theme.text || "#F6F7FF");
+    $("previewCta").textContent=config.primary_cta_text || "زر الإجراء الرئيسي";
+  }
+  function populateExperienceForm(config) {
+    const form=$("experienceForm"), theme=config.theme || {};
+    const mapping={
+      site_name:"site_name",page_title:"page_title",meta_description:"meta_description",
+      headline:"headline",headline_emphasis:"headline_emphasis",subtitle:"subtitle",
+      primary_cta_text:"primary_cta_text",primary_cta_url:"primary_cta_url",footer_text:"footer_text",
+      welcome_title:"welcome_title",welcome_message:"welcome_message",login_title:"login_title",
+      login_message:"login_message",sidebar_title:"sidebar_title",font_family:"font_family",
+      density:"density",corner_style:"corner_style"
+    };
+    Object.entries(mapping).forEach(([field,key])=>{form.elements[field].value=config[key] ?? "";});
+    ["primary","accent","highlight","background","surface","text"].forEach(key=>{
+      form.elements["color_"+key].value=theme[key] || ({primary:"#172A3A",accent:"#00A884",highlight:"#F2B84B",background:"#0B1020",surface:"#131B31",text:"#F6F7FF"}[key]);
+    });
+    form.elements.navigation_json.value=JSON.stringify(config.navigation || [],null,2);
+    form.elements.pages_json.value=JSON.stringify(config.pages || {},null,2);
+    paintExperiencePreview();
+  }
+  async function loadExperienceRevisions() {
+    const scope=experienceScope(), select=$("experienceRevision");
+    if(scope.surface==="customer_workspace" && !scope.workspace_id){select.innerHTML='<option value="">أدخل معرّف مساحة العمل</option>';return;}
+    const query=new URLSearchParams({surface:scope.surface});
+    if(scope.workspace_id)query.set("workspace_id",scope.workspace_id);
+    const data=await platformRequest("/api/platform/admin/experiences/revisions?"+query.toString());
+    select.replaceChildren();
+    if(!data.revisions?.length){const option=document.createElement("option");option.value="";option.textContent="لا توجد إصدارات منشورة";select.append(option);return;}
+    data.revisions.forEach(item=>{
+      const option=document.createElement("option");option.value=String(item.version);
+      option.textContent="الإصدار "+item.version+" · "+new Date(item.published_at).toLocaleString("ar-EG");
+      select.append(option);
+    });
+  }
+  async function loadExperienceStudio() {
+    const scope=experienceScope(), message=$("experienceMessage");
+    $("experienceWorkspaceWrap").classList.toggle("hidden",scope.surface!=="customer_workspace");
+    if(scope.surface==="customer_workspace" && !scope.workspace_id){
+      $("experienceScopeNote").textContent="أدخل معرّف مساحة العمل لتحميل إعداداتها المستقلة.";
+      $("experienceStatus").textContent="بانتظار المعرّف";
+      return;
+    }
+    const query=new URLSearchParams({surface:scope.surface});
+    if(scope.workspace_id)query.set("workspace_id",scope.workspace_id);
+    const button=$("loadExperienceBtn");button.disabled=true;
+    try{
+      const data=await platformRequest("/api/platform/admin/experiences?"+query.toString());
+      populateExperienceForm(data.draft || {});
+      put("experienceVersion",data.version || 0);
+      put("experienceStatus",data.status==="published"?"منشور":data.status==="draft"?"مسودة":"الإعدادات الافتراضية");
+      put("experienceState",data.status==="published"?"يوجد إصدار منشور":data.status==="draft"?"توجد مسودة":"لم يتم النشر بعد");
+      $("experienceScopeNote").textContent="أنت تعدّل: "+experienceSurfaceNames[scope.surface]+(scope.workspace_id?" · "+scope.workspace_id:"")+".";
+      await loadExperienceRevisions();
+      if(message)message.textContent="";
+    }catch(error){if(message)message.textContent=error.message || "تعذر تحميل إعدادات الواجهة.";}
+    finally{button.disabled=false;}
+  }
+  $("experienceForm")?.addEventListener("input",()=>{
+    try{paintExperiencePreview();}catch(error){put("experienceMessage",error.message);}
+  });
+  $("experienceForm")?.addEventListener("submit",async event=>{
+    event.preventDefault();const button=$("saveExperienceDraft"),message=$("experienceMessage");
+    const scope=experienceScope();
+    if(scope.surface==="customer_workspace"&&!scope.workspace_id){message.textContent="أدخل معرّف مساحة العمل أولًا.";return;}
+    button.disabled=true;message.textContent="جاري حفظ المسودة...";
+    try{
+      const config=experienceFormConfig();
+      await platformRequest("/api/platform/admin/experiences/draft",{method:"PUT",body:JSON.stringify({...scope,config})});
+      message.textContent="تم حفظ المسودة. لم يتم نشرها على الواجهة العامة.";
+      await loadExperienceStudio();
+    }catch(error){message.textContent=error.message || "تعذر حفظ المسودة.";}
+    finally{button.disabled=false;}
+  });
+  $("publishExperience")?.addEventListener("click",async()=>{
+    const scope=experienceScope(),message=$("experienceMessage"),button=$("publishExperience");
+    if(scope.surface==="customer_workspace"&&!scope.workspace_id){message.textContent="أدخل معرّف مساحة العمل أولًا.";return;}
+    if(!window.confirm("تأكيد نشر إعدادات "+experienceSurfaceNames[scope.surface]+"؟"))return;
+    button.disabled=true;message.textContent="جاري نشر الإصدار...";
+    try{
+      await platformRequest("/api/platform/admin/experiences/draft",{method:"PUT",body:JSON.stringify({...scope,config:experienceFormConfig()})});
+      const result=await platformRequest("/api/platform/admin/experiences/publish",{method:"POST",body:JSON.stringify(scope)});
+      message.textContent="تم نشر الإصدار رقم "+result.version+".";
+      await loadExperienceStudio();
+    }catch(error){message.textContent=error.message || "تعذر نشر الإصدار.";}
+    finally{button.disabled=false;}
+  });
+  $("restoreExperience")?.addEventListener("click",async()=>{
+    const scope=experienceScope(),version=Number($("experienceRevision").value),message=$("experienceMessage"),button=$("restoreExperience");
+    if(!version){message.textContent="اختار إصدارًا منشورًا للاستعادة.";return;}
+    if(!window.confirm("استعادة الإصدار "+version+" كمسودة؟"))return;
+    button.disabled=true;message.textContent="جاري استعادة الإصدار...";
+    try{
+      await platformRequest("/api/platform/admin/experiences/restore",{method:"POST",body:JSON.stringify({...scope,version})});
+      message.textContent="تمت استعادة الإصدار كمسودة. راجعه ثم انشره.";
+      await loadExperienceStudio();
+    }catch(error){message.textContent=error.message || "تعذرت استعادة الإصدار.";}
+    finally{button.disabled=false;}
+  });
+  $("experienceSurface")?.addEventListener("change",loadExperienceStudio);
+  $("experienceWorkspaceId")?.addEventListener("change",loadExperienceStudio);
+  $("loadExperienceBtn")?.addEventListener("click",loadExperienceStudio);
+
   // Sidebar navigation: show one workspace section at a time.
   const pageLinks = Array.from(document.querySelectorAll("[data-page-link]"));
   const pages = Array.from(document.querySelectorAll("[data-page]"));
@@ -855,7 +1005,7 @@
     }
     if (target === "subscriptions" && token) { loadBillingPlans(); loadSubscriptionCustomers(); loadSubscriptions(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
-    if (target === "website" && token) { loadWebsiteSettings(); }
+    if (target === "website" && token) { loadExperienceStudio(); }
     if (target === "operations" && token) { loadPlatformOperations(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "customers" && token) {
@@ -910,6 +1060,7 @@
     loadOverview();
     loadCustomers();
     loadTenantReadiness();
+    if (initialPage === "website") loadExperienceStudio();
   }
 
   $("logoutBtn").addEventListener("click", () => {
