@@ -278,3 +278,6 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 .ops-audit-row small,.ops-audit-row time{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:900px){.ops-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.ops-counts-grid{grid-template-columns:1fr}.ops-audit-row{align-items:flex-start;flex-direction:column}}
+.setting-toggle{display:flex!important;align-items:center;grid-template-columns:auto 1fr;gap:10px!important;color:var(--ink)!important;font-size:13px!important}
+.setting-toggle input{width:18px!important;height:18px;accent-color:var(--emerald)}
+#publicSiteUnavailable[hidden],.site-notice[hidden]{display:none!important}
