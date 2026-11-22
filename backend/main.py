@@ -20,6 +20,7 @@ from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number,
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password, hash_refresh_token
 from platform_admin_auth import issue_platform_token, require_platform_admin
+from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer)
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -29,6 +30,7 @@ from task_runner import task_execution_loop
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_platform_tenants_db()
     init_workflow_db()
     init_internal_messaging_db()
     init_whatsapp_db()
@@ -316,6 +318,48 @@ async def platform_admin_overview(_: str = Depends(require_platform_admin)):
         "catalog": {"employee_templates": len(EMPLOYEES)},
         "scope": "aggregate_only",
     }
+
+
+class PlatformCustomerCreateRequest(BaseModel):
+    company_name: str = Field(min_length=2, max_length=180)
+    contact_name: str = Field(default="", max_length=180)
+    email: str = Field(min_length=5, max_length=254)
+    phone: str = Field(default="", max_length=40)
+    plan_code: Literal["trial", "starter", "professional", "business", "enterprise"] = "trial"
+
+
+class PlatformCustomerUpdateRequest(BaseModel):
+    status: Literal["trial", "active", "suspended"] | None = None
+    plan_code: Literal["trial", "starter", "professional", "business", "enterprise"] | None = None
+
+
+@app.get("/api/platform/admin/customers")
+async def platform_admin_customers(q: str = "", status: str = "",
+                                   _: str = Depends(require_platform_admin)):
+    return list_platform_customers(q, status)
+
+
+@app.post("/api/platform/admin/customers")
+async def platform_admin_create_customer(body: PlatformCustomerCreateRequest,
+                                         actor: str = Depends(require_platform_admin)):
+    try:
+        return create_platform_customer(body.company_name, body.contact_name, body.email,
+                                        body.phone, body.plan_code, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/platform/admin/customers/{customer_id}")
+async def platform_admin_update_customer(customer_id: str, body: PlatformCustomerUpdateRequest,
+                                          actor: str = Depends(require_platform_admin)):
+    try:
+        result = update_platform_customer(customer_id, body.status, body.plan_code, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="العميل غير موجود.")
+    return result
+
 
 @app.get("/api/employees")
 async def employees(_: str = Depends(require_owner)):
