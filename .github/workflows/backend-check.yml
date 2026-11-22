@@ -12,6 +12,7 @@ on:
       - "backend/**"
       - "office/frontend/**"
       - ".github/workflows/backend-check.yml"
+  workflow_dispatch:
 
 jobs:
   syntax:
