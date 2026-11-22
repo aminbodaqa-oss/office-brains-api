@@ -35,8 +35,9 @@
     <a class="nav-item" href="#settings" data-page-link="settings"><span>إعدادات المنصة</span><small>قريبًا</small></a>
     <div class="side-bottom"><span class="status-dot"></span> بوابة الإدارة منفصلة<br><button id="logoutBtn" class="logout">تسجيل الخروج</button></div>
   </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <section class="main">
-    <header class="topbar"><div><p class="eyebrow">PLATFORM OVERVIEW</p><h1>صباح السيطرة على التفاصيل.</h1><p class="muted">نظرة تشغيلية آمنة على خدمة Office Brains.</p></div><button id="refreshBtn" class="ghost">تحديث البيانات</button></header>
+    <header class="topbar"><button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="فتح القائمة الجانبية" aria-expanded="true">☰</button><div><p class="eyebrow">PLATFORM OVERVIEW</p><h1>صباح السيطرة على التفاصيل.</h1><p class="muted">نظرة تشغيلية آمنة على خدمة Office Brains.</p></div><button id="refreshBtn" class="ghost">تحديث البيانات</button></header>
     <section class="admin-page active" data-page="overview">\n    <div id="loadError" class="error"></div>
     <section class="metrics">
       <article class="metric"><span>واجهة API</span><strong id="apiState">—</strong><small>حالة الخدمة</small></article>
