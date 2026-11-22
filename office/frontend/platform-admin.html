@@ -152,40 +152,87 @@
         <p class="billing-note">تأكيد الدفع هنا إجراء إداري يدوي، وليس اتصالًا ببنك أو بوابة دفع. لا يتم تحصيل أي مبلغ تلقائيًا.</p>
       </section>
     </section>
-    <section class="admin-page" data-page="website"><section class="panel website-branding"><div class="panel-head"><div><p class="eyebrow">WEBSITE IDENTITY</p><h2>إعدادات هوية الموقع</h2><p class="muted">ارفع شعارًا موحدًا ليظهر في الموقع وصفحات الدخول ولوحة التحكم.</p></div></div><div class="brand-settings-grid"><div class="brand-preview"><img id="siteLogoPreview" data-brand-logo src="assets/office-brains-logo.svg" alt="معاينة شعار Office Brains"><span>معاينة الشعار الحالي</span></div><form id="siteLogoForm" class="brand-upload-form"><label for="siteLogoFile">اختيار ملف الشعار</label><input id="siteLogoFile" type="file" accept="image/png,image/jpeg,image/webp" required><p class="muted">الصيغ المدعومة PNG وJPG وWEBP، بحد أقصى 2 ميجابايت.</p><p id="siteLogoMessage" class="muted" role="status">الشعار الحالي مستخدم في صفحات المنصة.</p><button type="submit">حفظ الشعار وتطبيقه</button></form></div></section><section class="panel website-studio-next"><div class="panel-head"><div><p class="eyebrow">WEBSITE CONTENT STUDIO</p><h2>محتوى الموقع والهوية</h2><p class="muted">تحكم في النصوص الأساسية وألوان الهوية وروابط الدعوة. التغييرات تُحفظ مركزيًا وتظهر في صفحة الموقع العامة.</p></div><button id="refreshWebsiteSettings" type="button" class="ghost">تحديث الإعدادات</button></div>
-        <form id="websiteSettingsForm" class="billing-form">
-          <h3 class="form-subheading">اسم الموقع ومحركات البحث</h3>
-          <div class="billing-fields">
-            <label>اسم المنصة<input name="site_name" maxlength="100" placeholder="Office Brains"></label>
-            <label>عنوان الصفحة<input name="page_title" maxlength="160" placeholder="Office Brains | مكتبك الذكي يبدأ من هنا"></label>
+    <section class="admin-page" data-page="website">
+      <section class="panel studio-intro">
+        <div class="panel-head"><div><p class="eyebrow">UNIFIED EXPERIENCE STUDIO</p><h2>استوديو تجربة Office Brains</h2><p class="muted">تحكم في الموقع العام، صفحات الدخول، المكتب، ومركز السوبر أدمن. كل واجهة لها إعداداتها وإصداراتها المستقلة.</p></div><span class="studio-state" id="experienceState">جاهز للتهيئة</span></div>
+        <div class="studio-scope-grid">
+          <label>الواجهة المستهدفة
+            <select id="experienceSurface">
+              <option value="platform_site">الموقع التعريفي العام</option>
+              <option value="office_login">صفحات الدخول</option>
+              <option value="office_workspace">المكتب ومساحة العمل</option>
+              <option value="super_admin">مركز السوبر أدمن</option>
+              <option value="customer_workspace">مكتب عميل محدد</option>
+            </select>
+          </label>
+          <label id="experienceWorkspaceWrap" class="hidden">معرّف مساحة العميل
+            <input id="experienceWorkspaceId" maxlength="80" placeholder="Workspace ID">
+          </label>
+          <div class="studio-version"><span>الإصدار المنشور</span><strong id="experienceVersion">0</strong></div>
+          <div class="studio-version"><span>حالة المسودة</span><strong id="experienceStatus">لا توجد تغييرات</strong></div>
+        </div>
+        <p id="experienceScopeNote" class="muted" role="status">اختار الواجهة التي تريد تخصيصها. إعدادات كل واجهة مستقلة عن الباقي.</p>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><p class="eyebrow">CONTENT & IDENTITY</p><h2>المحتوى والهوية البصرية</h2><p class="muted">تعديل النصوص والألوان والخطوط والمسافات دون تعديل ملفات الواجهة يدويًا.</p></div><button id="loadExperienceBtn" class="ghost" type="button">تحميل الإعدادات</button></div>
+        <form id="experienceForm" class="studio-form">
+          <div class="studio-form-grid">
+            <label>اسم الواجهة<input name="site_name" maxlength="100"></label>
+            <label>عنوان الصفحة والمتصفح<input name="page_title" maxlength="160"></label>
+            <label class="wide">الوصف التعريفي<textarea name="meta_description" maxlength="320" rows="2"></textarea></label>
+            <label>العنوان الرئيسي<input name="headline" maxlength="180"></label>
+            <label>الجملة المميزة<input name="headline_emphasis" maxlength="180"></label>
+            <label class="wide">الوصف الرئيسي<textarea name="subtitle" maxlength="900" rows="3"></textarea></label>
+            <label>عنوان صفحة الدخول<input name="login_title" maxlength="160"></label>
+            <label>رسالة صفحة الدخول<input name="login_message" maxlength="600"></label>
+            <label>عنوان ترحيب المكتب<input name="welcome_title" maxlength="180"></label>
+            <label>رسالة ترحيب المكتب<input name="welcome_message" maxlength="600"></label>
+            <label>عنوان القائمة الجانبية<input name="sidebar_title" maxlength="100"></label>
+            <label>نص التذييل<input name="footer_text" maxlength="240"></label>
+            <label>نص الزر الرئيسي<input name="primary_cta_text" maxlength="80"></label>
+            <label>رابط الزر الرئيسي<input name="primary_cta_url" maxlength="300" placeholder="./ أو / أو https://"></label>
           </div>
-          <label>وصف الموقع لمحركات البحث<textarea name="meta_description" maxlength="320" rows="2"></textarea></label>
-          <h3 class="form-subheading">الواجهة الرئيسية</h3>
-          <div class="billing-fields">
-            <label>العنوان الرئيسي<input name="hero_title" maxlength="160"></label>
-            <label>الجملة المميزة<input name="hero_emphasis" maxlength="160"></label>
-            <label>نص زر الدعوة<input name="primary_cta_text" maxlength="80"></label>
-            <label>رابط زر الدعوة<input name="primary_cta_url" maxlength="300" placeholder="frontend/"></label>
+          <h3 class="form-subheading">ألوان الواجهة</h3>
+          <div class="studio-colors">
+            <label>اللون الأساسي<input name="color_primary" type="color" value="#172A3A"></label>
+            <label>لون التفاعل<input name="color_accent" type="color" value="#00A884"></label>
+            <label>لون الإبراز<input name="color_highlight" type="color" value="#F2B84B"></label>
+            <label>الخلفية<input name="color_background" type="color" value="#0B1020"></label>
+            <label>لون البطاقات<input name="color_surface" type="color" value="#131B31"></label>
+            <label>لون النص<input name="color_text" type="color" value="#F6F7FF"></label>
           </div>
-          <label>وصف الواجهة<textarea name="hero_subtitle" maxlength="700" rows="3"></textarea></label>
-          <h3 class="form-subheading">قسم التعريف والدعوة</h3>
-          <div class="billing-fields">
-            <label>عنوان قسم التعريف<input name="about_title" maxlength="160"></label>
-            <label>عنوان قسم الدعوة<input name="cta_title" maxlength="160"></label>
+          <div class="studio-form-grid">
+            <label>الخط
+              <select name="font_family"><option value="system">System</option><option value="tajawal">Tajawal</option><option value="cairo">Cairo</option><option value="inter">Inter</option></select>
+            </label>
+            <label>كثافة الواجهة
+              <select name="density"><option value="compact">مضغوطة</option><option value="comfortable">مريحة</option><option value="spacious">واسعة</option></select>
+            </label>
+            <label>شكل الحواف
+              <select name="corner_style"><option value="sharp">حادة</option><option value="rounded">دائرية</option><option value="soft">ناعمة</option></select>
+            </label>
           </div>
-          <label>وصف قسم التعريف<textarea name="about_description" maxlength="700" rows="3"></textarea></label>
-          <label>وصف قسم الدعوة<textarea name="cta_description" maxlength="500" rows="2"></textarea></label>
-          <label>نص التذييل<input name="footer_text" maxlength="200"></label>
-          <h3 class="form-subheading">ألوان الهوية</h3>
-          <div class="billing-fields color-fields">
-            <label>اللون الأساسي<input name="brand_primary" type="color" value="#172A3A"></label>
-            <label>اللون المميز<input name="brand_accent" type="color" value="#00A884"></label>
-            <label>لون الإبراز<input name="brand_highlight" type="color" value="#F2B84B"></label>
+          <label>القائمة الرئيسية بصيغة JSON<textarea name="navigation_json" rows="4" spellcheck="false" placeholder='[{"label":"عن المنصة","url":"#about"}]'></textarea></label>
+          <label>تعريف الصفحات بصيغة JSON<textarea name="pages_json" rows="4" spellcheck="false" placeholder='{"home":{"title":"الرئيسية","description":"","visible":true}}'></textarea></label>
+          <div class="studio-actions">
+            <button id="saveExperienceDraft" type="submit">حفظ كمسودة</button>
+            <button id="publishExperience" type="button">نشر الإصدار</button>
+            <label class="studio-revision">الإصدارات السابقة<select id="experienceRevision"><option value="">لا توجد إصدارات</option></select></label>
+            <button id="restoreExperience" class="ghost" type="button">استعادة الإصدار</button>
           </div>
-          <div class="billing-actions"><button type="submit">حفظ ونشر التعديلات</button></div>
-          <p id="websiteSettingsMessage" class="muted" role="status"></p>
+          <p id="experienceMessage" class="muted" role="status"></p>
         </form>
-      </section></section>
+      </section>
+      <section class="panel studio-preview-panel">
+        <div class="panel-head"><div><p class="eyebrow">LIVE PREVIEW</p><h2>معاينة مباشرة</h2><p class="muted">المعاينة تعرض المسودة الحالية قبل النشر.</p></div></div>
+        <div id="experiencePreview" class="experience-preview">
+          <div class="experience-preview-top"><strong id="previewSiteName">Office Brains</strong><span id="previewSurfaceName">الموقع التعريفي العام</span></div>
+          <div class="experience-preview-body"><small>PREVIEW</small><h2 id="previewHeadline">عنوان الواجهة يظهر هنا</h2><h3 id="previewEmphasis"></h3><p id="previewSubtitle">وصف الواجهة سيظهر هنا عند الكتابة.</p><button id="previewCta" type="button" disabled>زر الإجراء الرئيسي</button></div>
+          <div class="experience-preview-foot" id="previewFooter">Office Brains</div>
+        </div>
+      </section>
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">WORKSPACE ISOLATION</p><h2>تخصيص مكاتب العملاء</h2><p class="muted">لكل عميل إعدادات مستقلة لا تؤثر على بقية المكاتب. تفعيل عرضها داخل جلسة العميل مرتبط باستكمال بوابة دخول العملاء وعزل بياناتهم.</p></div></div><p class="muted">اختار «مكتب عميل محدد» وأدخل معرّف مساحة العمل لحفظ مسودة مستقلة لها. لا يتم نشر إعدادات عميل على واجهة عميل آخر.</p></section>
+    </section>
     <section class="admin-page" data-page="ai-team">
       <section class="panel"><div class="panel-head"><div><p class="eyebrow">AI PROVIDER CONTROL</p><h2>إعداد محرك الذكاء الاصطناعي</h2><p class="muted">اختيار المزود والنموذج وضبط الاتصال. مفاتيح API تُشفّر على السيرفر ولا تظهر مرة أخرى في الواجهة.</p></div><span id="aiKeyStatus" class="billing-inactive">جاري فحص المفتاح...</span></div>
         <form id="aiSettingsForm" class="billing-form">
