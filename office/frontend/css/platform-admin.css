@@ -290,3 +290,8 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 .studio-logo-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .studio-logo-row button{min-height:42px}
 .studio-logo-row #studioLogoStatus{flex-basis:100%}
+
+.experience-preview{border-radius:var(--preview-radius,14px)}
+.experience-preview-top,.experience-preview-foot{padding:calc(13px * var(--preview-density,1)) calc(16px * var(--preview-density,1))}
+.experience-preview-body{padding:calc(32px * var(--preview-density,1)) calc(22px * var(--preview-density,1))}
+.experience-preview-body button{border-radius:var(--preview-radius,14px)}
