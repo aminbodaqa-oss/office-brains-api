@@ -36,5 +36,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Validate platform admin JavaScript
-        run: node --check office/frontend/js/platform-admin.js
+      - name: Validate all edited frontend JavaScript
+        run: |
+          node --check office/frontend/js/branding.js
+          node --check office/frontend/js/app.js
+          node --check office/frontend/js/platform-admin.js
+          node --check office/frontend/js/view-loader.js
