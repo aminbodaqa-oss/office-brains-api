@@ -29,7 +29,7 @@ from platform_billing import (init_platform_billing_db, expire_due_platform_subs
 from platform_ai import (init_platform_ai_db, get_platform_ai_settings, save_platform_ai_settings)
 from platform_team import (init_platform_team_db, list_platform_team, get_platform_employee_profile, save_platform_employee_profile)
 from platform_settings import (init_platform_settings_db, get_platform_settings, save_platform_settings)
-from platform_experiences import (init_platform_experiences_db, get_experience, save_experience_draft, publish_experience, list_experience_revisions, restore_experience_revision)
+from platform_experiences import (DEFAULT_CONFIG, init_platform_experiences_db, get_experience, save_experience_draft, publish_experience, list_experience_revisions, restore_experience_revision)
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan, manager_delegation_context)
@@ -461,7 +461,7 @@ async def public_experience(surface: str = "platform_site"):
     if surface not in {"platform_site", "office_login", "office_workspace", "super_admin"}:
         raise HTTPException(status_code=400, detail="نطاق الواجهة العامة غير مسموح.")
     experience = get_experience(surface)
-    return {"surface": surface, "config": experience["published"] or experience["draft"],
+    return {"surface": surface, "config": experience["published"] if experience["published"] is not None else DEFAULT_CONFIG,
             "version": experience["version"], "published": bool(experience["published"])}
 
 
