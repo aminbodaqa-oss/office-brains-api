@@ -250,6 +250,22 @@ def update_platform_subscription(subscription_id: str, payment_status: str | Non
                          (row["plan_code"], now, row["customer_id"]))
             conn.execute("""UPDATE platform_workspaces SET status='active',updated_at=? WHERE customer_id=?""",
                          (now, row["customer_id"]))
+        elif next_status == "pending_payment" and next_payment != "paid":
+            replacement = conn.execute(
+                """SELECT plan_code FROM platform_subscriptions
+                   WHERE customer_id=? AND id<>? AND status='active' AND payment_status='paid'
+                     AND ends_at>=? ORDER BY ends_at DESC LIMIT 1""",
+                (row["customer_id"], subscription_id, now),
+            ).fetchone()
+            customer_status = "active" if replacement else "suspended"
+            if replacement:
+                conn.execute("UPDATE platform_customers SET plan_code=?,status='active',updated_at=? WHERE id=?",
+                             (replacement["plan_code"], now, row["customer_id"]))
+            else:
+                conn.execute("UPDATE platform_customers SET status='suspended',updated_at=? WHERE id=?",
+                             (now, row["customer_id"]))
+            conn.execute("UPDATE platform_workspaces SET status=?,updated_at=? WHERE customer_id=?",
+                         (customer_status, now, row["customer_id"]))
         elif next_status in {"cancelled", "expired", "past_due"}:
             replacement = conn.execute(
                 """SELECT plan_code FROM platform_subscriptions
