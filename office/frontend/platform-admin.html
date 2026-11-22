@@ -95,6 +95,11 @@
       </form>
       <div class="customer-list-head"><h3>قائمة العملاء</h3><div class="customer-filters"><input id="customerSearch" type="search" placeholder="ابحث باسم الشركة أو البريد أو الهاتف"><select id="customerStatus"><option value="">كل الحالات</option><option value="trial">تجريبي</option><option value="active">نشط</option><option value="suspended">موقوف</option></select></div></div>
       <div id="customerList" class="customer-list"><p class="muted">سجّل الدخول لعرض العملاء.</p></div>
+      <section id="customerDetails" class="customer-details hidden" aria-live="polite">
+        <div class="customer-details-head"><div><p class="eyebrow">CUSTOMER PROFILE</p><h3 id="customerDetailsTitle">تفاصيل العميل</h3></div><button id="closeCustomerDetails" class="ghost" type="button">إغلاق</button></div>
+        <div id="customerDetailsGrid" class="customer-details-grid"></div>
+        <div class="customer-audit"><h4>سجل تغييرات الحساب</h4><div id="customerAuditList"><p class="muted">لا توجد أحداث مسجلة.</p></div></div>
+      </section>
       <p class="customer-note">إنشاء الحساب هنا يجهّز سجل العميل ومساحة عمل مستقلة. تفعيل دخول العملاء وربط بيانات المكتب بعزل المساحات مرحلة منفصلة قبل فتح التسجيل العام.</p>
     </section>
 
