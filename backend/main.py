@@ -27,6 +27,7 @@ from tenant_migration_preflight import tenant_migration_preflight
 from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
 from platform_billing import (init_platform_billing_db, expire_due_platform_subscriptions, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
 from platform_ai import (init_platform_ai_db, get_platform_ai_settings, save_platform_ai_settings)
+from platform_team import (init_platform_team_db, list_platform_team, get_platform_employee_profile, save_platform_employee_profile)
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan, manager_delegation_context)
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
     init_platform_billing_db()
     expire_due_platform_subscriptions()
     init_platform_ai_db()
+    init_platform_team_db()
     init_workflow_db()
     init_internal_messaging_db()
     init_whatsapp_db()
@@ -332,6 +334,12 @@ async def platform_admin_overview(_: str = Depends(require_platform_admin)):
     }
 
 
+class PlatformTeamMemberUpdateRequest(BaseModel):
+    role: str = Field(min_length=1, max_length=160)
+    department: str = Field(min_length=1, max_length=160)
+    instructions: str = Field(default="", max_length=6000)
+
+
 class PlatformAISettingsRequest(BaseModel):
     provider: Literal["demo", "gemini", "ollama"]
     model: str = Field(min_length=1, max_length=160)
@@ -408,12 +416,21 @@ async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admi
 
 @app.get("/api/platform/admin/team")
 async def platform_admin_team(_: str = Depends(require_platform_admin)):
-    return {"employees": [
-        {"id": item["id"], "role": item.get("role", ""),
-         "department": item.get("department", ""),
-         "specialties": item.get("specialties", [])}
-        for item in EMPLOYEES
-    ]}
+    return {"employees": list_platform_team()}
+
+
+@app.patch("/api/platform/admin/team/{employee_id}")
+async def platform_admin_update_team_member(employee_id: str,
+                                            body: PlatformTeamMemberUpdateRequest,
+                                            actor: str = Depends(require_platform_admin)):
+    try:
+        result = save_platform_employee_profile(employee_id, body.role, body.department,
+                                                body.instructions, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="الموظف غير موجود.")
+    return result
 
 
 @app.get("/api/platform/admin/ai-settings")
@@ -533,7 +550,7 @@ async def platform_admin_update_customer(customer_id: str, body: PlatformCustome
 
 @app.get("/api/employees")
 async def employees(_: str = Depends(require_owner)):
-    return {"employees": EMPLOYEES}
+    return {"employees": list_platform_team()}
 
 @app.get("/api/whatsapp/contacts")
 async def get_whatsapp_contacts(_: str = Depends(require_owner)):
@@ -568,7 +585,7 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
     result = {"sent": True, "message": saved, "reply_generated": False}
     # Owner messages trigger the selected employee's actual AI persona.
     if body.sender_id == "المالك":
-        employee = next((item for item in EMPLOYEES if item["id"] == body.recipient_id), None)
+        employee = get_platform_employee_profile(body.recipient_id)
         if employee:
             try:
                 if get_provider() == "demo":
@@ -733,7 +750,7 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     manager_team_context = management_context_for(body.employee_id)
     if manager_team_context:
         system += "\n\nمعرفة المدير بالفريق والتنسيق مع المختصين:\n" + manager_team_context
-    employee_profile = next((item for item in EMPLOYEES if item["id"] == body.employee_id), None)
+    employee_profile = get_platform_employee_profile(body.employee_id)
     if employee_profile and employee_profile.get("instructions"):
         system += "\n\nتعليمات التخصص الإضافية:\n" + employee_profile["instructions"]
     wa_number = virtual_number(body.employee_id)
@@ -823,7 +840,7 @@ async def _notify_assigned_employee(task: dict, event_label: str) -> None:
     if get_provider() == "demo":
         return
     employee_id = str(task.get("assigned_to") or "")
-    employee = next((item for item in EMPLOYEES if item["id"] == employee_id), None)
+    employee = get_platform_employee_profile(employee_id)
     if not employee:
         return
     try:
@@ -978,7 +995,7 @@ async def get_activity(limit: int = 60, _: str = Depends(require_owner)):
 
 async def _employee_contact_owner(employee_id: str, owner_request: str) -> dict:
     """Generate and persist an employee-initiated message before confirming success."""
-    employee = next((item for item in EMPLOYEES if item["id"] == employee_id), None)
+    employee = get_platform_employee_profile(employee_id)
     if not employee:
         return {"sent": False, "error": "الموظف المطلوب غير موجود."}
     if get_provider() == "demo":
