@@ -755,8 +755,14 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     if manager_team_context:
         system += "\n\nمعرفة المدير بالفريق والتنسيق مع المختصين:\n" + manager_team_context
     employee_profile = get_platform_employee_profile(body.employee_id)
-    if employee_profile and employee_profile.get("instructions"):
-        system += "\n\nتعليمات التخصص الإضافية:\n" + employee_profile["instructions"]
+    if employee_profile:
+        system += (
+            "\n\nدورك المعتمد في المنصة:\n"
+            + "المسمى الوظيفي: " + str(employee_profile.get("role", "")) + "\n"
+            + "الإدارة: " + str(employee_profile.get("department", ""))
+        )
+        if employee_profile.get("instructions"):
+            system += "\n\nتعليمات التخصص الإضافية:\n" + employee_profile["instructions"]
     wa_number = virtual_number(body.employee_id)
     wa_inbox = list_whatsapp_inbox(body.employee_id, 15)
     system += f"\nرقم واتساب المكتب الافتراضي الخاص بك هو {wa_number}. هذا رقم داخلي غير قابل للاتصال الهاتفي ولا يمثل رقم واتساب حقيقيًا."
