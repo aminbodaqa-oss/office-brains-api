@@ -415,6 +415,11 @@ async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_
     save_site_logo(body.data_url)
     return {"saved": True, "logo_data_url": body.data_url}
 
+@app.get("/api/platform/admin/branding/settings")
+async def get_platform_branding_settings(_: str = Depends(require_platform_admin)):
+    return {"settings": get_site_settings()}
+
+
 @app.put("/api/platform/admin/branding/settings")
 async def update_platform_branding_settings(body: WebsiteBrandingRequest,
                                             actor: str = Depends(require_platform_admin)):
