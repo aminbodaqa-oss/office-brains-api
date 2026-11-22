@@ -695,6 +695,93 @@
   });
   $("subscriptionStatusFilter")?.addEventListener("change", loadSubscriptions);
 
+  async function loadPlatformOperations() {
+    const healthGrid = $("opsHealthGrid");
+    const countsGrid = $("opsCountsGrid");
+    const auditList = $("opsAuditList");
+    if (!healthGrid || !token) return;
+    healthGrid.textContent = "جاري فحص المنصة...";
+    try {
+      const data = await platformRequest("/api/platform/admin/operations");
+      const health = data.health || {};
+      healthGrid.replaceChildren();
+      const healthItems = [
+        ["واجهة API",health.api === "ok" ? "تعمل" : "تحتاج مراجعة",health.api === "ok"],
+        ["قاعدة البيانات",health.database === "ok" ? "متصلة" : "تحتاج مراجعة",health.database === "ok"],
+        ["محرك الذكاء",health.ai_ready ? "مزود فعلي: " + health.ai_provider : "وضع التجربة",health.ai_ready],
+        ["التشغيل التلقائي",health.automation_enabled ? "مفعّل" : "متوقف",health.automation_enabled]
+      ];
+      healthItems.forEach(([label,value,ok]) => {
+        const card = document.createElement("article");
+        card.className = "ops-status-card";
+        const heading = document.createElement("small");
+        heading.textContent = label;
+        const state = document.createElement("strong");
+        state.textContent = value;
+        state.classList.toggle("ops-good",Boolean(ok));
+        state.classList.toggle("ops-warn",!ok);
+        card.append(heading,state);
+        healthGrid.append(card);
+      });
+      const statusLabels = {
+        trial:"تجريبي",active:"نشط",suspended:"موقوف",
+        pending_payment:"بانتظار الدفع",past_due:"متأخر",
+        cancelled:"ملغي",expired:"منتهي"
+      };
+      countsGrid.replaceChildren();
+      [["العملاء",data.customers_by_status || {}],["الاشتراكات",data.subscriptions_by_status || {}]].forEach(([title,items]) => {
+        const card = document.createElement("article");
+        card.className = "ops-count-card";
+        const heading = document.createElement("strong");
+        heading.textContent = title;
+        card.append(heading);
+        Object.entries(items).forEach(([key,count]) => {
+          const line = document.createElement("div");
+          line.className = "ops-count-line";
+          const label = document.createElement("span");
+          label.textContent = statusLabels[key] || key;
+          const numberNode = document.createElement("b");
+          numberNode.textContent = number(count);
+          line.append(label,numberNode);
+          card.append(line);
+        });
+        if (!Object.keys(items).length) {
+          const empty = document.createElement("small");
+          empty.textContent = "لا توجد سجلات بعد.";
+          card.append(empty);
+        }
+        countsGrid.append(card);
+      });
+      auditList.replaceChildren();
+      const auditNames = {
+        ai_provider_settings_updated:"تحديث إعدادات الذكاء الاصطناعي",
+        platform_employee_profile_updated:"تعديل بيانات موظف",
+        website_branding_updated:"تحديث هوية ومحتوى الموقع",
+        plan_saved:"حفظ باقة"
+      };
+      (data.audit_log || []).forEach(item => {
+        const row = document.createElement("article");
+        row.className = "ops-audit-row";
+        const details = document.createElement("div");
+        const action = document.createElement("strong");
+        action.textContent = auditNames[item.action] || item.action;
+        const meta = document.createElement("small");
+        meta.textContent = item.entity_type + " · " + item.entity_id + " · " + item.actor;
+        const date = document.createElement("time");
+        const parsed = new Date(item.created_at);
+        date.textContent = Number.isNaN(parsed.getTime()) ? item.created_at : parsed.toLocaleString("ar-EG");
+        details.append(action,meta);
+        row.append(details,date);
+        auditList.append(row);
+      });
+      if (!auditList.children.length) auditList.textContent = "لا توجد تغييرات مسجلة حتى الآن.";
+    } catch (error) {
+      healthGrid.textContent = error.message || "تعذر تحميل مؤشرات التشغيل.";
+    }
+  }
+
+  $("refreshOperations")?.addEventListener("click", loadPlatformOperations);
+
   async function loadWebsiteSettings() {
     const form = $("websiteSettingsForm");
     if (!form || !token) return;
@@ -769,6 +856,7 @@
     if (target === "subscriptions" && token) { loadBillingPlans(); loadSubscriptionCustomers(); loadSubscriptions(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "website" && token) { loadWebsiteSettings(); }
+    if (target === "operations" && token) { loadPlatformOperations(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "customers" && token) {
       loadCustomers();
