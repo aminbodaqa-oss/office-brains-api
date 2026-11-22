@@ -66,10 +66,10 @@ class PlatformControlsTests(unittest.TestCase):
             "التعليمات التجريبية", "owner"
         )
         self.assertEqual(result["role"], "مدير عام المنصة")
-        self.assertEqual(result["instructions"], "التعليمات التجريبية")
+        self.assertEqual(result["additional_instructions"], "التعليمات التجريبية")
         saved = get_platform_employee_profile("ابراهيم")
         self.assertEqual(saved["department"], "الإدارة التنفيذية")
-        self.assertEqual(saved["instructions"], "التعليمات التجريبية")
+        self.assertEqual(saved["additional_instructions"], "التعليمات التجريبية")
 
     def test_unknown_employee_cannot_be_created_through_profile_editor(self):
         self.assertIsNone(
