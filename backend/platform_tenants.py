@@ -3,10 +3,9 @@ from __future__ import annotations
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-from database import DB_PATH, _connect
+from database import _connect
 
 
 def _now() -> str:
@@ -45,6 +44,36 @@ def init_platform_tenants_db() -> None:
             created_at TEXT NOT NULL
         )""")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_platform_audit_created ON platform_audit_log(created_at DESC)")
+
+        # Additive identity foundation only. No tenant login or customer API is enabled here.
+        conn.execute("""CREATE TABLE IF NOT EXISTS tenant_users (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            full_name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'invited'
+                CHECK(status IN ('invited','active','disabled')),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT
+        )""")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_users_email ON tenant_users(email)")
+        conn.execute("""CREATE TABLE IF NOT EXISTS tenant_memberships (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES tenant_users(id) ON DELETE CASCADE,
+            workspace_id TEXT NOT NULL REFERENCES platform_workspaces(id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK(role IN ('owner','admin','member')),
+            status TEXT NOT NULL DEFAULT 'invited'
+                CHECK(status IN ('invited','active','disabled')),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, workspace_id)
+        )""")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tenant_memberships_workspace ON tenant_memberships(workspace_id,status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_tenant_memberships_user ON tenant_memberships(user_id,status)")
+        conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_memberships_single_owner
+            ON tenant_memberships(workspace_id)
+            WHERE role='owner' AND status IN ('invited','active')""")
 
 
 def list_platform_customers(query: str = "", status: str = "", limit: int = 100) -> dict[str, Any]:
