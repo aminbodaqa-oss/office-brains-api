@@ -198,12 +198,76 @@
       }
       list.innerHTML = data.customers.map((customer) => {
         const safe = (value) => String(value || "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
-        return '<article class="customer-row"><div class="customer-primary"><strong>'+safe(customer.company_name)+'</strong><span>'+safe(customer.contact_name || "لم يحدد المسؤول")+'</span><small>'+safe(customer.email)+' · '+safe(customer.phone)+'</small></div><div class="customer-meta"><span>الباقة: '+safe(planNames[customer.plan_code] || customer.plan_code)+'</span><span>المساحة: '+safe(customer.workspace_name || customer.company_name)+'</span><span class="status-label '+safe(customer.status)+'">'+safe(statusNames[customer.status] || customer.status)+'</span></div><div class="customer-actions"><select data-plan="'+safe(customer.id)+'" aria-label="تغيير الباقة">'+Object.entries(planNames).map(([key,label])=>'<option value="'+key+'" '+(customer.plan_code===key?'selected':'')+'>'+label+'</option>').join("")+'</select><select data-status="'+safe(customer.id)+'" aria-label="تغيير الحالة">'+Object.entries(statusNames).map(([key,label])=>'<option value="'+key+'" '+(customer.status===key?'selected':'')+'>'+label+'</option>').join("")+'</select><button type="button" data-save-customer="'+safe(customer.id)+'">حفظ</button></div></article>';
+        return '<article class="customer-row"><div class="customer-primary"><strong>'+safe(customer.company_name)+'</strong><span>'+safe(customer.contact_name || "لم يحدد المسؤول")+'</span><small>'+safe(customer.email)+' · '+safe(customer.phone)+'</small></div><div class="customer-meta"><span>الباقة: '+safe(planNames[customer.plan_code] || customer.plan_code)+'</span><span>المساحة: '+safe(customer.workspace_name || customer.company_name)+'</span><span class="status-label '+safe(customer.status)+'">'+safe(statusNames[customer.status] || customer.status)+'</span></div><div class="customer-actions"><select data-plan="'+safe(customer.id)+'" aria-label="تغيير الباقة">'+Object.entries(planNames).map(([key,label])=>'<option value="'+key+'" '+(customer.plan_code===key?'selected':'')+'>'+label+'</option>').join("")+'</select><select data-status="'+safe(customer.id)+'" aria-label="تغيير الحالة">'+Object.entries(statusNames).map(([key,label])=>'<option value="'+key+'" '+(customer.status===key?'selected':'')+'>'+label+'</option>').join("")+'</select><button type="button" data-save-customer="'+safe(customer.id)+'">حفظ</button><button type="button" class="ghost" data-view-customer="'+safe(customer.id)+'">التفاصيل</button></div></article>';
       }).join("");
     } catch (error) {
       list.innerHTML = '<p class="error">'+String(error.message || "تعذر تحميل العملاء.")+'</p>';
     }
   }
+
+  async function loadCustomerDetails(customerId) {
+    const panel = $("customerDetails");
+    if (!panel) return;
+    panel.classList.remove("hidden");
+    $("customerDetailsTitle").textContent = "جاري تحميل بيانات العميل...";
+    $("customerDetailsGrid").replaceChildren();
+    $("customerAuditList").textContent = "جاري تحميل سجل التغييرات...";
+    try {
+      const data = await platformRequest("/api/platform/admin/customers/" + encodeURIComponent(customerId));
+      const customer = data.customer || {};
+      const workspace = data.workspace || {};
+      $("customerDetailsTitle").textContent = customer.company_name || "تفاصيل العميل";
+      const fields = [
+        ["المسؤول", customer.contact_name || "غير محدد"],
+        ["البريد الإلكتروني", customer.email || "—"],
+        ["رقم الهاتف", customer.phone || "—"],
+        ["الباقة", planNames[customer.plan_code] || customer.plan_code || "—"],
+        ["حالة العميل", statusNames[customer.status] || customer.status || "—"],
+        ["معرّف العميل", customer.id || "—"],
+        ["اسم مساحة العمل", workspace.name || "—"],
+        ["حالة مساحة العمل", statusNames[workspace.status] || workspace.status || "—"],
+        ["الأعضاء المسجلون", number(workspace.memberships)],
+        ["دخول العملاء", workspace.customer_access_enabled ? "مفعّل" : "غير مفعّل"],
+        ["تاريخ الإنشاء", customer.created_at ? new Date(customer.created_at).toLocaleString("ar-EG") : "—"],
+        ["آخر تحديث", customer.updated_at ? new Date(customer.updated_at).toLocaleString("ar-EG") : "—"]
+      ];
+      const grid = $("customerDetailsGrid");
+      fields.forEach(([label, value]) => {
+        const item = document.createElement("article");
+        const name = document.createElement("span");
+        const text = document.createElement("strong");
+        name.textContent = label;
+        text.textContent = String(value);
+        item.append(name, text);
+        grid.append(item);
+      });
+      const auditList = $("customerAuditList");
+      auditList.replaceChildren();
+      const events = data.audit || [];
+      if (!events.length) {
+        auditList.textContent = "لا توجد تغييرات مسجلة لهذا الحساب حتى الآن.";
+      } else {
+        events.forEach((event) => {
+          const row = document.createElement("div");
+          row.className = "customer-audit-row";
+          const action = document.createElement("strong");
+          action.textContent = event.action || "تحديث";
+          const meta = document.createElement("span");
+          const when = event.created_at ? new Date(event.created_at).toLocaleString("ar-EG") : "";
+          meta.textContent = [event.actor, when].filter(Boolean).join(" · ");
+          row.append(action, meta);
+          auditList.append(row);
+        });
+      }
+      panel.scrollIntoView({behavior:"smooth",block:"start"});
+    } catch (error) {
+      $("customerDetailsTitle").textContent = "تعذر تحميل تفاصيل العميل";
+      $("customerDetailsGrid").textContent = error.message || "حدث خطأ أثناء تحميل البيانات.";
+      $("customerAuditList").textContent = "";
+    }
+  }
+
+  $("closeCustomerDetails")?.addEventListener("click", () => $("customerDetails")?.classList.add("hidden"));
 
   $("customerCreateForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -226,6 +290,11 @@
   });
 
   $("customerList")?.addEventListener("click", async (event) => {
+    const detailsButton = event.target.closest("[data-view-customer]");
+    if (detailsButton) {
+      await loadCustomerDetails(detailsButton.dataset.viewCustomer);
+      return;
+    }
     const button = event.target.closest("[data-save-customer]");
     if (!button) return;
     const id = button.dataset.saveCustomer;
