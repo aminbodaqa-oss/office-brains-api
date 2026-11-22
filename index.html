@@ -125,16 +125,19 @@ button::after,a.btn::after,.btn::after,.button::after,[role="button"]::after{con
       const desc=document.createElement("p");desc.className="plan-desc";desc.textContent=plan.description||"خطة مرنة لتنظيم وإدارة العمل.";
       const price=document.createElement("div");price.className="pricing-price";
       const amount=Number(cycle==="monthly"?plan.monthly_price_minor:plan.yearly_price_minor);
-      const value=document.createElement("strong");value.textContent=amount>0?money(amount):"حسب الاتفاق";
-      const unit=document.createElement("span");unit.textContent=amount>0?(cycle==="monthly"?"جنيه / شهر":"جنيه / سنة"):"تواصل معنا";
+      const isTrial=plan.code==="trial";
+      const value=document.createElement("strong");value.textContent=isTrial?"مجاني":(amount>0?money(amount):"حسب الاتفاق");
+      const unit=document.createElement("span");unit.textContent=isTrial?"3 أيام كاملة":(amount>0?(cycle==="monthly"?"جنيه / شهر":"جنيه / سنة"):"تواصل معنا");
       price.append(value,unit);
       const yearly=document.createElement("div");yearly.className="pricing-yearly";
-      if(cycle==="yearly"&&Number(plan.monthly_price_minor)>0&&amount>0){
+      if(isTrial){
+        yearly.textContent="تجربة مجانية لمرة واحدة لكل مساحة عمل";
+      }else if(cycle==="yearly"&&Number(plan.monthly_price_minor)>0&&amount>0){
         const saving=Number(plan.monthly_price_minor)*12-amount;
         yearly.textContent=saving>0?"توفير "+money(saving)+" جنيه مقارنة بالدفع الشهري":"اشتراك سنوي";
       }else{yearly.textContent=cycle==="monthly"?"إمكانية التحويل للاشتراك السنوي في أي وقت":"";}
       const button=document.createElement("a");button.className="btn"+(plan.code==="professional"?" primary":"");
-      button.href="office/frontend/";button.textContent="ابدأ مع باقة "+plan.name;
+      button.href="office/frontend/";button.textContent=isTrial?"ابدأ التجربة المجانية":"ابدأ مع باقة "+plan.name;
       card.append(code,name,desc,price,yearly,button);list.append(card);
     });
   }
