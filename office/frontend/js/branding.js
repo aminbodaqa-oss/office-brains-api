@@ -103,17 +103,17 @@
       inter:'"Inter",Arial,sans-serif'};
     if (fonts[config.font_family]) { document.documentElement.style.setProperty("--office-font", fonts[config.font_family]); if (document.body) document.body.style.fontFamily = fonts[config.font_family]; }
     const root = document.documentElement;
-    const density = {compact:"0.86",comfortable:"1",spacious:"1.16"};
-    const corners = {sharp:"7px",rounded:"14px",soft:"21px"};
-    if (density[config.density]) root.style.setProperty("--office-density-scale", density[config.density]);
-    if (corners[config.corner_style]) root.style.setProperty("--office-corner-radius", corners[config.corner_style]);
-    root.dataset.officeDensity = density[config.density] ? config.density : "comfortable";
-    root.dataset.officeCorners = corners[config.corner_style] ? config.corner_style : "rounded";
+    const densityScale = {compact:"0.86",comfortable:"1",spacious:"1.16"};
+    const cornerRadius = {sharp:"7px",rounded:"14px",soft:"21px"};
+    if (densityScale[config.density]) root.style.setProperty("--office-density-scale", densityScale[config.density]);
+    if (cornerRadius[config.corner_style]) root.style.setProperty("--office-corner-radius", cornerRadius[config.corner_style]);
+    root.dataset.officeDensity = densityScale[config.density] ? config.density : "comfortable";
+    root.dataset.officeCorners = cornerRadius[config.corner_style] ? config.corner_style : "rounded";
     document.getElementById("office-experience-layout-overrides")?.remove();
     const style = document.createElement("style");
     style.id = "office-experience-layout-overrides";
     style.textContent = `
-      :root{--office-density-scale:${density[config.density] || "1"};--office-corner-radius:${corners[config.corner_style] || "14px"}}
+      :root{--office-density-scale:${densityScale[config.density] || "1"};--office-corner-radius:${cornerRadius[config.corner_style] || "14px"}}
       .panel,.card,.auth-card,.auth-panel,.customer-row,.readiness-row,.experience-preview,.visual,.dash,.cta,.stat,.task,.nav-item,.admin-sidebar,.topbar{border-radius:var(--office-corner-radius)!important}
       .panel,.card,.auth-card,.customer-row,.readiness-row{padding:calc(16px * var(--office-density-scale))}
       .admin-page .panel,.studio-form{gap:calc(16px * var(--office-density-scale))}
