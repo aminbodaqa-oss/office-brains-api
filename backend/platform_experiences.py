@@ -98,7 +98,7 @@ def _clean_config(raw: dict[str, Any]) -> dict[str, Any]:
     unknown = set(raw) - (set(TEXT_LIMITS) | {"theme", "font_family", "density", "corner_style", "navigation", "pages"})
     if unknown:
         raise ValueError("يوجد حقل غير مدعوم في إعدادات الواجهة.")
-    cleaned = dict(DEFAULT_CONFIG)
+    cleaned = json.loads(json.dumps(DEFAULT_CONFIG))
     for key, limit in TEXT_LIMITS.items():
         if key in raw:
             value = str(raw[key]).strip()
@@ -137,6 +137,12 @@ def _clean_config(raw: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("روابط القوائم يجب أن تكون داخلية أو HTTPS.")
         safe_navigation.append({"label": label, "url": url})
     cleaned["navigation"] = safe_navigation
+    for key in ("primary_cta_url",):
+        value = cleaned[key]
+        if value and not (value.startswith("/") or value.startswith("./") or value.startswith("#") or value.startswith("https://")):
+            raise ValueError("رابط الإجراء يجب أن يكون داخليًا أو HTTPS.")
+        if value.startswith("//") or ".." in value:
+            raise ValueError("رابط الإجراء غير مسموح.")
     pages = raw.get("pages", {})
     if not isinstance(pages, dict) or len(pages) > 20:
         raise ValueError("إعدادات الصفحات غير صالحة.")
