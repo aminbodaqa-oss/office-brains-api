@@ -265,7 +265,20 @@
       <section class="panel"><p class="eyebrow">CUSTOMER & BILLING COUNTS</p><h2>ملخص العملاء والاشتراكات</h2><div id="opsCountsGrid" class="ops-counts-grid"><p class="muted">بانتظار تحميل البيانات.</p></div></section>
       <section class="panel"><div class="panel-head"><div><p class="eyebrow">AUDIT TRAIL</p><h2>سجل تغييرات المنصة</h2><p class="muted">آخر 50 تغييرًا إداريًا مسجلًا.</p></div></div><div id="opsAuditList" class="ops-audit-list"><p class="muted">بانتظار تحميل السجل.</p></div></section>
     </section>
-    <section class="admin-page" data-page="settings"><section class="panel coming-soon"><p class="eyebrow">PLATFORM SETTINGS</p><h2>إعدادات المنصة</h2><p class="muted">إعدادات الأمان والهوية العامة والتكاملات والتحكم في خصائص المنصة.</p><span>القسم قيد التجهيز</span></section></section>
+    <section class="admin-page" data-page="settings">
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">PLATFORM SAFETY CONTROLS</p><h2>مفاتيح التحكم العامة</h2><p class="muted">إعدادات تشغيلية مؤثرة في الموقع العام وإدارة العملاء. حساب Super Admin يظل قادرًا على الدخول حتى عند إيقاف الموقع العام.</p></div><button id="refreshPlatformSettings" class="ghost" type="button">تحديث الإعدادات</button></div>
+        <form id="platformSettingsForm" class="billing-form">
+          <label class="setting-toggle"><input name="public_site_enabled" type="checkbox"> إتاحة الموقع العام للزوار</label>
+          <p class="billing-note">عند إيقافه، تظهر صفحة صيانة للزوار بدل صفحة التعريف. لا يؤثر ذلك على دخول لوحة Super Admin.</p>
+          <label class="setting-toggle"><input name="allow_customer_creation" type="checkbox"> السماح بإنشاء سجلات عملاء ومساحات عمل جديدة</label>
+          <p class="billing-note">عند إيقافه، يمنع النظام إنشاء عميل جديد من لوحة التحكم حتى إعادة التفعيل.</p>
+          <label class="setting-toggle"><input name="site_notice_enabled" type="checkbox"> إظهار تنويه أعلى الموقع العام</label>
+          <label>نص التنويه<textarea name="site_notice_text" maxlength="500" rows="3" placeholder="رسالة قصيرة تظهر للزوار عند تفعيل التنويه"></textarea></label>
+          <div class="billing-actions"><button type="submit">حفظ إعدادات المنصة</button></div>
+          <p id="platformSettingsMessage" class="muted" role="status"></p>
+        </form>
+      </section>
+    </section>
 
     <footer>Office Brains · Platform Control</footer>
   </section>
