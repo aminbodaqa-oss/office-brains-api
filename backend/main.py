@@ -637,6 +637,12 @@ async def platform_admin_test_ai_settings(_: str = Depends(require_platform_admi
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.get("/api/public/plans")
+async def public_platform_plans():
+    """Expose only active subscription plans for the public pricing page."""
+    return list_platform_plans(include_inactive=False)
+
+
 @app.get("/api/platform/admin/plans")
 async def platform_admin_plans(_: str = Depends(require_platform_admin)):
     return list_platform_plans()
