@@ -9,7 +9,7 @@
 <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
 <main id="loginView" class="login-wrap">
   <section class="login-card">
-    <div class="brand-mark">OB</div><p class="eyebrow">OFFICE BRAINS / PLATFORM CONTROL</p>
+    <img class="brand-mark brand-image" data-brand-logo src="assets/office-brains-logo.svg" alt="Office Brains"><p class="eyebrow">OFFICE BRAINS / PLATFORM CONTROL</p>
     <h1>مركز قيادة المنصة</h1><p class="muted">دخول مخصص لمالك المنصة فقط. هذه البوابة منفصلة عن مكتب العملاء.</p>
     <form id="adminLogin">
       <label for="adminUser">اسم المستخدم</label><input id="adminUser" autocomplete="username" required>
@@ -21,7 +21,7 @@
 </main>
 <div id="appView" class="app hidden">
   <aside class="sidebar">
-    <div class="side-brand"><div class="brand-mark small">OB</div><div><b>OFFICE BRAINS</b><small>PLATFORM OS</small></div></div>
+    <div class="side-brand"><img class="brand-mark small brand-image" data-brand-logo src="assets/office-brains-logo.svg" alt="Office Brains"><div><b>OFFICE BRAINS</b><small>PLATFORM OS</small></div></div>
     <p class="nav-label">الرئيسية</p>
     <a class="nav-item active" href="#overview" data-page-link="overview"><span>نظرة عامة</span></a>
     <p class="nav-label">إدارة المنصة</p>
@@ -108,7 +108,7 @@
     </section>
 
     </section>\n    <section class="admin-page" data-page="subscriptions"><section class="panel coming-soon"><p class="eyebrow">BILLING & PLANS</p><h2>الباقات والاشتراكات</h2><p class="muted">إدارة الخطط والأسعار والفواتير وتجديد الاشتراكات وحدود الاستخدام.</p><span>القسم قيد التجهيز</span></section></section>
-    <section class="admin-page" data-page="website"><section class="panel coming-soon"><p class="eyebrow">WEBSITE STUDIO</p><h2>الموقع و Website Studio</h2><p class="muted">إدارة صفحات الموقع ومحتواه وصوره وألوانه والقوائم ومعاينة التعديلات قبل النشر.</p><span>القسم قيد التجهيز</span></section></section>
+    <section class="admin-page" data-page="website"><section class="panel website-branding"><div class="panel-head"><div><p class="eyebrow">WEBSITE IDENTITY</p><h2>إعدادات هوية الموقع</h2><p class="muted">ارفع شعارًا موحدًا ليظهر في الموقع وصفحات الدخول ولوحة التحكم.</p></div></div><div class="brand-settings-grid"><div class="brand-preview"><img id="siteLogoPreview" data-brand-logo src="assets/office-brains-logo.svg" alt="معاينة شعار Office Brains"><span>معاينة الشعار الحالي</span></div><form id="siteLogoForm" class="brand-upload-form"><label for="siteLogoFile">اختيار ملف الشعار</label><input id="siteLogoFile" type="file" accept="image/png,image/jpeg,image/webp" required><p class="muted">الصيغ المدعومة PNG وJPG وWEBP، بحد أقصى 2 ميجابايت.</p><p id="siteLogoMessage" class="muted" role="status">الشعار الحالي مستخدم في صفحات المنصة.</p><button type="submit">حفظ الشعار وتطبيقه</button></form></div></section><section class="panel coming-soon website-studio-next"><h2>باقي أدوات Website Studio</h2><p class="muted">إدارة الصفحات والمحتوى والألوان والقوائم والمعاينة قبل النشر.</p><span>قيد التجهيز</span></section></section>
     <section class="admin-page" data-page="ai-team"><section class="panel coming-soon"><p class="eyebrow">AI & TEAM</p><h2>الذكاء والموظفون</h2><p class="muted">إدارة مزودي الذكاء الاصطناعي والنماذج والموظفين وحدود قدراتهم.</p><span>القسم قيد التجهيز</span></section></section>
     <section class="admin-page" data-page="operations"><section class="panel coming-soon"><p class="eyebrow">OPERATIONS</p><h2>العمليات والسجلات</h2><p class="muted">متابعة المهام والتنفيذ والإشعارات وسجل الأحداث والتدقيق.</p><span>القسم قيد التجهيز</span></section></section>
     <section class="admin-page" data-page="settings"><section class="panel coming-soon"><p class="eyebrow">PLATFORM SETTINGS</p><h2>إعدادات المنصة</h2><p class="muted">إعدادات الأمان والهوية العامة والتكاملات والتحكم في خصائص المنصة.</p><span>القسم قيد التجهيز</span></section></section>
@@ -116,5 +116,5 @@
     <footer>Office Brains · Platform Control</footer>
   </section>
 </div>
-<script src="js/platform-admin.js"></script>
+<script src="js/config.js"></script><script src="js/branding.js"></script><script src="js/platform-admin.js"></script>
 </body></html>
