@@ -34,6 +34,7 @@
       $("appView").classList.remove("hidden");
       await loadOverview();
       await loadCustomers();
+      await loadTenantReadiness();
     } catch (error) {
       $("loginError").textContent = error.message || "حدث خطأ غير متوقع.";
     } finally {
@@ -102,6 +103,53 @@
     }
   }
 
+
+  async function loadTenantReadiness() {
+    const list = $("readinessTable");
+    if (!list || !token) return;
+    const status = $("readinessStatus");
+    list.textContent = "جاري فحص الجداول...";
+    status.textContent = "";
+    const button = $("refreshTenantReadiness");
+    if (button) button.disabled = true;
+    try {
+      const data = await platformRequest("/api/platform/admin/tenant-readiness");
+      const summary = data.summary || {};
+      put("readinessFound", number(summary.tenant_tables_found) + " / " + number(summary.tenant_tables_expected));
+      put("readinessMissingScope", number(summary.tables_missing_workspace_id));
+      put("readinessMissingTables", number(summary.tables_not_initialized));
+      put("readinessForeignKeys", number(summary.platform_foreign_key_issues));
+      const blocked = !data.tenant_data_schema_ready || Number(summary.platform_foreign_key_issues || 0) > 0;
+      status.textContent = blocked
+        ? "قاعدة البيانات غير جاهزة للترحيل. راجع الجداول التي تحتاج تجهيزًا."
+        : "البنية الأساسية جاهزة للمراجعة النهائية قبل الترحيل.";
+      status.classList.toggle("warn", blocked);
+      list.replaceChildren();
+      (data.tables || []).forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "readiness-row";
+        const name = document.createElement("strong");
+        name.textContent = item.table;
+        const purpose = document.createElement("span");
+        purpose.textContent = item.purpose || "";
+        const count = document.createElement("span");
+        count.textContent = item.rows === null ? "الجدول غير موجود" : number(item.rows) + " سجل";
+        const state = document.createElement("span");
+        state.className = item.has_workspace_id ? "readiness-good" : "readiness-warn";
+        state.textContent = item.has_workspace_id ? "مرتبط بمساحة عمل" : (item.exists ? "يحتاج workspace_id" : "غير مهيأ");
+        row.append(name, purpose, count, state);
+        list.append(row);
+      });
+      const safety = $("readinessSafety");
+      if (safety) safety.textContent = (data.guarantees || []).join(" ");
+    } catch (error) {
+      list.textContent = error.message || "تعذر إجراء الفحص.";
+      status.textContent = "تعذر تحميل تقرير الجاهزية.";
+      status.classList.add("warn");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
 
   const planNames = {trial:"تجريبية",starter:"بداية",professional:"احترافية",business:"أعمال",enterprise:"مؤسسات"};
   const statusNames = {trial:"تجريبي",active:"نشط",suspended:"موقوف"};
@@ -196,6 +244,8 @@
     clearTimeout(customerSearchTimer);
     customerSearchTimer = setTimeout(loadCustomers, 250);
   });
+
+  $("refreshTenantReadiness")?.addEventListener("click", loadTenantReadiness);
 
   $("refreshBtn").addEventListener("click", loadOverview);
   $("logoutBtn").addEventListener("click", () => {

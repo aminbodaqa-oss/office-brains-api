@@ -58,3 +58,22 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 @media(max-width:850px){.customer-row{grid-template-columns:1fr 1fr}.customer-actions{grid-column:1/-1}}
 @media(max-width:560px){.customer-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-fields{grid-template-columns:1fr}.customer-list-head{align-items:stretch;flex-direction:column}.customer-filters{min-width:0;flex-direction:column}.customer-row{grid-template-columns:1fr}.customer-actions{grid-column:auto}.customer-form-actions{align-items:stretch;flex-direction:column}.customer-form-actions button{width:100%}}
 /* Buttons contain labels only; decorative arrows are not used. */
+
+
+/* Tenant migration readiness */
+.tenant-readiness{margin-top:18px;scroll-margin-top:20px}
+.readiness-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}
+.readiness-summary article{padding:13px;border:1px solid var(--line);border-radius:12px;background:#0e1629}
+.readiness-summary span,.readiness-summary strong{display:block}
+.readiness-summary span{font-size:11px;color:var(--muted)}
+.readiness-summary strong{font-size:22px;margin-top:6px}
+.readiness-status{padding:12px 14px;border:1px solid #00A88455;border-radius:11px;color:#61d9b7;font-size:12px;line-height:1.8}
+.readiness-status.warn{border-color:#F2B84B66;color:#F2B84B}
+.readiness-table{display:grid;gap:7px}
+.readiness-row{display:grid;grid-template-columns:minmax(130px,.8fr) minmax(150px,1.2fr) minmax(90px,.6fr) minmax(130px,.8fr);gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#10192c;font-size:11px}
+.readiness-row strong{overflow-wrap:anywhere;color:var(--ink)}
+.readiness-row span{color:var(--muted)}
+.readiness-row .readiness-good{color:#61d9b7}
+.readiness-row .readiness-warn{color:#F2B84B}
+#refreshTenantReadiness:disabled{opacity:.6;cursor:wait}
+@media(max-width:700px){.readiness-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.readiness-row{grid-template-columns:1fr 1fr}.readiness-row strong{grid-column:1/-1}}
