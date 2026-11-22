@@ -543,10 +543,7 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
                 legal_instructions = employee.get("instructions", "")
                 if legal_instructions:
                     system += "\n\nتعليمات التخصص الإضافية:\n" + legal_instructions
-                try:
-                    system += await employee_context(body.recipient_id)
-                except Exception:
-                    system += "\nلا تتوفر بيانات خارجية إضافية حاليًا؛ اعتمد على سياق المحادثة فقط."
+                system += "\n\nلا توجد بيانات خارجية متصلة؛ اعتمد على سياق المحادثة وسجلات مساحة العمل المتاحة فقط."
                 reply_text = (await employee_reply(system, history)).strip()
                 if reply_text:
                     reply = send_whatsapp_message(body.recipient_id, "المالك", reply_text)
@@ -950,10 +947,7 @@ async def _employee_contact_owner(employee_id: str, owner_request: str) -> dict:
             system += "\n\nمعرفة الفريق والتنسيق في حدود الاختصاص:\n" + team_context
         if employee.get("instructions"):
             system += "\n\nتعليمات التخصص:\n" + employee["instructions"]
-        try:
-            system += await employee_context(employee_id)
-        except Exception:
-            system += "\nلا تتوفر بيانات خارجية إضافية؛ اعتمد على طلب المالك فقط."
+        system += "\nلا توجد بيانات خارجية متصلة؛ اعتمد على طلب المالك وسجلات مساحة العمل المتاحة فقط."
         prompt = (
             "هذه إحالة تواصل مباشرة من سلمى بناءً على طلب المالك. "
             "المالك قال لها: " + owner_request[:1500] +
