@@ -36,10 +36,21 @@ def init_platform_ai_db() -> None:
             model TEXT NOT NULL DEFAULT '',
             base_url TEXT NOT NULL DEFAULT '',
             timeout_seconds INTEGER NOT NULL DEFAULT 90,
+            fallback_provider TEXT NOT NULL DEFAULT 'demo',
+            fallback_model TEXT NOT NULL DEFAULT '',
+            fallback_base_url TEXT NOT NULL DEFAULT '',
             encrypted_api_key TEXT,
             updated_by TEXT NOT NULL DEFAULT 'system',
             updated_at TEXT NOT NULL
         )""")
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(platform_ai_settings)").fetchall()}
+        for column, definition in (
+            ("fallback_provider", "TEXT NOT NULL DEFAULT 'demo'"),
+            ("fallback_model", "TEXT NOT NULL DEFAULT ''"),
+            ("fallback_base_url", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE platform_ai_settings ADD COLUMN {column} {definition}")
         row = conn.execute("SELECT id FROM platform_ai_settings WHERE id=1").fetchone()
         if row is None:
             provider = os.getenv("BRAIN_PROVIDER", "demo").strip().lower()
@@ -78,6 +89,9 @@ def get_runtime_ai_config() -> dict[str, Any]:
             "base_url": str(row["base_url"]).rstrip("/"),
             "timeout_seconds": int(row["timeout_seconds"]),
             "api_key": api_key,
+            "fallback_provider": str(row["fallback_provider"] or "demo"),
+            "fallback_model": str(row["fallback_model"] or ""),
+            "fallback_base_url": str(row["fallback_base_url"] or "").rstrip("/"),
         }
     except sqlite3.Error:
         return fallback
@@ -103,6 +117,9 @@ def get_platform_ai_settings() -> dict[str, Any]:
         "model": row["model"],
         "base_url": row["base_url"],
         "timeout_seconds": row["timeout_seconds"],
+        "fallback_provider": row["fallback_provider"],
+        "fallback_model": row["fallback_model"],
+        "fallback_base_url": row["fallback_base_url"],
         "has_api_key": bool(row["encrypted_api_key"] or env_key),
         "key_source": "database" if row["encrypted_api_key"] else ("environment" if env_key else "none"),
         "updated_by": row["updated_by"],
@@ -112,12 +129,23 @@ def get_platform_ai_settings() -> dict[str, Any]:
 
 def save_platform_ai_settings(provider: str, model: str, base_url: str,
                               timeout_seconds: int, api_key: str | None,
-                              clear_api_key: bool, actor: str) -> dict[str, Any]:
+                              clear_api_key: bool, actor: str,
+                              fallback_provider: str = "demo",
+                              fallback_model: str = "",
+                              fallback_base_url: str = "") -> dict[str, Any]:
     provider = provider.strip().lower()
     model = model.strip()
     base_url = base_url.strip().rstrip("/")
-    if provider not in {"demo", "gemini", "ollama"}:
+    if provider not in {"demo", "gemini", "ollama"} or fallback_provider not in {"demo", "gemini", "ollama"}:
         raise ValueError("مزود الذكاء الاصطناعي غير مدعوم.")
+    fallback_model = fallback_model.strip()
+    fallback_base_url = fallback_base_url.strip().rstrip("/")
+    if fallback_provider != "demo" and not fallback_model:
+        raise ValueError("اسم نموذج المزود الاحتياطي مطلوب.")
+    if fallback_base_url:
+        parsed_fallback = urlparse(fallback_base_url)
+        if parsed_fallback.scheme not in {"http", "https"} or not parsed_fallback.netloc:
+            raise ValueError("عنوان المزود الاحتياطي يجب أن يكون رابط HTTP أو HTTPS صحيحًا.")
     if not model or len(model) > 160:
         raise ValueError("اسم النموذج مطلوب وبحد أقصى 160 حرفًا.")
     if timeout_seconds < 5 or timeout_seconds > 180:
@@ -138,13 +166,16 @@ def save_platform_ai_settings(provider: str, model: str, base_url: str,
         elif existing:
             encrypted = existing["encrypted_api_key"]
         conn.execute("""INSERT INTO platform_ai_settings
-            (id,provider,model,base_url,timeout_seconds,encrypted_api_key,updated_by,updated_at)
-            VALUES(1,?,?,?,?,?,?,datetime('now'))
+            (id,provider,model,base_url,timeout_seconds,fallback_provider,fallback_model,
+             fallback_base_url,encrypted_api_key,updated_by,updated_at)
+            VALUES(1,?,?,?,?,?,?,?,?,?,datetime('now'))
             ON CONFLICT(id) DO UPDATE SET provider=excluded.provider,model=excluded.model,
             base_url=excluded.base_url,timeout_seconds=excluded.timeout_seconds,
-            encrypted_api_key=excluded.encrypted_api_key,updated_by=excluded.updated_by,
-            updated_at=excluded.updated_at""",
-            (provider, model, base_url, timeout_seconds, encrypted, actor))
+            fallback_provider=excluded.fallback_provider,fallback_model=excluded.fallback_model,
+            fallback_base_url=excluded.fallback_base_url,encrypted_api_key=excluded.encrypted_api_key,
+            updated_by=excluded.updated_by,updated_at=excluded.updated_at""",
+            (provider, model, base_url, timeout_seconds, fallback_provider, fallback_model,
+             fallback_base_url, encrypted, actor))
         conn.execute("""INSERT INTO platform_audit_log(actor,action,entity_type,entity_id,created_at)
             VALUES(?,?,?,?,datetime('now'))""", (actor, "ai_provider_settings_updated", "platform", "ai"))
     return get_platform_ai_settings()
