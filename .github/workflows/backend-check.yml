@@ -25,6 +25,8 @@ jobs:
           python-version: "3.12"
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
       - name: Compile backend modules
         run: python -m compileall -q backend
       - name: Run platform billing tests
