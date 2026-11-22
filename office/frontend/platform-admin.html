@@ -92,6 +92,19 @@
       <p class="customer-note">إنشاء الحساب هنا يجهّز سجل العميل ومساحة عمل مستقلة. تفعيل دخول العملاء وربط بيانات المكتب بعزل المساحات مرحلة منفصلة قبل فتح التسجيل العام.</p>
     </section>
 
+    <section id="tenant-readiness" class="panel tenant-readiness">
+      <div class="panel-head"><div><p class="eyebrow">TENANT DATA READINESS</p><h2>جاهزية عزل بيانات الشركات</h2><p class="muted">فحص آمن لقاعدة البيانات قبل ترحيل بيانات المكتب إلى مساحة عمل المالك.</p></div><button id="refreshTenantReadiness" class="ghost" type="button">فحص الآن</button></div>
+      <div class="readiness-summary">
+        <article><span>الجداول الموجودة</span><strong id="readinessFound">—</strong></article>
+        <article><span>تحتاج ربط مساحة عمل</span><strong id="readinessMissingScope">—</strong></article>
+        <article><span>جداول غير مهيأة</span><strong id="readinessMissingTables">—</strong></article>
+        <article><span>مشكلات العلاقات</span><strong id="readinessForeignKeys">—</strong></article>
+      </div>
+      <p id="readinessStatus" class="readiness-status">لم يتم إجراء الفحص بعد.</p>
+      <div id="readinessTable" class="readiness-table"><p class="muted">اضغط فحص الآن لعرض حالة الجداول.</p></div>
+      <p id="readinessSafety" class="customer-note">الفحص للقراءة فقط ولا يغيّر أي بيانات أو يفعّل دخول العملاء.</p>
+    </section>
+
     <footer>Office Brains · Platform Control</footer>
   </section>
 </div>
