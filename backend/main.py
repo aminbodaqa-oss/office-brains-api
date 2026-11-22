@@ -420,7 +420,16 @@ class PlatformCustomerUpdateRequest(BaseModel):
 
 @app.get("/api/public/branding")
 async def public_branding():
-    return {"logo_data_url": get_site_logo(), "settings": get_site_settings(), "platform": get_platform_settings()}
+    platform = get_platform_settings()
+    return {
+        "logo_data_url": get_site_logo(),
+        "settings": get_site_settings(),
+        "platform": {
+            "public_site_enabled": platform["public_site_enabled"],
+            "site_notice_enabled": platform["site_notice_enabled"],
+            "site_notice_text": platform["site_notice_text"],
+        },
+    }
 
 @app.post("/api/platform/admin/branding/logo")
 async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_platform_admin)):
