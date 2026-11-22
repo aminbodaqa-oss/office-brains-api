@@ -444,10 +444,69 @@
         dept.textContent = employee.department;
         card.append(name, role, dept);
         if ((employee.specialties || []).length) {
-          const details = document.createElement("p");
-          details.textContent = "التخصصات: " + employee.specialties.join(" · ");
-          card.append(details);
+          const specialty = document.createElement("p");
+          specialty.textContent = "التخصصات: " + employee.specialties.join(" · ");
+          card.append(specialty);
         }
+        const details = document.createElement("details");
+        details.className = "team-edit-details";
+        const summary = document.createElement("summary");
+        summary.textContent = "تعديل بيانات الدور";
+        const form = document.createElement("form");
+        form.className = "team-edit-form";
+        const roleLabel = document.createElement("label");
+        roleLabel.textContent = "المسمى الوظيفي";
+        const roleInput = document.createElement("input");
+        roleInput.name = "role";
+        roleInput.maxLength = 160;
+        roleInput.required = true;
+        roleInput.value = employee.role || "";
+        roleLabel.append(roleInput);
+        const deptLabel = document.createElement("label");
+        deptLabel.textContent = "القسم";
+        const deptInput = document.createElement("input");
+        deptInput.name = "department";
+        deptInput.maxLength = 160;
+        deptInput.required = true;
+        deptInput.value = employee.department || "";
+        deptLabel.append(deptInput);
+        const instructionsLabel = document.createElement("label");
+        instructionsLabel.textContent = "التعليمات الإضافية للموظف";
+        const instructions = document.createElement("textarea");
+        instructions.name = "instructions";
+        instructions.maxLength = 6000;
+        instructions.rows = 5;
+        instructions.value = employee.instructions || "";
+        instructions.placeholder = "تعليمات تخصصية إضافية توجه سلوك الموظف";
+        instructionsLabel.append(instructions);
+        const save = document.createElement("button");
+        save.type = "submit";
+        save.textContent = "حفظ التعديلات";
+        const status = document.createElement("small");
+        status.setAttribute("role", "status");
+        form.append(roleLabel,deptLabel,instructionsLabel,save,status);
+        form.addEventListener("submit", async event => {
+          event.preventDefault();
+          save.disabled = true;
+          status.textContent = "جاري الحفظ...";
+          try {
+            await platformRequest("/api/platform/admin/team/" + encodeURIComponent(employee.id), {
+              method:"PATCH",
+              body:JSON.stringify({
+                role:roleInput.value.trim(),
+                department:deptInput.value.trim(),
+                instructions:instructions.value
+              })
+            });
+            status.textContent = "تم حفظ بيانات الموظف.";
+            await loadPlatformTeam();
+          } catch (error) {
+            status.textContent = error.message || "تعذر حفظ بيانات الموظف.";
+            save.disabled = false;
+          }
+        });
+        details.append(summary,form);
+        card.append(details);
         list.append(card);
       });
       if (!list.children.length) list.textContent = "لا يوجد موظفون معرفون.";
