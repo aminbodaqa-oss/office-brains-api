@@ -877,7 +877,7 @@
       primary_cta_text:value("primary_cta_text"), primary_cta_url:value("primary_cta_url"),
       footer_text:value("footer_text"), welcome_title:value("welcome_title"), welcome_message:value("welcome_message"),
       login_title:value("login_title"), login_message:value("login_message"), sidebar_title:value("sidebar_title"),
-      theme:{primary:value("color_primary"),accent:value("color_accent"),highlight:value("color_highlight"),
+      theme:{primary:value("color_primary"),accent:value("color_accent"),highlight:value("color_accent"),
         background:value("color_background"),surface:value("color_surface"),text:value("color_text")},
       font_family:value("font_family"),density:value("density"),corner_style:value("corner_style"),
       navigation,pages
@@ -915,8 +915,8 @@
       density:"density",corner_style:"corner_style"
     };
     Object.entries(mapping).forEach(([field,key])=>{form.elements[field].value=config[key] ?? "";});
-    ["primary","accent","highlight","background","surface","text"].forEach(key=>{
-      form.elements["color_"+key].value=theme[key] || ({primary:"#172A3A",accent:"#00A884",highlight:"#F2B84B",background:"#0B1020",surface:"#131B31",text:"#F6F7FF"}[key]);
+    ["primary","accent","background","surface","text"].forEach(key=>{
+      form.elements["color_"+key].value=theme[key] || ({primary:"#172A3A",accent:"#00A884",highlight:"#00A884",background:"#0B1020",surface:"#131B31",text:"#F6F7FF"}[key]);
     });
     form.elements.navigation_json.value=JSON.stringify(config.navigation || [],null,2);
     form.elements.pages_json.value=JSON.stringify(config.pages || {},null,2);
@@ -951,7 +951,7 @@
       const data=await platformRequest("/api/platform/admin/experiences?"+query.toString());
       if(scope.surface==="super_admin" && data.published){
         const root=document.documentElement,theme=data.published.theme||{};
-        const variables={background:"--bg",surface:"--panel",text:"--ink",accent:"--emerald",highlight:"--gold"};
+        const variables={background:"--bg",surface:"--panel",text:"--ink",accent:"--emerald",highlight:"--emerald"};
         Object.entries(variables).forEach(([key,name])=>{if(/^#[0-9A-Fa-f]{6}$/.test(theme[key]||""))root.style.setProperty(name,theme[key]);});
         if(data.published.font_family==="tajawal")root.style.setProperty("--platform-font",'"Tajawal",Tahoma,Arial,sans-serif');
         else if(data.published.font_family==="cairo")root.style.setProperty("--platform-font",'"Cairo",Tahoma,Arial,sans-serif');
