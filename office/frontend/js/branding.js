@@ -56,8 +56,8 @@
     const fields = {
       site_name:config.site_name, page_title:config.page_title, meta_description:config.meta_description,
       hero_title:config.headline, hero_emphasis:config.headline_emphasis, hero_subtitle:config.subtitle,
-      about_title:config.headline, about_description:config.subtitle,
-      cta_title:config.welcome_title, cta_description:config.welcome_message,
+      about_title:config.about_title, about_description:config.about_description,
+      cta_title:config.cta_title, cta_description:config.cta_description,
       primary_cta_text:config.primary_cta_text, footer_text:config.footer_text
     };
     Object.entries(fields).forEach(([key,value]) => {
@@ -74,6 +74,34 @@
     }
     if (config.primary_cta_url) {
       document.querySelectorAll('[data-brand-href="primary_cta_url"]').forEach(node => node.setAttribute("href", config.primary_cta_url));
+    }
+    if (Array.isArray(config.navigation) && config.navigation.length) {
+      const nav = document.querySelector(".navlinks");
+      if (nav) {
+        nav.replaceChildren();
+        config.navigation.forEach(item => {
+          if (!item || !item.label || !item.url) return;
+          const link = document.createElement("a");
+          link.textContent = item.label;
+          link.setAttribute("href", item.url);
+          nav.append(link);
+        });
+      }
+    }
+    if (config.pages && typeof config.pages === "object") {
+      Object.entries(config.pages).forEach(([pageId,page]) => {
+        const section = document.getElementById(pageId);
+        if (!section || !page || typeof page !== "object") return;
+        if (typeof page.visible === "boolean") section.hidden = !page.visible;
+        if (page.title) {
+          const heading = section.querySelector("h2");
+          if (heading) heading.textContent = page.title;
+        }
+        if (page.description) {
+          const description = section.querySelector("p");
+          if (description) description.textContent = page.description;
+        }
+      });
     }
     if (config.login_title) {
       const node = document.querySelector("#loginForm [data-brand-login-title], #loginView [data-brand-login-title]");
