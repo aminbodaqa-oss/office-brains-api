@@ -67,6 +67,20 @@ def init_platform_billing_db() -> None:
                    VALUES(?,?,?,0,0,'EGP','{}',0,?,?)""",
                 (code, name, description, _now(), _now()),
             )
+        # Seed launch-display prices only when no public plan has been configured yet.
+        # The owner can change every amount and visibility from Super Admin > Plans.
+        active_count = int(conn.execute("SELECT COUNT(*) FROM platform_plans WHERE active=1").fetchone()[0])
+        if active_count == 0:
+            launch_prices = {
+                "starter": (29900, 299000),
+                "professional": (69900, 699000),
+                "business": (149900, 1499000),
+            }
+            for code, (monthly, yearly) in launch_prices.items():
+                conn.execute(
+                    "UPDATE platform_plans SET monthly_price_minor=?,yearly_price_minor=?,active=1,updated_at=? WHERE code=?",
+                    (monthly, yearly, _now(), code),
+                )
 
 
 def expire_due_platform_subscriptions() -> int:
