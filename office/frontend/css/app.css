@@ -2,7 +2,7 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1020;--card:#131b31;--ink:#f6f7ff;--mut:#aab3ca;--line:#27314b;--acc:#00A884;--accink:#fff;--me:#203b43;--bot:#203b43;color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.6}
+body{background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans Arabic",sans-serif;line-height:1.75}\nbutton,input,textarea,select{font-family:"IBM Plex Sans Arabic",sans-serif!important}\nbody *{font-family:inherit}strong,b,h1,h2,h3,h4,h5,h6{font-weight:700}
 header{padding:18px 16px 6px}
 h1{margin:0;font-size:22px}
 header p{margin:2px 0 0;color:var(--mut);font-size:14px}
