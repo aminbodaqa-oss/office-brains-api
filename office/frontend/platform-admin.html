@@ -153,7 +153,26 @@
       </section>
     </section>
     <section class="admin-page" data-page="website"><section class="panel website-branding"><div class="panel-head"><div><p class="eyebrow">WEBSITE IDENTITY</p><h2>إعدادات هوية الموقع</h2><p class="muted">ارفع شعارًا موحدًا ليظهر في الموقع وصفحات الدخول ولوحة التحكم.</p></div></div><div class="brand-settings-grid"><div class="brand-preview"><img id="siteLogoPreview" data-brand-logo src="assets/office-brains-logo.svg" alt="معاينة شعار Office Brains"><span>معاينة الشعار الحالي</span></div><form id="siteLogoForm" class="brand-upload-form"><label for="siteLogoFile">اختيار ملف الشعار</label><input id="siteLogoFile" type="file" accept="image/png,image/jpeg,image/webp" required><p class="muted">الصيغ المدعومة PNG وJPG وWEBP، بحد أقصى 2 ميجابايت.</p><p id="siteLogoMessage" class="muted" role="status">الشعار الحالي مستخدم في صفحات المنصة.</p><button type="submit">حفظ الشعار وتطبيقه</button></form></div></section><section class="panel coming-soon website-studio-next"><h2>باقي أدوات Website Studio</h2><p class="muted">إدارة الصفحات والمحتوى والألوان والقوائم والمعاينة قبل النشر.</p><span>قيد التجهيز</span></section></section>
-    <section class="admin-page" data-page="ai-team"><section class="panel coming-soon"><p class="eyebrow">AI & TEAM</p><h2>الذكاء والموظفون</h2><p class="muted">إدارة مزودي الذكاء الاصطناعي والنماذج والموظفين وحدود قدراتهم.</p><span>القسم قيد التجهيز</span></section></section>
+    <section class="admin-page" data-page="ai-team">
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">AI PROVIDER CONTROL</p><h2>إعداد محرك الذكاء الاصطناعي</h2><p class="muted">اختيار المزود والنموذج وضبط الاتصال. مفاتيح API تُشفّر على السيرفر ولا تظهر مرة أخرى في الواجهة.</p></div><span id="aiKeyStatus" class="billing-inactive">جاري فحص المفتاح...</span></div>
+        <form id="aiSettingsForm" class="billing-form">
+          <div class="billing-fields">
+            <label>مزود الذكاء الاصطناعي<select name="provider"><option value="demo">وضع التجربة</option><option value="gemini">Google Gemini</option><option value="ollama">Ollama محلي</option></select></label>
+            <label>اسم النموذج<input name="model" maxlength="160" required placeholder="gemini-3.8-flash"></label>
+            <label>عنوان Ollama<input name="base_url" maxlength="500" placeholder="http://127.0.0.1:11434"></label>
+            <label>مهلة الاتصال بالثواني<input name="timeout_seconds" type="number" min="5" max="180" value="90" required></label>
+          </div>
+          <label>مفتاح API الجديد<input name="api_key" type="password" maxlength="500" autocomplete="new-password" placeholder="اتركه فارغًا للاحتفاظ بالمفتاح الحالي"></label>
+          <label class="billing-check"><input name="clear_api_key" type="checkbox"> حذف مفتاح API المخزن</label>
+          <p class="billing-note">لتخزين مفتاح جديد، يجب ضبط PLATFORM_SECRETS_KEY في متغيرات السيرفر أولًا. لا تضع المفتاح في ملفات الواجهة أو GitHub.</p>
+          <div class="billing-actions"><button type="submit">حفظ إعدادات الذكاء الاصطناعي</button><button id="testAIConnection" class="ghost" type="button">اختبار الاتصال</button></div>
+          <p id="aiSettingsMessage" class="muted" role="status"></p>
+        </form>
+      </section>
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">BUILT-IN TEAM</p><h2>دليل موظفي المكتب</h2><p class="muted">قائمة الموظفين وتخصصاتهم الحالية. تعديل الأدوار والتعليمات وصلاحيات الوصول سيُبنى كطبقة مستقلة.</p></div><button id="refreshTeamBtn" class="ghost" type="button">تحديث الفريق</button></div>
+        <div id="platformTeamList" class="platform-team-grid"><p class="muted">سجّل الدخول لعرض الفريق.</p></div>
+      </section>
+    </section>
     <section class="admin-page" data-page="operations"><section class="panel coming-soon"><p class="eyebrow">OPERATIONS</p><h2>العمليات والسجلات</h2><p class="muted">متابعة المهام والتنفيذ والإشعارات وسجل الأحداث والتدقيق.</p><span>القسم قيد التجهيز</span></section></section>
     <section class="admin-page" data-page="settings"><section class="panel coming-soon"><p class="eyebrow">PLATFORM SETTINGS</p><h2>إعدادات المنصة</h2><p class="muted">إعدادات الأمان والهوية العامة والتكاملات والتحكم في خصائص المنصة.</p><span>القسم قيد التجهيز</span></section></section>
 
