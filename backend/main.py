@@ -564,12 +564,15 @@ async def platform_admin_operations(_: str = Depends(require_platform_admin)):
                    FROM platform_audit_log ORDER BY id DESC LIMIT 50"""
             ).fetchall()]
     provider = get_provider()
+    platform_settings = get_platform_settings()
     return {
         "health": {
             "api": "ok", "database": "ok", "ai_provider": provider,
             "ai_ready": provider != "demo",
             "automation_enabled": os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower()
                 in {"1", "true", "yes", "on"},
+            "public_site_enabled": platform_settings["public_site_enabled"],
+            "allow_customer_creation": platform_settings["allow_customer_creation"],
         },
         "customers_by_status": customers,
         "subscriptions_by_status": subscriptions,
