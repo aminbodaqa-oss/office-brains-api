@@ -162,6 +162,11 @@
             <label>عنوان Ollama<input name="base_url" maxlength="500" placeholder="http://127.0.0.1:11434"></label>
             <label>مهلة الاتصال بالثواني<input name="timeout_seconds" type="number" min="5" max="180" value="90" required></label>
           </div>
+          <div class="billing-fields">
+            <label>المزود الاحتياطي<select name="fallback_provider"><option value="demo">بدون احتياطي</option><option value="gemini">Google Gemini</option><option value="ollama">Ollama محلي</option></select></label>
+            <label>نموذج المزود الاحتياطي<input name="fallback_model" maxlength="160" placeholder="اسم النموذج الاحتياطي"></label>
+            <label>عنوان المزود الاحتياطي<input name="fallback_base_url" maxlength="500" placeholder="اختياري لـ Ollama"></label>
+          </div>
           <label>مفتاح API الجديد<input name="api_key" type="password" maxlength="500" autocomplete="new-password" placeholder="اتركه فارغًا للاحتفاظ بالمفتاح الحالي"></label>
           <label class="billing-check"><input name="clear_api_key" type="checkbox"> حذف مفتاح API المخزن</label>
           <p class="billing-note">لتخزين مفتاح جديد، يجب ضبط PLATFORM_SECRETS_KEY في متغيرات السيرفر أولًا. لا تضع المفتاح في ملفات الواجهة أو GitHub.</p>
