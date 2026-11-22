@@ -25,6 +25,7 @@ from platform_admin_auth import issue_platform_token, require_platform_admin
 from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer, get_platform_customer)
 from tenant_migration_preflight import tenant_migration_preflight
 from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
+from platform_billing import (init_platform_billing_db, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -36,6 +37,7 @@ async def lifespan(app: FastAPI):
     init_db()
     init_platform_tenants_db()
     init_platform_branding_db()
+    init_platform_billing_db()
     init_workflow_db()
     init_internal_messaging_db()
     init_whatsapp_db()
@@ -328,6 +330,30 @@ async def platform_admin_overview(_: str = Depends(require_platform_admin)):
     }
 
 
+class PlatformPlanSaveRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=100)
+    description: str = Field(default="", max_length=1000)
+    monthly_price_minor: int = Field(default=0, ge=0, le=1000000000)
+    yearly_price_minor: int = Field(default=0, ge=0, le=1000000000)
+    limits: dict = Field(default_factory=dict)
+    active: bool = False
+
+
+class PlatformSubscriptionCreateRequest(BaseModel):
+    customer_id: str = Field(min_length=1, max_length=80)
+    plan_code: str = Field(min_length=1, max_length=40)
+    billing_cycle: Literal["monthly", "yearly"]
+    starts_at: str | None = None
+    notes: str = Field(default="", max_length=2000)
+
+
+class PlatformSubscriptionUpdateRequest(BaseModel):
+    payment_status: Literal["unpaid", "paid", "refunded"] | None = None
+    status: Literal["pending_payment", "active", "past_due", "cancelled", "expired"] | None = None
+    notes: str | None = Field(default=None, max_length=2000)
+
+
 class PlatformCustomerCreateRequest(BaseModel):
     company_name: str = Field(min_length=2, max_length=180)
     contact_name: str = Field(default="", max_length=180)
@@ -367,6 +393,53 @@ async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_
 async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admin)):
     """Read-only schema and row-count audit before tenant data migration."""
     return tenant_migration_preflight()
+
+
+@app.get("/api/platform/admin/plans")
+async def platform_admin_plans(_: str = Depends(require_platform_admin)):
+    return list_platform_plans()
+
+
+@app.post("/api/platform/admin/plans")
+async def platform_admin_save_plan(body: PlatformPlanSaveRequest,
+                                   actor: str = Depends(require_platform_admin)):
+    try:
+        return save_platform_plan(body.code, body.name, body.description,
+                                  body.monthly_price_minor, body.yearly_price_minor,
+                                  body.limits, body.active, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/platform/admin/subscriptions")
+async def platform_admin_subscriptions(customer_id: str = "", status: str = "",
+                                       _: str = Depends(require_platform_admin)):
+    return list_platform_subscriptions(customer_id, status)
+
+
+@app.post("/api/platform/admin/subscriptions")
+async def platform_admin_create_subscription(body: PlatformSubscriptionCreateRequest,
+                                              actor: str = Depends(require_platform_admin)):
+    try:
+        return create_platform_subscription(body.customer_id, body.plan_code,
+                                            body.billing_cycle, body.starts_at,
+                                            body.notes, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.patch("/api/platform/admin/subscriptions/{subscription_id}")
+async def platform_admin_update_subscription(subscription_id: str,
+                                              body: PlatformSubscriptionUpdateRequest,
+                                              actor: str = Depends(require_platform_admin)):
+    try:
+        result = update_platform_subscription(subscription_id, body.payment_status,
+                                              body.status, body.notes, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if result is None:
+        raise HTTPException(status_code=404, detail="الاشتراك غير موجود.")
+    return result
 
 
 @app.get("/api/platform/admin/customers")
