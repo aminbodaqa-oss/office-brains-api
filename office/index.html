@@ -19,6 +19,29 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 
 /* Keep public-site buttons free of decorative arrows and pseudo markers. */
 button::after,a.btn::after,.btn::after,.button::after,[role="button"]::after{content:none!important;display:none!important}
+
+/* Public pricing section */
+.pricing-section{padding-top:72px;padding-bottom:76px}
+.pricing-cycle{display:inline-flex;gap:6px;padding:5px;border:1px solid var(--line);border-radius:14px;background:#ffffff08;margin-top:20px}
+.cycle-btn{border:0;border-radius:10px;padding:9px 16px;background:transparent;color:var(--muted);font:inherit;font-size:13px;cursor:pointer}
+.cycle-btn.active{background:var(--brand-accent);color:#fff}
+.cycle-btn span{font-size:10px;margin-right:5px;opacity:.85}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:stretch}
+.pricing-card{position:relative;display:flex;flex-direction:column;gap:12px;padding:25px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(150deg,#18213a,#10182b);min-width:0}
+.pricing-card.featured{border-color:var(--brand-accent);box-shadow:0 18px 55px #00a88420;transform:translateY(-8px)}
+.pricing-ribbon{position:absolute;top:14px;left:14px;padding:5px 10px;border-radius:99px;background:#00a88420;color:#5ce0bf;font-size:10px;font-weight:800}
+.pricing-card h3{font-size:20px;margin:0}
+.pricing-card .plan-desc{min-height:48px;color:var(--muted);font-size:13px;margin:0}
+.pricing-price{display:flex;align-items:baseline;gap:7px;margin:3px 0}
+.pricing-price strong{font-size:34px;line-height:1.25;font-variant-numeric:tabular-nums}
+.pricing-price span{color:var(--muted);font-size:12px}
+.pricing-yearly{font-size:11px;color:#69d9b8;min-height:18px}
+.pricing-card .btn{width:100%;margin-top:auto}
+.pricing-card .plan-code{font-size:10px;color:var(--muted);letter-spacing:1px}
+.pricing-loading{grid-column:1/-1;text-align:center;padding:35px;border:1px solid var(--line);border-radius:18px;color:var(--muted)}
+.pricing-footnote{text-align:center;color:var(--muted);font-size:11px;margin-top:22px}
+.pricing-contact{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:24px;color:var(--muted);font-size:13px}
+@media(max-width:800px){.pricing-grid{grid-template-columns:1fr;max-width:520px}.pricing-card.featured{transform:none}.pricing-contact{flex-direction:column;text-align:center}.cycle-btn span{display:block;margin:2px 0 0}}
 </style>
 </head>
 <body>
@@ -26,7 +49,7 @@ button::after,a.btn::after,.btn::after,.button::after,[role="button"]::after{con
 <div id="siteNotice" class="site-notice" hidden></div>
 <header class="wrap nav">
 <a class="brand" href="./"><img class="logo-image" data-brand-logo src="frontend/assets/office-brains-logo.svg" alt="Office Brains"><span><b data-brand-field="site_name">OFFICE BRAINS</b><small>YOUR AI-POWERED OFFICE</small></span></a>
-<nav class="navlinks" data-brand-navigation><a href="#about">عن المنصة</a><a href="#capabilities">المميزات</a><a href="#how">كيف تعمل</a></nav>
+<nav class="navlinks" data-brand-navigation><a href="#about">عن المنصة</a><a href="#capabilities">المميزات</a><a href="#how">كيف تعمل</a><a href="#pricing">الأسعار</a></nav>
 <div class="nav-actions"><a class="btn" href="frontend/">دخول المكتب</a><a class="btn primary" href="#contact">ابدأ الآن</a></div>
 </header>
 <main>
@@ -66,9 +89,63 @@ button::after,a.btn::after,.btn::after,.button::after,[role="button"]::after{con
 <div class="step"><b>02 / نسّق</b><h3>نظّم خطوات التنفيذ</h3><p>استفد من الأدوار المتخصصة لتوزيع العمل ومتابعة تقدمه.</p></div>
 <div class="step"><b>03 / راجع</b><h3>استلم النتيجة</h3><p>راجع التقرير والمخرجات قبل استخدامها أو اعتمادها.</p></div>
 </div></section>
-<section class="wrap cta" id="contact" data-page-key="contact"><div><h2 data-brand-field="cta_title">جاهز ترتّب شغلك بطريقة جديدة؟</h2><p data-brand-field="cta_description">ادخل إلى مساحة Office Brains وابدأ استكشاف المكتب الذكي.</p></div><a class="btn primary" data-brand-field="primary_cta_text" data-brand-href="primary_cta_url" href="frontend/">ادخل إلى مكتبك الذكي</a></section>
+<section id="pricing" class="section pricing-section" data-page-key="pricing"><div class="wrap section-head"><span class="eyebrow">SIMPLE, CLEAR PRICING</span><h2>اختار مساحة العمل المناسبة ليك</h2><p>ابدأ بالخطة المناسبة لحجم شغلك، وطوّر اشتراكك وقت ما تحتاج.</p><div class="pricing-cycle" role="group" aria-label="دورة الاشتراك"><button type="button" class="cycle-btn active" data-cycle="monthly">شهري</button><button type="button" class="cycle-btn" data-cycle="yearly">سنوي <span>وفّر مع الاشتراك السنوي</span></button></div></div><div class="wrap pricing-grid" id="publicPlans"><article class="pricing-loading">جاري تحميل الباقات والأسعار...</article></div><p class="wrap pricing-footnote">الأسعار المعروضة بالجنيه المصري، وهي أسعار استرشادية قابلة للتعديل من لوحة تحكم المنصة.</p><div class="wrap pricing-contact"><span>محتاج باقة مخصصة لفريقك؟</span><a class="btn" href="frontend/">تواصل مع فريق Office Brains</a></div></section>
 </main>
 <footer class="wrap footer"><span data-brand-field="footer_text">© 2026 Office Brains. جميع الحقوق محفوظة.</span><span><a href="frontend/">دخول المكتب</a>　 <a href="frontend/platform-admin.html">إدارة المنصة</a></span></footer>
 <script src="frontend/js/config.js"></script><script src="frontend/js/branding.js"></script>
+
+<script>
+(() => {
+  const list=document.getElementById("publicPlans");
+  if(!list)return;
+  let cycle="monthly",plans=[];
+  const money=value=>new Intl.NumberFormat("ar-EG",{maximumFractionDigits:0}).format(Number(value||0)/100);
+  function render(){
+    list.replaceChildren();
+    if(!plans.length){
+      const empty=document.createElement("article");
+      empty.className="pricing-loading";
+      empty.textContent="الباقات غير متاحة حاليًا. تواصل معنا لمعرفة تفاصيل الاشتراك.";
+      list.append(empty);return;
+    }
+    plans.forEach(plan=>{
+      const card=document.createElement("article");
+      card.className="pricing-card"+(plan.code==="professional"?" featured":"");
+      if(plan.code==="professional"){
+        const ribbon=document.createElement("span");
+        ribbon.className="pricing-ribbon";ribbon.textContent="اختيار مناسب لمعظم الفرق";card.append(ribbon);
+      }
+      const code=document.createElement("small");code.className="plan-code";code.textContent="OFFICE BRAINS PLAN";
+      const name=document.createElement("h3");name.textContent=plan.name;
+      const desc=document.createElement("p");desc.className="plan-desc";desc.textContent=plan.description||"خطة مرنة لتنظيم وإدارة العمل.";
+      const price=document.createElement("div");price.className="pricing-price";
+      const amount=Number(cycle==="monthly"?plan.monthly_price_minor:plan.yearly_price_minor);
+      const value=document.createElement("strong");value.textContent=amount>0?money(amount):"حسب الاتفاق";
+      const unit=document.createElement("span");unit.textContent=amount>0?(cycle==="monthly"?"جنيه / شهر":"جنيه / سنة"):"تواصل معنا";
+      price.append(value,unit);
+      const yearly=document.createElement("div");yearly.className="pricing-yearly";
+      if(cycle==="yearly"&&Number(plan.monthly_price_minor)>0&&amount>0){
+        const saving=Number(plan.monthly_price_minor)*12-amount;
+        yearly.textContent=saving>0?"توفير "+money(saving)+" جنيه مقارنة بالدفع الشهري":"اشتراك سنوي";
+      }else{yearly.textContent=cycle==="monthly"?"إمكانية التحويل للاشتراك السنوي في أي وقت":"";}
+      const button=document.createElement("a");button.className="btn"+(plan.code==="professional"?" primary":"");
+      button.href="frontend/";button.textContent="ابدأ مع باقة "+plan.name;
+      card.append(code,name,desc,price,yearly,button);list.append(card);
+    });
+  }
+  document.querySelectorAll("[data-cycle]").forEach(button=>button.addEventListener("click",()=>{
+    cycle=button.dataset.cycle;
+    document.querySelectorAll("[data-cycle]").forEach(item=>item.classList.toggle("active",item===button));
+    render();
+  }));
+  let api=window.OFFICE_API_URL||"";
+  if(api.endsWith("/"))api=api.slice(0,-1);
+  if(!api){list.textContent="تعذر الاتصال بخدمة الباقات.";return;}
+  fetch(api+"/api/public/plans",{cache:"no-store"})
+    .then(response=>{if(!response.ok)throw new Error("plans unavailable");return response.json();})
+    .then(data=>{plans=Array.isArray(data.plans)?data.plans:[];render();})
+    .catch(()=>{list.textContent="تعذر تحميل الأسعار حاليًا. حاول مرة أخرى لاحقًا.";});
+})();
+</script>
 </body>
 </html>
