@@ -275,11 +275,11 @@
     const submit = form.querySelector('button[type="submit"]');
     const message = $("customerFormMessage");
     submit.disabled = true;
-    message.textContent = "جاري إنشاء حساب العميل ومساحة العمل...";
+    message.textContent = "جاري إضافة سجل العميل ومساحة العمل...";
     const values = Object.fromEntries(new FormData(form).entries());
     try {
       const result = await platformRequest("/api/platform/admin/customers", {method:"POST",body:JSON.stringify(values)});
-      message.textContent = "تم إنشاء حساب العميل ومساحة العمل بنجاح.";
+      message.textContent = "تمت إضافة سجل العميل ومساحة العمل بنجاح.";
       form.reset();
       await loadCustomers();
     } catch (error) {
