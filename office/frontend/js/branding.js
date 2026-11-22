@@ -39,7 +39,7 @@
     if (!config || typeof config !== "object") return;
     const theme = config.theme || {};
     const vars = {
-      primary:["--brand-primary"], accent:["--brand-accent","--emerald"],
+      primary:["--brand-primary","--primary"], accent:["--brand-accent","--emerald","--acc"],
       highlight:["--brand-highlight","--gold"], background:["--bg"],
       surface:["--card","--panel"], text:["--ink","--text"]
     };
