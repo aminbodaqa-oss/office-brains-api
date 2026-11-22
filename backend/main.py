@@ -26,7 +26,6 @@ from platform_tenants import (init_platform_tenants_db, list_platform_customers,
 from tenant_migration_preflight import tenant_migration_preflight
 from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
 from platform_billing import (init_platform_billing_db, expire_due_platform_subscriptions, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
-from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan, manager_delegation_context)
@@ -530,7 +529,7 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
                     for item in thread
                 ]
                 system = (
-                    "أنت موظف افتراضي متخصص داخل مكتب Vindora وتتحدث مباشرة مع مالك المكتب عبر WhatsApp Office. "
+                    "أنت موظف افتراضي متخصص داخل مكتب Office Brains وتتحدث مباشرة مع مالك المكتب عبر WhatsApp Office. "
                     "رد بشكل طبيعي وتفاعلي بالعامية المصرية، وافهم سياق المحادثة وتذكر الرسائل السابقة الظاهرة أمامك. "
                     "التزم بتخصصك ولا تتصرف كأنك موظف آخر. لا تخترع أرقامًا أو نتائج أو إجراءات تمت. "
                     "إذا طلب المالك تنفيذ إجراء يحتاج النظام، وضّح ما تستطيع فعله ولا تدّعِ تنفيذه دون تأكيد فعلي. "
@@ -554,7 +553,7 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
                     log_activity(body.recipient_id, "office_whatsapp_reply", "office_whatsapp_message", reply["id"],
                                  f"{body.recipient_id} رد على المالك عبر واتساب المكتب", reply_text)
                     result.update({"reply_generated": True, "reply": reply})
-            except (BrainUnavailable, VindoraUnavailable) as exc:
+            except BrainUnavailable as exc:
                 result["reply_error"] = str(exc)
             except ValueError as exc:
                 result["reply_error"] = str(exc)
@@ -681,7 +680,7 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
     sent = list_internal_messages(body.employee_id, "sent", 8)
     memories = get_memories(body.employee_id, 12)
     assigned_tasks = list_tasks(20, assigned_to=body.employee_id)
-    system = "أنت موظف افتراضي متخصص داخل مكتب Vindora. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
+    system = "أنت موظف افتراضي متخصص داخل مكتب Office Brains. التزم بالشخصية والتعليمات المرسلة. لا تخترع بيانات، واسأل عند نقص المعلومات. " + body.employee_prompt
     manager_team_context = management_context_for(body.employee_id)
     if manager_team_context:
         system += "\n\nمعرفة المدير بالفريق والتنسيق مع المختصين:\n" + manager_team_context
@@ -721,10 +720,7 @@ async def chat(body: ChatRequest, _: str = Depends(require_owner)):
             for task in assigned_tasks
         ) + "\nلا تقل إنك أنجزت مهمة أو غيرت حالتها إلا إذا تم تحديث سجلها فعليًا من النظام."
     try:
-        system += await employee_context(body.employee_id)
         content = await employee_reply(system, [m.model_dump() for m in body.messages])
-    except VindoraUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except BrainUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "chat", {"messages": [m.model_dump() for m in body.messages], "response": content})
@@ -744,10 +740,7 @@ async def meeting_respond(body: MeetingRequest, _: str = Depends(require_owner))
         system += "\n\nمعرفة المدير بالفريق والتنسيق مع المختصين:\n" + manager_team_context
     prompt = "الوقت: " + body.time + "\nسياق الاجتماع حتى الآن:\n" + body.transcript + "\n\nالمطلوب منك:\n" + body.instruction
     try:
-        system += await employee_context(body.employee_id)
         content = await employee_reply(system, [{"role": "user", "content": prompt}])
-    except VindoraUnavailable as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except BrainUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     log_interaction(body.employee_id, "meeting", {"transcript": body.transcript, "instruction": body.instruction, "response": content})
@@ -785,12 +778,9 @@ async def _notify_assigned_employee(task: dict, event_label: str) -> None:
     if not employee:
         return
     try:
-        try:
-            context = await employee_context(employee_id, days=7)
-        except Exception:
-            context = "لا تتوفر بيانات خارجية إضافية حاليًا؛ اعتمد فقط على تفاصيل المهمة المسجلة."
+        context = "لا توجد بيانات خارجية متصلة؛ اعتمد فقط على تفاصيل المهمة المسجلة."
         system = (
-            "أنت موظف افتراضي متخصص داخل مكتب Vindora. وصلتك معلومة عمل جديدة مرتبطة بمهمتك. "
+            "أنت موظف افتراضي متخصص داخل مكتب Office Brains. وصلتك معلومة عمل جديدة مرتبطة بمهمتك. "
             "اكتب مبادرة قصيرة للمالك بالعامية المصرية: وضّح فهمك للتحديث، واذكر اقتراحًا عمليًا أو سؤالًا واحدًا فقط إذا لزم. "
             "لا تدّعِ بدء التنفيذ أو إنجازه، ولا تخترع بيانات. إذا لم يكن لديك شيء مفيد جديد فاكتب فقط: لا يوجد تحديث يستحق الإرسال الآن.\n"
             f"اسمك: {employee_id}\nوظيفتك: {employee['role']}\nالإدارة: {employee['department']}\n"
@@ -949,7 +939,7 @@ async def _employee_contact_owner(employee_id: str, owner_request: str) -> dict:
         return {"sent": False, "error": error}
     try:
         system = (
-            "أنت موظف افتراضي متخصص داخل مكتب Vindora. المالك طلب منك أن تبدأ التواصل معه بنفسك الآن. "
+            "أنت موظف افتراضي متخصص داخل مكتب Office Brains. المالك طلب منك أن تبدأ التواصل معه بنفسك الآن. "
             "اكتب له رسالة مباشرة بصوتك وشخصيتك وتخصصك، وابدأ بذكر سبب تواصلك وما الذي تحتاج مناقشته أو توضيحه. "
             "استخدم العامية المصرية المهنية والطبيعية. لا تدّعِ تنفيذ عمل أو إرسال شيء خارج المكتب، ولا تخترع حقائق. "
             "إذا كان طلب المالك عامًا، ابدأ برسالة قصيرة واسأله عن النقطة التي يريد مناقشتها. "
@@ -1034,7 +1024,7 @@ async def secretary_briefing(body: SecretaryRequest, background_tasks: Backgroun
         for item in reports[:8]
     ) or "لا توجد تقارير يومية محفوظة."
     system = (
-        "أنتِ سلمى، السكرتيرة التنفيذية والمساعدة الشخصية لصاحب Vindora. أنتِ حلقة التنسيق بين المالك وإبراهيم المدير العام وباقي الموظفين. "
+        "أنتِ سلمى، السكرتيرة التنفيذية والمساعدة الشخصية لمالك مساحة العمل. أنتِ حلقة التنسيق بين المالك وإبراهيم المدير العام وباقي الموظفين. "
         "شخصيتك مصرية نغشة وخفيفة الدم وذكية، بتاخدي وتدي مع الريّس باحترام ومن غير مبالغة، لكن في التنظيم دقيقة وحازمة. "
         "مهمتك تنظيم يوم المالك، ترتيب الأولويات، متابعة المهام والمواعيد والاجتماعات، تلخيص ما حدث، تجهيز جداول الأعمال ومحاضر الاجتماعات، "
         "التنبيه للمتأخرات والتعارضات، واقتراح الشخص المناسب لكل متابعة. استخدمي البيانات المرفقة فقط. "
