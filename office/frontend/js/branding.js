@@ -135,6 +135,10 @@
       tajawal:'"Tajawal",Tahoma,Arial,sans-serif',cairo:'"Cairo",Tahoma,Arial,sans-serif',
       inter:'"Inter",Arial,sans-serif'};
     if (fonts[config.font_family]) { document.documentElement.style.setProperty("--office-font", fonts[config.font_family]); if (document.body) document.body.style.fontFamily = fonts[config.font_family]; }
+    const density = {compact:"52px",comfortable:"76px",spacious:"96px"};
+    const corners = {sharp:"4px",rounded:"14px",soft:"22px"};
+    if (density[config.density]) document.documentElement.style.setProperty("--office-section-space", density[config.density]);
+    if (corners[config.corner_style]) document.documentElement.style.setProperty("--office-radius", corners[config.corner_style]);
   }
   async function applyOfficeExperience(surface) {
     if (!base) return null;
