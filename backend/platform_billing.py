@@ -153,6 +153,8 @@ def create_platform_subscription(customer_id: str, plan_code: str, billing_cycle
             start_dt = start_dt.replace(tzinfo=timezone.utc)
     except (ValueError, AttributeError):
         raise ValueError("تاريخ بداية الاشتراك غير صحيح.")
+    if start_dt > now_dt:
+        raise ValueError("تاريخ بداية الاشتراك لا يمكن أن يكون في المستقبل حاليًا.")
     with _connect() as conn:
         customer = conn.execute("SELECT id FROM platform_customers WHERE id=?", (customer_id,)).fetchone()
         plan = conn.execute("SELECT * FROM platform_plans WHERE code=? AND active=1", (plan_code,)).fetchone()
@@ -207,12 +209,21 @@ def update_platform_subscription(subscription_id: str, payment_status: str | Non
             conn.execute("""UPDATE platform_workspaces SET status='active',updated_at=? WHERE customer_id=?""",
                          (now, row["customer_id"]))
         elif next_status in {"cancelled", "expired", "past_due"}:
-            conn.execute("""UPDATE platform_customers SET status=?,updated_at=? WHERE id=?""",
-                         ("suspended" if next_status in {"cancelled", "expired"} else "active",
-                          now, row["customer_id"]))
-            conn.execute("""UPDATE platform_workspaces SET status=?,updated_at=? WHERE customer_id=?""",
-                         ("suspended" if next_status in {"cancelled", "expired"} else "active",
-                          now, row["customer_id"]))
+            replacement = conn.execute(
+                """SELECT plan_code FROM platform_subscriptions
+                   WHERE customer_id=? AND id<>? AND status='active' AND payment_status='paid'
+                     AND ends_at>=? ORDER BY ends_at DESC LIMIT 1""",
+                (row["customer_id"], subscription_id, now),
+            ).fetchone()
+            customer_status = "active" if replacement or next_status == "past_due" else "suspended"
+            if replacement:
+                conn.execute("UPDATE platform_customers SET plan_code=?,status='active',updated_at=? WHERE id=?",
+                             (replacement["plan_code"], now, row["customer_id"]))
+            else:
+                conn.execute("UPDATE platform_customers SET status=?,updated_at=? WHERE id=?",
+                             (customer_status, now, row["customer_id"]))
+            conn.execute("UPDATE platform_workspaces SET status=?,updated_at=? WHERE customer_id=?",
+                         (customer_status, now, row["customer_id"]))
         conn.execute("""INSERT INTO platform_billing_events(subscription_id,actor,event_type,details,created_at)
             VALUES(?,?,?,?,?)""", (subscription_id, actor, "subscription_updated",
                                     f"payment={next_payment}; status={next_status}", now))
