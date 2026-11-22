@@ -152,7 +152,40 @@
         <p class="billing-note">تأكيد الدفع هنا إجراء إداري يدوي، وليس اتصالًا ببنك أو بوابة دفع. لا يتم تحصيل أي مبلغ تلقائيًا.</p>
       </section>
     </section>
-    <section class="admin-page" data-page="website"><section class="panel website-branding"><div class="panel-head"><div><p class="eyebrow">WEBSITE IDENTITY</p><h2>إعدادات هوية الموقع</h2><p class="muted">ارفع شعارًا موحدًا ليظهر في الموقع وصفحات الدخول ولوحة التحكم.</p></div></div><div class="brand-settings-grid"><div class="brand-preview"><img id="siteLogoPreview" data-brand-logo src="assets/office-brains-logo.svg" alt="معاينة شعار Office Brains"><span>معاينة الشعار الحالي</span></div><form id="siteLogoForm" class="brand-upload-form"><label for="siteLogoFile">اختيار ملف الشعار</label><input id="siteLogoFile" type="file" accept="image/png,image/jpeg,image/webp" required><p class="muted">الصيغ المدعومة PNG وJPG وWEBP، بحد أقصى 2 ميجابايت.</p><p id="siteLogoMessage" class="muted" role="status">الشعار الحالي مستخدم في صفحات المنصة.</p><button type="submit">حفظ الشعار وتطبيقه</button></form></div></section><section class="panel coming-soon website-studio-next"><h2>باقي أدوات Website Studio</h2><p class="muted">إدارة الصفحات والمحتوى والألوان والقوائم والمعاينة قبل النشر.</p><span>قيد التجهيز</span></section></section>
+    <section class="admin-page" data-page="website"><section class="panel website-branding"><div class="panel-head"><div><p class="eyebrow">WEBSITE IDENTITY</p><h2>إعدادات هوية الموقع</h2><p class="muted">ارفع شعارًا موحدًا ليظهر في الموقع وصفحات الدخول ولوحة التحكم.</p></div></div><div class="brand-settings-grid"><div class="brand-preview"><img id="siteLogoPreview" data-brand-logo src="assets/office-brains-logo.svg" alt="معاينة شعار Office Brains"><span>معاينة الشعار الحالي</span></div><form id="siteLogoForm" class="brand-upload-form"><label for="siteLogoFile">اختيار ملف الشعار</label><input id="siteLogoFile" type="file" accept="image/png,image/jpeg,image/webp" required><p class="muted">الصيغ المدعومة PNG وJPG وWEBP، بحد أقصى 2 ميجابايت.</p><p id="siteLogoMessage" class="muted" role="status">الشعار الحالي مستخدم في صفحات المنصة.</p><button type="submit">حفظ الشعار وتطبيقه</button></form></div></section><section class="panel website-studio-next"><div class="panel-head"><div><p class="eyebrow">WEBSITE CONTENT STUDIO</p><h2>محتوى الموقع والهوية</h2><p class="muted">تحكم في النصوص الأساسية وألوان الهوية وروابط الدعوة. التغييرات تُحفظ مركزيًا وتظهر في صفحة الموقع العامة.</p></div><button id="refreshWebsiteSettings" type="button" class="ghost">تحديث الإعدادات</button></div>
+        <form id="websiteSettingsForm" class="billing-form">
+          <h3 class="form-subheading">اسم الموقع ومحركات البحث</h3>
+          <div class="billing-fields">
+            <label>اسم المنصة<input name="site_name" maxlength="100" placeholder="Office Brains"></label>
+            <label>عنوان الصفحة<input name="page_title" maxlength="160" placeholder="Office Brains | مكتبك الذكي يبدأ من هنا"></label>
+          </div>
+          <label>وصف الموقع لمحركات البحث<textarea name="meta_description" maxlength="320" rows="2"></textarea></label>
+          <h3 class="form-subheading">الواجهة الرئيسية</h3>
+          <div class="billing-fields">
+            <label>العنوان الرئيسي<input name="hero_title" maxlength="160"></label>
+            <label>الجملة المميزة<input name="hero_emphasis" maxlength="160"></label>
+            <label>نص زر الدعوة<input name="primary_cta_text" maxlength="80"></label>
+            <label>رابط زر الدعوة<input name="primary_cta_url" maxlength="300" placeholder="frontend/"></label>
+          </div>
+          <label>وصف الواجهة<textarea name="hero_subtitle" maxlength="700" rows="3"></textarea></label>
+          <h3 class="form-subheading">قسم التعريف والدعوة</h3>
+          <div class="billing-fields">
+            <label>عنوان قسم التعريف<input name="about_title" maxlength="160"></label>
+            <label>عنوان قسم الدعوة<input name="cta_title" maxlength="160"></label>
+          </div>
+          <label>وصف قسم التعريف<textarea name="about_description" maxlength="700" rows="3"></textarea></label>
+          <label>وصف قسم الدعوة<textarea name="cta_description" maxlength="500" rows="2"></textarea></label>
+          <label>نص التذييل<input name="footer_text" maxlength="200"></label>
+          <h3 class="form-subheading">ألوان الهوية</h3>
+          <div class="billing-fields color-fields">
+            <label>اللون الأساسي<input name="brand_primary" type="color" value="#172A3A"></label>
+            <label>اللون المميز<input name="brand_accent" type="color" value="#00A884"></label>
+            <label>لون الإبراز<input name="brand_highlight" type="color" value="#F2B84B"></label>
+          </div>
+          <div class="billing-actions"><button type="submit">حفظ ونشر التعديلات</button></div>
+          <p id="websiteSettingsMessage" class="muted" role="status"></p>
+        </form>
+      </section></section>
     <section class="admin-page" data-page="ai-team">
       <section class="panel"><div class="panel-head"><div><p class="eyebrow">AI PROVIDER CONTROL</p><h2>إعداد محرك الذكاء الاصطناعي</h2><p class="muted">اختيار المزود والنموذج وضبط الاتصال. مفاتيح API تُشفّر على السيرفر ولا تظهر مرة أخرى في الواجهة.</p></div><span id="aiKeyStatus" class="billing-inactive">جاري فحص المفتاح...</span></div>
         <form id="aiSettingsForm" class="billing-form">
