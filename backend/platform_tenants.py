@@ -111,7 +111,8 @@ def create_platform_customer(company_name: str, contact_name: str, email: str,
     customer_id = str(uuid.uuid4())
     workspace_id = str(uuid.uuid4())
     now = _now()
-    status = "trial" if plan_code == "trial" else "active"
+    # A customer record alone never grants paid access; only a confirmed subscription does.
+    status = "trial" if plan_code == "trial" else "suspended"
     try:
         with _connect() as conn:
             conn.execute("PRAGMA foreign_keys=ON")
@@ -147,6 +148,20 @@ def update_platform_customer(customer_id: str, status: str | None, plan_code: st
             return None
         next_status = status or str(row["status"])
         next_plan = plan_code or str(row["plan_code"])
+        if next_status == "active" or next_plan != str(row["plan_code"]):
+            tables = {item["name"] for item in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()}
+            if "platform_subscriptions" not in tables:
+                raise ValueError("لا يمكن تفعيل عميل أو تغيير باقته قبل وجود اشتراك مؤكد.")
+            covered = conn.execute(
+                """SELECT 1 FROM platform_subscriptions
+                   WHERE customer_id=? AND plan_code=? AND status='active'
+                     AND payment_status='paid' AND ends_at>=? LIMIT 1""",
+                (customer_id, next_plan, now),
+            ).fetchone()
+            if not covered:
+                raise ValueError("تغيير الباقة أو تفعيل العميل يتطلب اشتراكًا مدفوعًا وساريًا.")
         conn.execute("UPDATE platform_customers SET status=?,plan_code=?,updated_at=? WHERE id=?",
                      (next_status, next_plan, now, customer_id))
         conn.execute("UPDATE platform_workspaces SET status=?,updated_at=? WHERE customer_id=?",
