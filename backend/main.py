@@ -19,7 +19,7 @@ from database import add_memory, get_memories, init_db, log_interaction, get_cha
 from employees import EMPLOYEES, EMPLOYEE_IDS, management_context_for
 from internal_messaging import (init_internal_messaging_db, send_internal_message, list_internal_messages, mark_internal_inbox_read, mark_internal_message_read, detect_send_request, has_send_intent, detect_contact_request)
 from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number, send_whatsapp_message, list_whatsapp_messages, list_whatsapp_inbox, detect_whatsapp_send_request
-from brains import PROVIDER, BrainUnavailable, employee_reply
+from brains import get_provider, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password, hash_refresh_token
 from platform_admin_auth import issue_platform_token, require_platform_admin
 from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer, get_platform_customer)
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     push_task = asyncio.create_task(push_delivery_loop())
     if os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
         scheduler_task = asyncio.create_task(scheduler_loop())
-        if PROVIDER != "demo":
+        if get_provider() != "demo":
             from automation import salma_proactive_loop
             proactive_task = asyncio.create_task(salma_proactive_loop())
             task_worker_task = asyncio.create_task(task_execution_loop())
@@ -309,11 +309,11 @@ async def platform_admin_overview(_: str = Depends(require_platform_admin)):
         "1", "true", "yes", "on"
     }
     return {
-        "api": {"status": "ok", "provider": PROVIDER},
+        "api": {"status": "ok", "provider": get_provider()},
         "system": {
             "database": "ok",
             "automation_enabled": automation_enabled,
-            "provider_ready": PROVIDER != "demo",
+            "provider_ready": get_provider() != "demo",
             "admin_auth": "active",
         },
         "operations": {
@@ -519,7 +519,7 @@ async def post_whatsapp_message(body: OfficeWhatsAppSendRequest, _: str = Depend
         employee = next((item for item in EMPLOYEES if item["id"] == body.recipient_id), None)
         if employee:
             try:
-                if PROVIDER == "demo":
+                if get_provider() == "demo":
                     result["reply_error"] = "محرك الذكاء الاصطناعي مضبوط على وضع التجربة وليس على مزود ردود فعلي."
                     return result
                 thread = list_whatsapp_messages("المالك", body.recipient_id, 14)
@@ -753,8 +753,8 @@ async def get_workspace_overview(_: str = Depends(require_owner)):
     autonomous_enabled = os.getenv("AUTONOMOUS_OFFICE_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
     overview["task_execution_engine"] = {
         "enabled": autonomous_enabled,
-        "provider": PROVIDER,
-        "ready": autonomous_enabled and PROVIDER != "demo",
+        "provider": get_provider(),
+        "ready": autonomous_enabled and get_provider() != "demo",
     }
     return overview
 
@@ -768,7 +768,7 @@ async def get_tasks(limit: int = 100, status: str | None = None, assigned_to: st
     return {"tasks": list_tasks(limit, status, assigned_to)}
 
 async def _notify_assigned_employee(task: dict, event_label: str) -> None:
-    if PROVIDER == "demo":
+    if get_provider() == "demo":
         return
     employee_id = str(task.get("assigned_to") or "")
     employee = next((item for item in EMPLOYEES if item["id"] == employee_id), None)
@@ -929,7 +929,7 @@ async def _employee_contact_owner(employee_id: str, owner_request: str) -> dict:
     employee = next((item for item in EMPLOYEES if item["id"] == employee_id), None)
     if not employee:
         return {"sent": False, "error": "الموظف المطلوب غير موجود."}
-    if PROVIDER == "demo":
+    if get_provider() == "demo":
         error = "محرك الذكاء الاصطناعي مضبوط على وضع التجربة، ولم يتم إنشاء رسالة."
         log_activity("سلمى", "contact_request_failed", "employee", None, error, "الموظف المطلوب: " + employee_id)
         add_notification("contact_request_failed", "تعذر بدء التواصل", error, "لم يتم إرسال رسالة من الموظف.")
