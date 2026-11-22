@@ -21,6 +21,7 @@ from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password, hash_refresh_token
 from platform_admin_auth import issue_platform_token, require_platform_admin
 from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer)
+from tenant_migration_preflight import tenant_migration_preflight
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -331,6 +332,12 @@ class PlatformCustomerCreateRequest(BaseModel):
 class PlatformCustomerUpdateRequest(BaseModel):
     status: Literal["trial", "active", "suspended"] | None = None
     plan_code: Literal["trial", "starter", "professional", "business", "enterprise"] | None = None
+
+
+@app.get("/api/platform/admin/tenant-readiness")
+async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admin)):
+    """Read-only schema and row-count audit before tenant data migration."""
+    return tenant_migration_preflight()
 
 
 @app.get("/api/platform/admin/customers")
