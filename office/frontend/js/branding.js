@@ -34,6 +34,58 @@
       document.head.append(style);
     }
   }
+  function applyExperienceConfig(config) {
+    if (!config || typeof config !== "object") return;
+    const theme = config.theme || {};
+    const vars = {primary:"--brand-primary",accent:"--brand-accent",highlight:"--brand-highlight",
+      background:"--bg",surface:"--card",text:"--ink"};
+    Object.entries(vars).forEach(([key, variable]) => {
+      if (validColor(theme[key])) document.documentElement.style.setProperty(variable, theme[key]);
+    });
+    const fields = {
+      site_name:config.site_name, page_title:config.page_title, meta_description:config.meta_description,
+      hero_title:config.headline, hero_emphasis:config.headline_emphasis, hero_subtitle:config.subtitle,
+      primary_cta_text:config.primary_cta_text, footer_text:config.footer_text
+    };
+    Object.entries(fields).forEach(([key,value]) => {
+      if (!value) return;
+      document.querySelectorAll('[data-brand-field="' + key + '"]').forEach(node => {
+        if (node.tagName === "META") node.setAttribute("content", value);
+        else node.textContent = value;
+      });
+    });
+    if (config.page_title) document.title = config.page_title;
+    if (config.meta_description) {
+      const meta = document.querySelector('meta[name="description"]');
+      if (meta) meta.setAttribute("content", config.meta_description);
+    }
+    if (config.primary_cta_url) {
+      document.querySelectorAll('[data-brand-href="primary_cta_url"]').forEach(node => node.setAttribute("href", config.primary_cta_url));
+    }
+    if (config.login_title) {
+      const node = document.querySelector("#loginForm [data-brand-login-title]");
+      if (node) node.textContent = config.login_title;
+    }
+    if (config.login_message) {
+      const node = document.querySelector("#loginForm [data-brand-login-message]");
+      if (node) node.textContent = config.login_message;
+    }
+    const fonts = {system:'system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif',
+      tajawal:'"Tajawal",Tahoma,Arial,sans-serif',cairo:'"Cairo",Tahoma,Arial,sans-serif',
+      inter:'"Inter",Arial,sans-serif'};
+    if (fonts[config.font_family]) document.documentElement.style.setProperty("--office-font", fonts[config.font_family]);
+  }
+  async function applyOfficeExperience(surface) {
+    if (!base) return null;
+    try {
+      const response = await fetch(base + "/api/public/experience?surface=" + encodeURIComponent(surface), {cache:"no-store"});
+      if (!response.ok) return null;
+      const data = await response.json();
+      applyExperienceConfig(data.config || {});
+      return data;
+    } catch (_) { return null; }
+  }
+  window.applyOfficeExperience = applyOfficeExperience;
   async function applySavedBrand() {
     if (!base) return;
     try {
@@ -45,6 +97,8 @@
         document.querySelectorAll("[data-brand-icon]").forEach(icon => { icon.href = data.logo_data_url; });
       }
       applySettings(data.settings || {});
+      const surface = location.pathname.includes("/frontend/") ? "office_login" : "platform_site";
+      await applyOfficeExperience(surface);
       const platform = data.platform || {};
       const notice = document.getElementById("siteNotice");
       if (notice && platform.site_notice_enabled && platform.site_notice_text) {
