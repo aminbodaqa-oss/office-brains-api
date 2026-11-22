@@ -746,6 +746,7 @@
       const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = () => reject(new Error("تعذر قراءة ملف الصورة.")); reader.readAsDataURL(file); });
       await platformRequest("/api/platform/admin/branding/logo", {method:"POST", body:JSON.stringify({data_url:dataUrl})});
       document.querySelectorAll("[data-brand-logo]").forEach(img => { img.src = dataUrl; });
+      document.querySelectorAll("[data-brand-icon]").forEach(icon => { icon.href = dataUrl; });
       $("siteLogoPreview").src = dataUrl; message.textContent = "تم حفظ الشعار وتطبيقه على صفحات المنصة."; form.reset();
     } catch (error) { message.textContent = error.message || "تعذر حفظ الشعار."; }
     finally { button.disabled = false; }
