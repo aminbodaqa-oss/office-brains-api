@@ -899,6 +899,9 @@
     preview.style.setProperty("--preview-bg",config.theme.background || "#0B1020");
     preview.style.setProperty("--preview-surface",config.theme.surface || "#131B31");
     preview.style.setProperty("--preview-text",config.theme.text || "#F6F7FF");
+    preview.style.setProperty("--preview-radius",({sharp:"7px",rounded:"14px",soft:"21px"})[config.corner_style] || "14px");
+    preview.style.setProperty("--preview-density",({compact:"0.86",comfortable:"1",spacious:"1.16"})[config.density] || "1");
+    preview.style.fontFamily=({system:"system-ui",tajawal:"Tajawal, Tahoma",cairo:"Cairo, Tahoma",inter:"Inter, Arial"})[config.font_family] || "system-ui";
     $("previewCta").textContent=config.primary_cta_text || "زر الإجراء الرئيسي";
   }
   function populateExperienceForm(config) {
