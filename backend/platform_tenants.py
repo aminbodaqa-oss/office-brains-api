@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from database import _connect
@@ -125,6 +125,19 @@ def create_platform_customer(company_name: str, contact_name: str, email: str,
                 (id,customer_id,workspace_name,status,created_at,updated_at)
                 VALUES(?,?,?,?,?,?)""",
                 (workspace_id, customer_id, company_name, status, now, now))
+            if plan_code == "trial":
+                trial_id = str(uuid.uuid4())
+                trial_end = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+                conn.execute("""INSERT INTO platform_subscriptions
+                    (id,customer_id,plan_code,billing_cycle,status,payment_status,amount_minor,currency,
+                     starts_at,ends_at,notes,created_at,updated_at)
+                    VALUES(?,?,'trial','monthly','active','unpaid',0,'EGP',?,?,?, ?,?)""",
+                    (trial_id, customer_id, now, trial_end,
+                     "فترة تجريبية مجانية لمدة 3 أيام", now, now))
+                conn.execute("""INSERT INTO platform_billing_events
+                    (subscription_id,actor,event_type,details,created_at)
+                    VALUES(?,?,'trial_started','بدأت الفترة التجريبية المجانية لمدة 3 أيام',?)""",
+                    (trial_id, actor, now))
             conn.execute("""INSERT INTO platform_audit_log(actor,action,entity_type,entity_id,created_at)
                 VALUES(?,?,?,?,?)""", (actor, "customer_created", "customer", customer_id, now))
     except sqlite3.IntegrityError as exc:
