@@ -217,3 +217,10 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 .platform-team-card p{margin:0}
 @media(max-width:900px){.platform-team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.platform-team-grid{grid-template-columns:1fr}}
+.team-edit-details{margin-top:8px;border-top:1px solid var(--line);padding-top:9px}
+.team-edit-details summary{cursor:pointer;color:var(--emerald);font-size:11px;font-weight:700}
+.team-edit-form{display:grid;gap:9px;margin-top:10px}
+.team-edit-form label{display:grid;gap:6px;color:var(--muted);font-size:11px}
+.team-edit-form input,.team-edit-form textarea{width:100%;min-width:0;border:1px solid var(--line);border-radius:9px;background:#0b1325;color:var(--ink);padding:9px;font:inherit}
+.team-edit-form textarea{resize:vertical;line-height:1.7}
+.team-edit-form button{margin:0}
