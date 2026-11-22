@@ -26,6 +26,7 @@ from platform_tenants import (init_platform_tenants_db, list_platform_customers,
 from tenant_migration_preflight import tenant_migration_preflight
 from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
 from platform_billing import (init_platform_billing_db, expire_due_platform_subscriptions, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
+from platform_ai import (init_platform_ai_db, get_platform_ai_settings, save_platform_ai_settings)
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan, manager_delegation_context)
@@ -38,6 +39,7 @@ async def lifespan(app: FastAPI):
     init_platform_branding_db()
     init_platform_billing_db()
     expire_due_platform_subscriptions()
+    init_platform_ai_db()
     init_workflow_db()
     init_internal_messaging_db()
     init_whatsapp_db()
@@ -242,7 +244,7 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "office-brains-api", "provider": os.getenv("BRAIN_PROVIDER", "demo")}
+    return {"status": "ok", "service": "office-brains-api", "provider": get_provider()}
 
 
 @app.post("/api/platform/admin/login")
@@ -330,6 +332,15 @@ async def platform_admin_overview(_: str = Depends(require_platform_admin)):
     }
 
 
+class PlatformAISettingsRequest(BaseModel):
+    provider: Literal["demo", "gemini", "ollama"]
+    model: str = Field(min_length=1, max_length=160)
+    base_url: str = Field(default="", max_length=500)
+    timeout_seconds: int = Field(default=90, ge=5, le=180)
+    api_key: str | None = Field(default=None, max_length=500)
+    clear_api_key: bool = False
+
+
 class PlatformPlanSaveRequest(BaseModel):
     code: str = Field(min_length=1, max_length=40)
     name: str = Field(min_length=1, max_length=100)
@@ -393,6 +404,34 @@ async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_
 async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admin)):
     """Read-only schema and row-count audit before tenant data migration."""
     return tenant_migration_preflight()
+
+
+@app.get("/api/platform/admin/ai-settings")
+async def platform_admin_ai_settings(_: str = Depends(require_platform_admin)):
+    return get_platform_ai_settings()
+
+
+@app.put("/api/platform/admin/ai-settings")
+async def platform_admin_save_ai_settings(body: PlatformAISettingsRequest,
+                                          actor: str = Depends(require_platform_admin)):
+    try:
+        return save_platform_ai_settings(body.provider, body.model, body.base_url,
+                                         body.timeout_seconds, body.api_key,
+                                         body.clear_api_key, actor)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/platform/admin/ai-settings/test")
+async def platform_admin_test_ai_settings(_: str = Depends(require_platform_admin)):
+    try:
+        sample = await employee_reply(
+            "أجب بكلمة واحدة فقط لإثبات أن الاتصال يعمل.",
+            [{"role": "user", "content": "اكتب: متصل"}],
+        )
+        return {"success": True, "provider": get_provider(), "response": sample[:120]}
+    except BrainUnavailable as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/platform/admin/plans")
