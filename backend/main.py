@@ -28,6 +28,7 @@ from platform_branding import init_platform_branding_db, get_site_logo, save_sit
 from platform_billing import (init_platform_billing_db, expire_due_platform_subscriptions, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
 from platform_ai import (init_platform_ai_db, get_platform_ai_settings, save_platform_ai_settings)
 from platform_team import (init_platform_team_db, list_platform_team, get_platform_employee_profile, save_platform_employee_profile)
+from platform_experiences import (init_platform_experiences_db, get_experience, save_experience_draft, publish_experience, list_experience_revisions, restore_experience_revision)
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
 from workflow import (TASK_PRIORITIES, TASK_STATUSES, create_task, update_task, list_tasks, create_meeting, update_meeting, list_meetings, list_activity, workflow_overview, log_activity, init_workflow_db, retry_task_execution, approve_delegation_plan, manager_delegation_context)
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI):
     expire_due_platform_subscriptions()
     init_platform_ai_db()
     init_platform_team_db()
+    init_platform_experiences_db()
     init_workflow_db()
     init_internal_messaging_db()
     init_whatsapp_db()
@@ -89,6 +91,23 @@ class WebsiteBrandingRequest(BaseModel):
 
 class BrandLogoRequest(BaseModel):
     data_url: str = Field(min_length=100, max_length=2800000)
+
+class ExperienceDraftRequest(BaseModel):
+    surface: str = Field(min_length=1, max_length=40)
+    workspace_id: str | None = Field(default=None, max_length=80)
+    config: dict = Field(default_factory=dict)
+
+
+class ExperiencePublishRequest(BaseModel):
+    surface: str = Field(min_length=1, max_length=40)
+    workspace_id: str | None = Field(default=None, max_length=80)
+
+
+class ExperienceRestoreRequest(BaseModel):
+    surface: str = Field(min_length=1, max_length=40)
+    workspace_id: str | None = Field(default=None, max_length=80)
+    version: int = Field(ge=1)
+
 
 @app.post("/api/auth/login")
 async def login(body: LoginRequest, request: Request):
@@ -428,6 +447,61 @@ async def update_platform_branding_settings(body: WebsiteBrandingRequest,
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"saved": True, "settings": settings}
+
+
+
+@app.get("/api/public/experience")
+async def public_experience(surface: str = "platform_site"):
+    if surface not in {"platform_site", "office_login", "office_workspace"}:
+        raise HTTPException(status_code=400, detail="نطاق الواجهة العامة غير مسموح.")
+    experience = get_experience(surface)
+    return {"surface": surface, "config": experience["published"] or experience["draft"],
+            "version": experience["version"], "published": bool(experience["published"])}
+
+
+@app.get("/api/platform/admin/experiences")
+async def platform_admin_get_experience(surface: str, workspace_id: str | None = None,
+                                        _: str = Depends(require_platform_admin)):
+    try:
+        return get_experience(surface, workspace_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.put("/api/platform/admin/experiences/draft")
+async def platform_admin_save_experience(body: ExperienceDraftRequest,
+                                         actor: str = Depends(require_platform_admin)):
+    try:
+        return save_experience_draft(body.surface, body.workspace_id, body.config, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/platform/admin/experiences/publish")
+async def platform_admin_publish_experience(body: ExperiencePublishRequest,
+                                            actor: str = Depends(require_platform_admin)):
+    try:
+        return publish_experience(body.surface, body.workspace_id, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/platform/admin/experiences/revisions")
+async def platform_admin_experience_revisions(surface: str, workspace_id: str | None = None,
+                                              _: str = Depends(require_platform_admin)):
+    try:
+        return {"revisions": list_experience_revisions(surface, workspace_id)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/platform/admin/experiences/restore")
+async def platform_admin_restore_experience(body: ExperienceRestoreRequest,
+                                            actor: str = Depends(require_platform_admin)):
+    try:
+        return restore_experience_revision(body.surface, body.workspace_id, body.version, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/platform/admin/tenant-readiness")
