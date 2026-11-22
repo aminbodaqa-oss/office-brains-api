@@ -1,7 +1,12 @@
 (() => {
   const API = "https://9ywu5lapwb.apps.bot-hosting.cloud";
   const $ = (id) => document.getElementById(id);
-  let token = "";
+  let token = sessionStorage.getItem("office_platform_admin_token") || "";
+  const saveToken = (value) => {
+    token = value || "";
+    if (token) sessionStorage.setItem("office_platform_admin_token", token);
+    else sessionStorage.removeItem("office_platform_admin_token");
+  };
   let customerSearchTimer = null;
 
   const number = (value) => Number(value || 0).toLocaleString("ar-EG");
@@ -29,7 +34,7 @@
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "تعذر تسجيل الدخول.");
-      token = data.access_token;
+      saveToken(data.access_token);
       $("loginView").classList.add("hidden");
       $("appView").classList.remove("hidden");
       await loadOverview();
@@ -52,7 +57,7 @@
       });
       const data = await response.json();
       if (response.status === 401) {
-        token = "";
+        saveToken("");
         $("appView").classList.add("hidden");
         $("loginView").classList.remove("hidden");
         $("adminPass").value = "";
@@ -162,7 +167,7 @@
     });
     const data = await response.json();
     if (response.status === 401) {
-      token = "";
+      saveToken("");
       $("appView").classList.add("hidden");
       $("loginView").classList.remove("hidden");
       throw new Error("انتهت الجلسة الإدارية. سجّل الدخول مرة أخرى.");
@@ -248,8 +253,17 @@
   $("refreshTenantReadiness")?.addEventListener("click", loadTenantReadiness);
 
   $("refreshBtn").addEventListener("click", loadOverview);
+  // Restore the admin session after a page refresh in the same browser tab.
+  if (token) {
+    $("loginView").classList.add("hidden");
+    $("appView").classList.remove("hidden");
+    loadOverview();
+    loadCustomers();
+    loadTenantReadiness();
+  }
+
   $("logoutBtn").addEventListener("click", () => {
-    token = "";
+    saveToken("");
     $("appView").classList.add("hidden");
     $("loginView").classList.remove("hidden");
     $("adminPass").value = "";
