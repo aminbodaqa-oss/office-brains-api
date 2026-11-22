@@ -6,7 +6,7 @@ import os
 from datetime import datetime, time as clock_time, timezone
 from zoneinfo import ZoneInfo
 
-from brains import PROVIDER, BrainUnavailable, employee_reply
+from brains import get_provider, BrainUnavailable, employee_reply
 from database import _connect, add_notification, log_interaction
 from employees import EMPLOYEES, management_context_for
 from workflow import workflow_overview, log_activity, list_tasks, list_activity, list_meetings
@@ -373,7 +373,7 @@ async def scheduler_loop() -> None:
         now = datetime.now(CAIRO)
         if now.weekday() in WORK_DAYS and now.time().replace(tzinfo=None) >= START_TIME:
             run_date = now.date().isoformat()
-            if PROVIDER != "demo" and _claim_run(run_date):
+            if get_provider() != "demo" and _claim_run(run_date):
                 add_notification("automation", "بدأ التشغيل التلقائي",
                     "بدأ إعداد تقارير الفريق اليومية.", "التاريخ: " + run_date + "\nموعد التشغيل: 09:00 بتوقيت القاهرة.")
                 try:
@@ -388,7 +388,7 @@ async def salma_proactive_loop() -> None:
     """Generate occasional, context-grounded private-office messages from Salma."""
     while True:
         await asyncio.sleep(3600)
-        if PROVIDER == "demo":
+        if get_provider() == "demo":
             continue
         now_utc = datetime.now(timezone.utc)
         with _connect() as conn:
@@ -470,7 +470,7 @@ def automation_status() -> dict:
         row = conn.execute("SELECT run_date,status,started_at,finished_at,error FROM autonomous_runs WHERE run_date=?", (today,)).fetchone()
     return {
         "enabled": _enabled(),
-        "provider_ready": PROVIDER != "demo",
+        "provider_ready": get_provider() != "demo",
         "timezone": "Africa/Cairo",
         "work_days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
         "start_time": "09:00",
