@@ -210,3 +210,7 @@ body{background:var(--bg);color:var(--ink)}
 
 /* Office Brains: three-color design tokens */
 :root{--brand-primary:#172A3A;--brand-accent:#00A884;--brand-highlight:#F2B84B;--acc:var(--brand-accent)}
+
+
+/* Remove decorative dots beside text throughout the workspace and sign-in screens */
+.dot,.orbit-dot,.showcase-tag span,.auth-kicker:before,.auth-foot:before{display:none!important;content:none!important}
