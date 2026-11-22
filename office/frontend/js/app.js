@@ -2,7 +2,10 @@
 const TOKEN_STORAGE_KEY = "office_owner_token";
 let ownerToken = sessionStorage.getItem(TOKEN_STORAGE_KEY) || null;
 const authGate = document.getElementById("authGate");
-if (ownerToken) authGate.classList.add("hidden");
+if (ownerToken) {
+  authGate.classList.add("hidden");
+  if (window.applyOfficeExperience) window.applyOfficeExperience("office_workspace");
+}
 const loginForm = document.getElementById("loginForm");
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
