@@ -36,8 +36,7 @@ def get_platform_employee_profile(employee_id: str) -> dict[str, Any] | None:
     if row:
         profile["role"] = row["role"]
         profile["department"] = row["department"]
-        if row["instructions"]:
-            profile["instructions"] = row["instructions"]
+        profile["instructions"] = row["instructions"]
     return profile
 
 
