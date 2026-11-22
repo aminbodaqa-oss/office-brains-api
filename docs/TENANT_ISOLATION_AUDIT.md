@@ -2,9 +2,9 @@
 
 ## Current state
 
-The platform customer registry is present, but it is not yet a multi-tenant application. A customer row and a workspace row are created together; there is no customer user, membership, workspace-scoped session, or tenant-aware data access layer. The existing office login authenticates only the configured platform owner.
+The platform customer registry and the additive tenant identity foundation now exist. Tenant users and workspace memberships have schema support, and a separate tenant token verifier checks the user, membership, workspace, and customer status against the database on each authenticated request.
 
-**Release rule:** do not issue customer credentials, expose the office APIs to customer users, or advertise customer workspaces as operational until every tenant-owned read/write path and background worker is scoped and the cross-tenant tests pass.
+**Customer login is intentionally not exposed yet.** The identity tables are not populated by any customer-facing flow, the tenant dependency is not attached to office APIs, and business data is not workspace-scoped. Do not issue customer credentials or advertise customer workspaces as operational until every tenant-owned read/write path and background worker is scoped and the cross-tenant tests pass.
 
 ## Data inventory
 
@@ -18,7 +18,8 @@ The current SQLite-backed application contains the following data families. Name
 | Internal employee messaging | `internal_messages`, `office_whatsapp_messages` | workspace |
 | Autonomous operations | `autonomous_runs`, `autonomous_reports` | workspace; run uniqueness must become (workspace_id, run_date) |
 | Notifications and delivery | `notifications`, `push_devices`, `push_outbox` | workspace; a device and its queued deliveries must never cross workspaces |
-| Authentication | `auth_sessions`, `owner_credentials` | owner auth remains platform-only; customer credentials and sessions need a separate tenant identity model |
+| Owner authentication | `auth_sessions`, `owner_credentials` | platform-owner only |
+| Tenant identity | `tenant_users`, `tenant_memberships` | tenant identity; membership links a user to a workspace and carries role/status |
 | Platform control plane | `platform_customers`, `platform_workspaces`, `platform_audit_log` | platform-admin only; never expose as tenant data |
 
 The employee catalogue is currently a shared Python constant, not tenant-owned data. Before customer workspaces are enabled, each workspace needs its own employee roster/configuration and its own company context, AI/provider configuration, integrations, schedules, and secrets. Environment-level credentials must not silently become shared customer credentials.
@@ -26,21 +27,24 @@ The employee catalogue is currently a shared Python constant, not tenant-owned d
 ## Security invariants
 
 1. Resolve the workspace from a verified server-side membership/session. Never accept a client-supplied `workspace_id` as authority.
-2. A tenant principal carries immutable `user_id`, `workspace_id`, role, and account status claims. A suspended customer/workspace or disabled membership is denied on every request.
+2. A tenant principal carries immutable `user_id`, `workspace_id`, and role claims. The dependency rechecks active user, active membership, workspace status, customer status, and current role against the database on every request.
 3. Every tenant-owned SELECT, INSERT, UPDATE, and DELETE is scoped by the resolved workspace. Updates/deletes must include both the record ID and workspace ID in the predicate.
 4. Related records are checked through their parent in the same workspace. A task execution, delegation plan, report, or diagnostic cannot be attached to another workspace's task.
 5. Background workers claim work by workspace and carry that workspace context through AI calls, notifications, internal messages, retries, and final reports. A global worker must not accidentally process tenant work using the platform owner's employee roster or context.
 6. Push tokens, queued pushes, files, integration credentials, and scheduled jobs are workspace-owned. No cross-workspace broadcast or storage-path reuse.
-7. Platform-admin APIs remain a separate audience and authorization boundary. Platform admins may administer customer metadata; tenant APIs must not accept platform tokens as tenant sessions.
+7. Platform-admin APIs remain a separate audience and authorization boundary. Platform-admin tokens must not be accepted as tenant sessions.
 8. Preserve the existing owner workspace and all existing records. No destructive migration, blanket reassignment, or live data rewrite without a verified backup, row-count checks, and rollback plan.
 
 ## Safe implementation sequence
 
-### Phase A — foundation (no tenant access yet)
-- Add tenant identity and membership tables with unique normalized email, password hash, role, status, and workspace foreign key.
-- Add tenant token issuance/verification with a distinct audience and signing secret; leave owner auth unchanged.
-- Add a server-side tenant principal dependency that checks current membership and customer/workspace status on each request.
-- Add migration metadata and a dry-run schema/data audit. Do not enable customer login.
+### Phase A — identity foundation (partially implemented; no tenant access)
+- [x] Add tenant identity and membership tables with unique email, password hash, role, status, and workspace foreign key.
+- [x] Add tenant token issuance/verification with a distinct audience and signing secret; leave owner auth unchanged.
+- [x] Add a server-side tenant principal dependency that checks current membership and customer/workspace status on each request.
+- [ ] Add invitation/password setup flow and login endpoint only after data scoping is complete.
+- [ ] Add migration metadata and a dry-run schema/data audit.
+
+The schema is additive and initialized through the existing platform tenant initializer. It does not create users, memberships, credentials, or alter existing customer/owner records. The tenant auth module is not attached to any route yet.
 
 ### Phase B — data ownership migration
 - Introduce a reserved owner workspace and explicitly map all existing owner data to it.
