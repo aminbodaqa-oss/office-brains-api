@@ -20,3 +20,6 @@
 
 /* Keep status labels clear without decorative dots beside them */
 .status-dot{display:none!important}
+
+/* Keep buttons clean: no decorative arrow marks beside button labels. */
+button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after{content:none!important;display:none!important}
