@@ -1,14 +1,16 @@
-name: Backend Validation
+name: Platform Code Validation
 
 on:
   push:
     branches: [main]
     paths:
       - "backend/**"
+      - "office/frontend/**"
       - ".github/workflows/backend-check.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "office/frontend/**"
       - ".github/workflows/backend-check.yml"
 
 jobs:
@@ -23,3 +25,9 @@ jobs:
           python-version: "3.12"
       - name: Compile backend modules
         run: python -m compileall -q backend
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate platform admin JavaScript
+        run: node --check office/frontend/js/platform-admin.js
