@@ -75,51 +75,7 @@
     if (config.primary_cta_url) {
       document.querySelectorAll('[data-brand-href="primary_cta_url"]').forEach(node => node.setAttribute("href", config.primary_cta_url));
     }
-    if (Array.isArray(config.navigation) && config.navigation.length) {
-      const nav = document.querySelector(".navlinks");
-      if (nav) {
-        nav.replaceChildren();
-        config.navigation.forEach(item => {
-          if (!item || !item.label || !item.url) return;
-          const link = document.createElement("a");
-          link.textContent = item.label;
-          link.setAttribute("href", item.url);
-          nav.append(link);
-        });
-      }
-    }
-    if (config.pages && typeof config.pages === "object") {
-      Object.entries(config.pages).forEach(([pageId,page]) => {
-        const section = document.getElementById(pageId);
-        if (!section || !page || typeof page !== "object") return;
-        if (typeof page.visible === "boolean") section.hidden = !page.visible;
-        if (page.title) {
-          const heading = section.querySelector("h2");
-          if (heading) heading.textContent = page.title;
-        }
-        if (page.description) {
-          const description = section.querySelector("p");
-          if (description) description.textContent = page.description;
-        }
-      });
-    }
-    if (config.login_title) {
-      const node = document.querySelector("#loginForm [data-brand-login-title], #loginView [data-brand-login-title]");
-      if (node) node.textContent = config.login_title;
-    }
-    if (config.login_message) {
-      const node = document.querySelector("#loginForm [data-brand-login-message], #loginView [data-brand-login-message]");
-      if (node) node.textContent = config.login_message;
-    }
-    if (config.welcome_title) {
-      const node = document.querySelector("[data-brand-workspace-title]");
-      if (node) node.textContent = config.welcome_title;
-    }
-    if (config.welcome_message) {
-      const node = document.querySelector("[data-brand-workspace-message]");
-      if (node) node.textContent = config.welcome_message;
-    }
-    if (Array.isArray(config.navigation) && config.navigation.length) {
+    if (Array.isArray(config.navigation)) {
       const nav = document.querySelector("nav[data-brand-navigation]");
       if (nav) {
         nav.replaceChildren();
@@ -130,6 +86,17 @@
           nav.append(link);
         });
       }
+    }
+    if (config.pages && typeof config.pages === "object") {
+      Object.entries(config.pages).forEach(([pageId, page]) => {
+        const section = Array.from(document.querySelectorAll("[data-page-key]")).find(node => node.dataset.pageKey === pageId);
+        if (!section) return;
+        section.hidden = page.visible === false;
+        const heading = section.querySelector("h1,h2,h3");
+        const description = section.querySelector("p");
+        if (page.title && heading) heading.textContent = page.title;
+        if (page.description && description) description.textContent = page.description;
+      });
     }
     const fonts = {system:'system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif',
       tajawal:'"Tajawal",Tahoma,Arial,sans-serif',cairo:'"Cairo",Tahoma,Arial,sans-serif',
