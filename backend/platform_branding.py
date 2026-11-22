@@ -8,6 +8,26 @@ from urllib.parse import urlparse
 from database import _connect
 
 
+DEFAULT_SITE_SETTINGS = {
+    "site_name": "OFFICE BRAINS",
+    "page_title": "Office Brains | مكتبك الذكي يبدأ من هنا",
+    "meta_description": "Office Brains — مكتب ذكي يجمع مساعدين متخصصين بالذكاء الاصطناعي لتنظيم المهام وتنسيق العمل في مكان واحد.",
+    "hero_title": "مش مجرد مساعد ذكي…",
+    "hero_emphasis": "ده مكتب كامل بيفكر معاك.",
+    "hero_subtitle": "Office Brains منصة لإنشاء وإدارة مكتب رقمي يضم مساعدين متخصصين بالذكاء الاصطناعي، يتعاونون لتنظيم المهام، متابعة التنفيذ، وتجميع النتائج في تجربة عمل واحدة.",
+    "primary_cta_text": "ادخل إلى مكتبك الذكي",
+    "primary_cta_url": "frontend/",
+    "about_title": "حوّل طريقة إدارتك للشغل",
+    "about_description": "بدل ما تتعامل مع أدوات ومحادثات متفرقة، Office Brains بتجمع المساعدين والمهام وسير العمل في مكان واحد، مع وضوح أكبر في المسؤوليات والنتائج.",
+    "cta_title": "جاهز ترتّب شغلك بطريقة جديدة؟",
+    "cta_description": "ادخل إلى مساحة Office Brains وابدأ استكشاف المكتب الذكي.",
+    "footer_text": "© 2026 Office Brains. جميع الحقوق محفوظة.",
+    "brand_primary": "#172A3A",
+    "brand_accent": "#00A884",
+    "brand_highlight": "#F2B84B",
+}
+
+
 SITE_SETTING_LIMITS = {
     "site_name": 100,
     "page_title": 160,
@@ -60,8 +80,10 @@ def get_site_settings() -> dict[str, str]:
         rows = conn.execute(
             "SELECT setting_key,setting_value FROM platform_settings WHERE setting_key LIKE 'site_%' OR setting_key LIKE 'brand_%'"
         ).fetchall()
-    return {str(row["setting_key"]): str(row["setting_value"]) for row in rows
-            if row["setting_key"] != "site_logo_data_url"}
+    settings = dict(DEFAULT_SITE_SETTINGS)
+    settings.update({str(row["setting_key"]): str(row["setting_value"]) for row in rows
+                     if row["setting_key"] != "site_logo_data_url"})
+    return settings
 
 
 def save_site_settings(settings: dict[str, Any], actor: str) -> dict[str, str]:
