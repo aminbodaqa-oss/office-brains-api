@@ -252,6 +252,31 @@
 
   $("refreshTenantReadiness")?.addEventListener("click", loadTenantReadiness);
 
+
+  // Sidebar navigation: show one workspace section at a time.
+  const pageLinks = Array.from(document.querySelectorAll("[data-page-link]"));
+  const pages = Array.from(document.querySelectorAll("[data-page]"));
+  function activatePage(pageName, updateHash = true) {
+    const exists = pages.some((page) => page.dataset.page === pageName);
+    const target = exists ? pageName : "overview";
+    pages.forEach((page) => page.classList.toggle("active", page.dataset.page === target));
+    pageLinks.forEach((link) => link.classList.toggle("active", link.dataset.pageLink === target));
+    if (updateHash) {
+      const activeLink = pageLinks.find((link) => link.dataset.pageLink === target);
+      if (activeLink) history.replaceState(null, "", activeLink.getAttribute("href"));
+    }
+    if (target === "customers" && token) {
+      loadCustomers();
+      loadTenantReadiness();
+    }
+  }
+  pageLinks.forEach((link) => link.addEventListener("click", (event) => {
+    event.preventDefault();
+    activatePage(link.dataset.pageLink);
+  }));
+  const initialPage = pageLinks.find((link) => link.getAttribute("href") === location.hash)?.dataset.pageLink || "overview";
+  activatePage(initialPage, false);
+
   $("refreshBtn").addEventListener("click", loadOverview);
   // Restore the admin session after a page refresh in the same browser tab.
   if (token) {
