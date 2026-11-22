@@ -197,3 +197,14 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 .billing-note{margin:15px 0 0;color:var(--muted);font-size:11px;line-height:1.8}
 @media(max-width:900px){.billing-plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.billing-fields,.billing-plan-grid{grid-template-columns:1fr}.subscription-row{align-items:stretch;flex-direction:column}.subscription-actions{justify-content:stretch}.subscription-actions button{flex:1}.billing-actions button{flex:1}}
+
+/* AI provider and team directory */
+.platform-team-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.platform-team-card{display:grid;gap:6px;min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:#0e172a}
+.platform-team-card strong{font-size:13px}
+.platform-team-card span{font-size:11px;color:var(--ink)}
+.platform-team-card small{font-size:10px;line-height:1.7;color:var(--muted);overflow-wrap:anywhere}
+#aiKeyStatus{font-size:11px;white-space:nowrap}
+@media(max-width:1000px){.platform-team-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.platform-team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.platform-team-grid{grid-template-columns:1fr}.panel-head{align-items:flex-start;flex-direction:column}}
