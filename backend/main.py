@@ -347,6 +347,9 @@ class PlatformAISettingsRequest(BaseModel):
     timeout_seconds: int = Field(default=90, ge=5, le=180)
     api_key: str | None = Field(default=None, max_length=500)
     clear_api_key: bool = False
+    fallback_provider: Literal["demo", "gemini", "ollama"] = "demo"
+    fallback_model: str = Field(default="", max_length=160)
+    fallback_base_url: str = Field(default="", max_length=500)
 
 
 class PlatformPlanSaveRequest(BaseModel):
@@ -444,7 +447,8 @@ async def platform_admin_save_ai_settings(body: PlatformAISettingsRequest,
     try:
         return save_platform_ai_settings(body.provider, body.model, body.base_url,
                                          body.timeout_seconds, body.api_key,
-                                         body.clear_api_key, actor)
+                                         body.clear_api_key, actor, body.fallback_provider,
+                                         body.fallback_model, body.fallback_base_url)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
