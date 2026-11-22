@@ -24,7 +24,7 @@ from auth import issue_token, require_owner, verify_password, hash_password, has
 from platform_admin_auth import issue_platform_token, require_platform_admin
 from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer, get_platform_customer)
 from tenant_migration_preflight import tenant_migration_preflight
-from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
+from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo, get_site_settings, save_site_settings
 from platform_billing import (init_platform_billing_db, expire_due_platform_subscriptions, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
 from platform_ai import (init_platform_ai_db, get_platform_ai_settings, save_platform_ai_settings)
 from platform_team import (init_platform_team_db, list_platform_team, get_platform_employee_profile, save_platform_employee_profile)
@@ -82,6 +82,10 @@ class LoginRequest(BaseModel):
 class PlatformAdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=1, max_length=512)
+
+class WebsiteBrandingRequest(BaseModel):
+    settings: dict[str, str] = Field(default_factory=dict)
+
 
 class BrandLogoRequest(BaseModel):
     data_url: str = Field(min_length=100, max_length=2800000)
@@ -391,7 +395,7 @@ class PlatformCustomerUpdateRequest(BaseModel):
 
 @app.get("/api/public/branding")
 async def public_branding():
-    return {"logo_data_url": get_site_logo()}
+    return {"logo_data_url": get_site_logo(), "settings": get_site_settings()}
 
 @app.post("/api/platform/admin/branding/logo")
 async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_platform_admin)):
@@ -410,6 +414,16 @@ async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_
         raise HTTPException(status_code=400, detail="محتوى الملف لا يطابق نوع الصورة.")
     save_site_logo(body.data_url)
     return {"saved": True, "logo_data_url": body.data_url}
+
+@app.put("/api/platform/admin/branding/settings")
+async def update_platform_branding_settings(body: WebsiteBrandingRequest,
+                                            actor: str = Depends(require_platform_admin)):
+    try:
+        settings = save_site_settings(body.settings, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"saved": True, "settings": settings}
+
 
 @app.get("/api/platform/admin/tenant-readiness")
 async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admin)):
