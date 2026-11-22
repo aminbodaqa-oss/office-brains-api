@@ -28,6 +28,7 @@ from platform_branding import init_platform_branding_db, get_site_logo, save_sit
 from platform_billing import (init_platform_billing_db, expire_due_platform_subscriptions, list_platform_plans, save_platform_plan, list_platform_subscriptions, create_platform_subscription, update_platform_subscription)
 from platform_ai import (init_platform_ai_db, get_platform_ai_settings, save_platform_ai_settings)
 from platform_team import (init_platform_team_db, list_platform_team, get_platform_employee_profile, save_platform_employee_profile)
+from platform_settings import (init_platform_settings_db, get_platform_settings, save_platform_settings)
 from platform_experiences import (init_platform_experiences_db, get_experience, save_experience_draft, publish_experience, list_experience_revisions, restore_experience_revision)
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
     expire_due_platform_subscriptions()
     init_platform_ai_db()
     init_platform_team_db()
+    init_platform_settings_db()
     init_platform_experiences_db()
     init_workflow_db()
     init_internal_messaging_db()
@@ -84,6 +86,10 @@ class LoginRequest(BaseModel):
 class PlatformAdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=1, max_length=512)
+
+class PlatformSettingsRequest(BaseModel):
+    settings: dict[str, object] = Field(default_factory=dict)
+
 
 class WebsiteBrandingRequest(BaseModel):
     settings: dict[str, str] = Field(default_factory=dict)
@@ -414,7 +420,7 @@ class PlatformCustomerUpdateRequest(BaseModel):
 
 @app.get("/api/public/branding")
 async def public_branding():
-    return {"logo_data_url": get_site_logo(), "settings": get_site_settings()}
+    return {"logo_data_url": get_site_logo(), "settings": get_site_settings(), "platform": get_platform_settings()}
 
 @app.post("/api/platform/admin/branding/logo")
 async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_platform_admin)):
@@ -500,6 +506,20 @@ async def platform_admin_restore_experience(body: ExperienceRestoreRequest,
                                             actor: str = Depends(require_platform_admin)):
     try:
         return restore_experience_revision(body.surface, body.workspace_id, body.version, actor)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/platform/admin/settings")
+async def platform_admin_settings(_: str = Depends(require_platform_admin)):
+    return {"settings": get_platform_settings()}
+
+
+@app.put("/api/platform/admin/settings")
+async def platform_admin_save_settings(body: PlatformSettingsRequest,
+                                       actor: str = Depends(require_platform_admin)):
+    try:
+        return {"saved": True, "settings": save_platform_settings(body.settings, actor)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -661,6 +681,8 @@ async def platform_admin_customers(q: str = "", status: str = "",
 @app.post("/api/platform/admin/customers")
 async def platform_admin_create_customer(body: PlatformCustomerCreateRequest,
                                          actor: str = Depends(require_platform_admin)):
+    if not get_platform_settings()["allow_customer_creation"]:
+        raise HTTPException(status_code=403, detail="إنشاء العملاء متوقف من إعدادات المنصة.")
     try:
         return create_platform_customer(body.company_name, body.contact_name, body.email,
                                         body.phone, body.plan_code, actor)
