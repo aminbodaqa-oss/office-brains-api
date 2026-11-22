@@ -458,7 +458,7 @@ async def update_platform_branding_settings(body: WebsiteBrandingRequest,
 
 @app.get("/api/public/experience")
 async def public_experience(surface: str = "platform_site"):
-    if surface not in {"platform_site", "office_login", "office_workspace"}:
+    if surface not in {"platform_site", "office_login", "office_workspace", "super_admin"}:
         raise HTTPException(status_code=400, detail="نطاق الواجهة العامة غير مسموح.")
     experience = get_experience(surface)
     return {"surface": surface, "config": experience["published"] or experience["draft"],
