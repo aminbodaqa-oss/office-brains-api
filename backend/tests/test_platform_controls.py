@@ -35,7 +35,8 @@ class PlatformControlsTests(unittest.TestCase):
     def test_provider_secret_is_encrypted_and_never_returned(self):
         secret = "test-gemini-secret-value"
         saved = save_platform_ai_settings(
-            "gemini", "gemini-2.5-flash", "", 45, secret, False, "owner"
+            "gemini", "gemini-2.5-flash", "", 45, secret, False, "owner",
+            "ollama", "qwen2.5:3b", "http://127.0.0.1:11434"
         )
         self.assertTrue(saved["has_api_key"])
         self.assertNotIn("api_key", saved)
@@ -44,7 +45,10 @@ class PlatformControlsTests(unittest.TestCase):
                 "SELECT encrypted_api_key FROM platform_ai_settings WHERE id=1"
             ).fetchone()
         self.assertNotEqual(row["encrypted_api_key"], secret)
-        self.assertEqual(get_runtime_ai_config()["api_key"], secret)
+        runtime = get_runtime_ai_config()
+        self.assertEqual(runtime["api_key"], secret)
+        self.assertEqual(runtime["fallback_provider"], "ollama")
+        self.assertEqual(runtime["fallback_model"], "qwen2.5:3b")
 
     def test_provider_secret_can_be_cleared(self):
         save_platform_ai_settings(
