@@ -98,10 +98,11 @@
         if (page.description && description) description.textContent = page.description;
       });
     }
-    const fonts = {system:'system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif',
-      tajawal:'"Tajawal",Tahoma,Arial,sans-serif',cairo:'"Cairo",Tahoma,Arial,sans-serif',
-      inter:'"Inter",Arial,sans-serif'};
-    if (fonts[config.font_family]) { document.documentElement.style.setProperty("--office-font", fonts[config.font_family]); if (document.body) document.body.style.fontFamily = fonts[config.font_family]; }
+    /* Keep one Arabic typeface across the public site and workspace. */
+    const officeFont = '"IBM Plex Sans Arabic",sans-serif';
+    document.documentElement.style.setProperty("--office-font", officeFont);
+    document.documentElement.style.setProperty("font-family", officeFont);
+    if (document.body) document.body.style.fontFamily = officeFont;
     const root = document.documentElement;
     const densityScale = {compact:"0.86",comfortable:"1",spacious:"1.16"};
     const cornerRadius = {sharp:"7px",rounded:"14px",soft:"21px"};
