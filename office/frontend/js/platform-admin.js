@@ -404,6 +404,108 @@
     catch (error) { $("platformTeamList").textContent = error.message || "تعذر تحميل الفريق."; }
   });
 
+  async function loadAISettings() {
+    const message = $("aiSettingsMessage");
+    try {
+      const data = await platformRequest("/api/platform/admin/ai-settings");
+      const form = $("aiSettingsForm");
+      if (!form) return;
+      form.elements.provider.value = data.provider || "demo";
+      form.elements.model.value = data.model || "gemini-3.8-flash";
+      form.elements.base_url.value = data.base_url || "";
+      form.elements.timeout_seconds.value = data.timeout_seconds || 90;
+      form.elements.api_key.value = "";
+      form.elements.clear_api_key.checked = false;
+      $("aiKeyStatus").textContent = data.has_api_key
+        ? "مفتاح محفوظ (" + data.key_source + ")"
+        : "لا يوجد مفتاح محفوظ";
+      $("aiKeyStatus").className = data.has_api_key ? "billing-active" : "billing-inactive";
+      if (message) message.textContent = "";
+    } catch (error) {
+      if (message) message.textContent = error.message || "تعذر تحميل إعدادات الذكاء الاصطناعي.";
+    }
+  }
+
+  async function loadPlatformTeam() {
+    const list = $("platformTeamList");
+    if (!list || !token) return;
+    list.textContent = "جاري تحميل دليل الفريق...";
+    try {
+      const data = await platformRequest("/api/platform/admin/team");
+      list.replaceChildren();
+      (data.employees || []).forEach(employee => {
+        const card = document.createElement("article");
+        card.className = "platform-team-card";
+        const name = document.createElement("strong");
+        name.textContent = employee.id;
+        const role = document.createElement("span");
+        role.textContent = employee.role;
+        const dept = document.createElement("small");
+        dept.textContent = employee.department;
+        card.append(name, role, dept);
+        if ((employee.specialties || []).length) {
+          const details = document.createElement("p");
+          details.textContent = "التخصصات: " + employee.specialties.join(" · ");
+          card.append(details);
+        }
+        list.append(card);
+      });
+      if (!list.children.length) list.textContent = "لا يوجد موظفون معرفون.";
+    } catch (error) {
+      list.textContent = error.message || "تعذر تحميل دليل الفريق.";
+    }
+  }
+
+  $("aiSettingsForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const message = $("aiSettingsMessage");
+    button.disabled = true;
+    if (message) message.textContent = "جاري حفظ الإعدادات...";
+    try {
+      const payload = {
+        provider:form.elements.provider.value,
+        model:form.elements.model.value.trim(),
+        base_url:form.elements.base_url.value.trim(),
+        timeout_seconds:Number(form.elements.timeout_seconds.value),
+        api_key:form.elements.api_key.value || null,
+        clear_api_key:form.elements.clear_api_key.checked
+      };
+      const data = await platformRequest("/api/platform/admin/ai-settings", {
+        method:"PUT", body:JSON.stringify(payload)
+      });
+      form.elements.api_key.value = "";
+      form.elements.clear_api_key.checked = false;
+      $("aiKeyStatus").textContent = data.has_api_key
+        ? "مفتاح محفوظ (" + data.key_source + ")"
+        : "لا يوجد مفتاح محفوظ";
+      $("aiKeyStatus").className = data.has_api_key ? "billing-active" : "billing-inactive";
+      if (message) message.textContent = "تم حفظ الإعدادات. اختبر الاتصال للتأكد من عمل المزود.";
+    } catch (error) {
+      if (message) message.textContent = error.message || "تعذر حفظ الإعدادات.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("testAIConnection")?.addEventListener("click", async () => {
+    const button = $("testAIConnection");
+    const message = $("aiSettingsMessage");
+    button.disabled = true;
+    if (message) message.textContent = "جاري إرسال طلب اختبار فعلي إلى المزود...";
+    try {
+      const data = await platformRequest("/api/platform/admin/ai-settings/test", {method:"POST"});
+      if (message) message.textContent = "نجح الاتصال بالمزود " + data.provider + " · رد الاختبار: " + data.response;
+    } catch (error) {
+      if (message) message.textContent = error.message || "فشل اختبار الاتصال.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("refreshTeamBtn")?.addEventListener("click", loadPlatformTeam);
+
   const billingStatusNames = {
     pending_payment:"بانتظار الدفع", active:"نشط", past_due:"متأخر",
     cancelled:"ملغي", expired:"منتهي"
@@ -648,6 +750,7 @@
       if (activeLink) history.replaceState(null, "", activeLink.getAttribute("href"));
     }
     if (target === "subscriptions" && token) { loadBillingPlans(); loadSubscriptionCustomers(); loadSubscriptions(); }
+    if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "customers" && token) {
       loadCustomers();
