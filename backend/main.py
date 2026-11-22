@@ -2,6 +2,8 @@ from __future__ import annotations
 import json
 import hmac
 import asyncio
+import base64
+import binascii
 import os
 import secrets
 import time
@@ -22,6 +24,7 @@ from auth import issue_token, require_owner, verify_password, hash_password, has
 from platform_admin_auth import issue_platform_token, require_platform_admin
 from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer)
 from tenant_migration_preflight import tenant_migration_preflight
+from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
 from vindora_client import VindoraUnavailable, employee_context
 from automation import automation_status, recent_reports, scheduler_loop
 from push import push_delivery_loop
@@ -32,6 +35,7 @@ from task_runner import task_execution_loop
 async def lifespan(app: FastAPI):
     init_db()
     init_platform_tenants_db()
+    init_platform_branding_db()
     init_workflow_db()
     init_internal_messaging_db()
     init_whatsapp_db()
@@ -72,6 +76,9 @@ class LoginRequest(BaseModel):
 class PlatformAdminLoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=1, max_length=512)
+
+class BrandLogoRequest(BaseModel):
+    data_url: str = Field(min_length=100, max_length=2800000)
 
 @app.post("/api/auth/login")
 async def login(body: LoginRequest, request: Request):
@@ -333,6 +340,28 @@ class PlatformCustomerUpdateRequest(BaseModel):
     status: Literal["trial", "active", "suspended"] | None = None
     plan_code: Literal["trial", "starter", "professional", "business", "enterprise"] | None = None
 
+
+@app.get("/api/public/branding")
+async def public_branding():
+    return {"logo_data_url": get_site_logo()}
+
+@app.post("/api/platform/admin/branding/logo")
+async def update_platform_logo(body: BrandLogoRequest, _: str = Depends(require_platform_admin)):
+    prefix, separator, encoded = body.data_url.partition(",")
+    signatures = {"data:image/png;base64": bytes.fromhex("89504e470d0a1a0a"), "data:image/jpeg;base64": bytes.fromhex("ffd8ff")}
+    if not separator or not encoded or prefix not in (*signatures.keys(), "data:image/webp;base64"):
+        raise HTTPException(status_code=400, detail="ارفع صورة PNG أو JPG أو WEBP فقط.")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status_code=400, detail="ملف الصورة غير صالح.")
+    if len(raw) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="حجم الشعار يجب ألا يتجاوز 2 ميجابايت.")
+    valid = raw.startswith(signatures[prefix]) if prefix in signatures else (len(raw) >= 12 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP")
+    if not valid:
+        raise HTTPException(status_code=400, detail="محتوى الملف لا يطابق نوع الصورة.")
+    save_site_logo(body.data_url)
+    return {"saved": True, "logo_data_url": body.data_url}
 
 @app.get("/api/platform/admin/tenant-readiness")
 async def platform_admin_tenant_readiness(_: str = Depends(require_platform_admin)):
