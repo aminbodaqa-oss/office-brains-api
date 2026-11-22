@@ -319,6 +319,218 @@
     customerSearchTimer = setTimeout(loadCustomers, 250);
   });
 
+  const billingStatusNames = {
+    pending_payment:"بانتظار الدفع", active:"نشط", past_due:"متأخر",
+    cancelled:"ملغي", expired:"منتهي"
+  };
+  let billingPlans = [];
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, char =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+  const money = (minor) => (Number(minor || 0) / 100).toLocaleString("ar-EG", {
+    style:"currency",currency:"EGP",maximumFractionDigits:2
+  });
+
+  async function loadBillingPlans() {
+    const data = await platformRequest("/api/platform/admin/plans");
+    billingPlans = data.plans || [];
+    const catalog = $("planCatalog");
+    if (catalog) {
+      catalog.replaceChildren();
+      billingPlans.forEach((plan) => {
+        const card = document.createElement("article");
+        card.className = "billing-plan-card";
+        const title = document.createElement("h3");
+        title.textContent = plan.name;
+        const code = document.createElement("small");
+        code.textContent = plan.code;
+        const desc = document.createElement("p");
+        desc.textContent = plan.description || "بدون وصف";
+        const price = document.createElement("p");
+        price.textContent = "شهري: " + money(plan.monthly_price_minor) + " · سنوي: " + money(plan.yearly_price_minor);
+        const state = document.createElement("span");
+        state.className = plan.active ? "billing-active" : "billing-inactive";
+        state.textContent = plan.active ? "متاحة للاشتراك" : "غير مفعّلة";
+        const limits = document.createElement("small");
+        limits.textContent = "الحدود: " + JSON.stringify(plan.limits || {});
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "ghost";
+        edit.textContent = "تعديل الباقة";
+        edit.addEventListener("click", () => {
+          const form = $("planForm");
+          form.elements.code.value = plan.code;
+          form.elements.code.readOnly = true;
+          form.elements.name.value = plan.name;
+          form.elements.description.value = plan.description || "";
+          form.elements.monthly_price.value = (Number(plan.monthly_price_minor || 0) / 100).toFixed(2);
+          form.elements.yearly_price.value = (Number(plan.yearly_price_minor || 0) / 100).toFixed(2);
+          form.elements.limits.value = JSON.stringify(plan.limits || {}, null, 2);
+          form.elements.active.checked = Boolean(plan.active);
+          $("planFormMessage").textContent = "تعديل الباقة: " + plan.name;
+          form.scrollIntoView({behavior:"smooth",block:"center"});
+        });
+        card.append(title,code,desc,price,state,limits,edit);
+        catalog.append(card);
+      });
+    }
+    const select = $("subscriptionPlan");
+    if (select) {
+      const active = billingPlans.filter(plan => plan.active);
+      select.innerHTML = '<option value="">اختر الباقة</option>' + active.map(plan =>
+        '<option value="' + escapeHtml(plan.code) + '">' + escapeHtml(plan.name) +
+        ' · ' + money(plan.monthly_price_minor) + ' شهري</option>').join("");
+    }
+  }
+
+  async function loadSubscriptionCustomers() {
+    const data = await platformRequest("/api/platform/admin/customers");
+    const select = $("subscriptionCustomer");
+    if (!select) return;
+    select.innerHTML = '<option value="">اختر العميل</option>' + (data.customers || []).map(customer =>
+      '<option value="' + escapeHtml(customer.id) + '">' +
+      escapeHtml(customer.company_name) + ' · ' + escapeHtml(customer.email) + '</option>').join("");
+  }
+
+  async function loadSubscriptions() {
+    const list = $("subscriptionList");
+    if (!list || !token) return;
+    list.textContent = "جاري تحميل الاشتراكات...";
+    try {
+      const status = $("subscriptionStatusFilter")?.value || "";
+      const data = await platformRequest("/api/platform/admin/subscriptions" +
+        (status ? "?status=" + encodeURIComponent(status) : ""));
+      const items = data.subscriptions || [];
+      if (!items.length) {
+        list.textContent = "لا توجد اشتراكات في هذه القائمة.";
+        return;
+      }
+      list.replaceChildren();
+      items.forEach((item) => {
+        const row = document.createElement("article");
+        row.className = "subscription-row";
+        const info = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = item.company_name + " · " + item.plan_name;
+        const meta = document.createElement("span");
+        meta.textContent = (item.billing_cycle === "yearly" ? "سنوي" : "شهري") +
+          " · " + money(item.amount_minor) + " · " + new Date(item.starts_at).toLocaleDateString("ar-EG") +
+          " حتى " + new Date(item.ends_at).toLocaleDateString("ar-EG");
+        const statusNode = document.createElement("span");
+        statusNode.className = "status-label " + item.status;
+        statusNode.textContent = billingStatusNames[item.status] || item.status;
+        const payment = document.createElement("small");
+        payment.textContent = "الدفع: " + (item.payment_status === "paid" ? "مدفوع" :
+          item.payment_status === "refunded" ? "مسترد" : "غير مدفوع");
+        info.append(title,meta,statusNode,payment);
+        const actions = document.createElement("div");
+        actions.className = "subscription-actions";
+        if (item.payment_status !== "paid" && item.status === "pending_payment") {
+          const paid = document.createElement("button");
+          paid.type = "button";
+          paid.textContent = "تأكيد استلام الدفع";
+          paid.addEventListener("click", async () => {
+            if (!confirm("تأكيد استلام المبلغ يدويًا لهذا الاشتراك؟")) return;
+            paid.disabled = true;
+            try {
+              await platformRequest("/api/platform/admin/subscriptions/" + encodeURIComponent(item.id), {
+                method:"PATCH",body:JSON.stringify({payment_status:"paid"})
+              });
+              await loadSubscriptions();
+              await loadCustomers();
+            } catch (error) { alert(error.message || "تعذر تحديث الدفع."); paid.disabled = false; }
+          });
+          actions.append(paid);
+        }
+        if (!["cancelled","expired"].includes(item.status)) {
+          const cancel = document.createElement("button");
+          cancel.type = "button";
+          cancel.className = "ghost";
+          cancel.textContent = "إلغاء الاشتراك";
+          cancel.addEventListener("click", async () => {
+            if (!confirm("هل تريد إلغاء هذا الاشتراك؟")) return;
+            cancel.disabled = true;
+            try {
+              await platformRequest("/api/platform/admin/subscriptions/" + encodeURIComponent(item.id), {
+                method:"PATCH",body:JSON.stringify({status:"cancelled"})
+              });
+              await loadSubscriptions();
+              await loadCustomers();
+            } catch (error) { alert(error.message || "تعذر إلغاء الاشتراك."); cancel.disabled = false; }
+          });
+          actions.append(cancel);
+        }
+        row.append(info,actions);
+        list.append(row);
+      });
+    } catch (error) {
+      list.textContent = error.message || "تعذر تحميل الاشتراكات.";
+    }
+  }
+
+  $("planForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const message = $("planFormMessage");
+    button.disabled = true;
+    try {
+      let limits;
+      try { limits = JSON.parse(form.elements.limits.value || "{}"); }
+      catch { throw new Error("صيغة حدود الاستخدام يجب أن تكون JSON صحيحة."); }
+      if (!limits || Array.isArray(limits) || typeof limits !== "object") {
+        throw new Error("حدود الاستخدام يجب أن تكون كائن JSON.");
+      }
+      const payload = {
+        code:form.elements.code.value.trim(), name:form.elements.name.value.trim(),
+        description:form.elements.description.value.trim(),
+        monthly_price_minor:Math.round(Number(form.elements.monthly_price.value) * 100),
+        yearly_price_minor:Math.round(Number(form.elements.yearly_price.value) * 100),
+        limits, active:form.elements.active.checked
+      };
+      await platformRequest("/api/platform/admin/plans", {method:"POST",body:JSON.stringify(payload)});
+      message.textContent = "تم حفظ الباقة.";
+      form.reset(); form.elements.code.readOnly = false; form.elements.limits.value = "{}";
+      await loadBillingPlans();
+    } catch (error) { message.textContent = error.message || "تعذر حفظ الباقة."; }
+    finally { button.disabled = false; }
+  });
+
+  $("resetPlanForm")?.addEventListener("click", () => {
+    $("planForm").reset();
+    $("planForm").elements.code.readOnly = false;
+    $("planForm").elements.limits.value = "{}";
+    $("planFormMessage").textContent = "";
+  });
+
+  $("subscriptionForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const message = $("subscriptionFormMessage");
+    button.disabled = true;
+    try {
+      const starts = form.elements.starts_at.value;
+      const payload = {
+        customer_id:form.elements.customer_id.value,
+        plan_code:form.elements.plan_code.value,
+        billing_cycle:form.elements.billing_cycle.value,
+        starts_at:starts ? new Date(starts + "T00:00:00").toISOString() : null,
+        notes:form.elements.notes.value.trim()
+      };
+      await platformRequest("/api/platform/admin/subscriptions", {method:"POST",body:JSON.stringify(payload)});
+      message.textContent = "تم إنشاء الاشتراك في انتظار تأكيد الدفع.";
+      form.reset();
+      await loadSubscriptions();
+    } catch (error) { message.textContent = error.message || "تعذر إنشاء الاشتراك."; }
+    finally { button.disabled = false; }
+  });
+
+  $("refreshBillingBtn")?.addEventListener("click", async () => {
+    try { await loadBillingPlans(); await loadSubscriptionCustomers(); await loadSubscriptions(); }
+    catch (error) { $("planFormMessage").textContent = error.message || "تعذر تحديث بيانات الاشتراكات."; }
+  });
+  $("subscriptionStatusFilter")?.addEventListener("change", loadSubscriptions);
+
   $("refreshTenantReadiness")?.addEventListener("click", loadTenantReadiness);
   $("siteLogoForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -350,6 +562,7 @@
       const activeLink = pageLinks.find((link) => link.dataset.pageLink === target);
       if (activeLink) history.replaceState(null, "", activeLink.getAttribute("href"));
     }
+    if (target === "subscriptions" && token) { loadBillingPlans(); loadSubscriptionCustomers(); loadSubscriptions(); }
     if (target === "customers" && token) {
       loadCustomers();
       loadTenantReadiness();
