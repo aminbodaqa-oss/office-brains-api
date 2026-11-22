@@ -49,6 +49,10 @@ def _now() -> str:
 
 def init_platform_experiences_db() -> None:
     with _connect() as conn:
+        conn.execute("""CREATE TABLE IF NOT EXISTS platform_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT NOT NULL, action TEXT NOT NULL,
+            entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, created_at TEXT NOT NULL
+        )""")
         conn.execute("""CREATE TABLE IF NOT EXISTS platform_experiences (
             surface TEXT NOT NULL,
             workspace_id TEXT NOT NULL DEFAULT '',
