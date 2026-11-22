@@ -944,6 +944,13 @@
     const button=$("loadExperienceBtn");button.disabled=true;
     try{
       const data=await platformRequest("/api/platform/admin/experiences?"+query.toString());
+      if(scope.surface==="super_admin" && data.published){
+        const root=document.documentElement,theme=data.published.theme||{};
+        const variables={background:"--bg",surface:"--panel",text:"--ink",accent:"--emerald",highlight:"--gold"};
+        Object.entries(variables).forEach(([key,name])=>{if(/^#[0-9A-Fa-f]{6}$/.test(theme[key]||""))root.style.setProperty(name,theme[key]);});
+        if(data.published.font_family==="tajawal")root.style.setProperty("--platform-font",'"Tajawal",Tahoma,Arial,sans-serif');
+        else if(data.published.font_family==="cairo")root.style.setProperty("--platform-font",'"Cairo",Tahoma,Arial,sans-serif');
+      }
       populateExperienceForm(data.draft || {});
       put("experienceVersion",data.version || 0);
       put("experienceStatus",data.status==="published"?"منشور":data.status==="draft"?"مسودة":"الإعدادات الافتراضية");
