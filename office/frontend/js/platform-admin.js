@@ -696,6 +696,53 @@
   });
   $("subscriptionStatusFilter")?.addEventListener("change", loadSubscriptions);
 
+  async function loadPlatformSettings() {
+    const form = $("platformSettingsForm");
+    if (!form || !token) return;
+    try {
+      const data = await platformRequest("/api/platform/admin/settings");
+      const settings = data.settings || {};
+      form.elements.public_site_enabled.checked = Boolean(settings.public_site_enabled);
+      form.elements.allow_customer_creation.checked = Boolean(settings.allow_customer_creation);
+      form.elements.site_notice_enabled.checked = Boolean(settings.site_notice_enabled);
+      form.elements.site_notice_text.value = settings.site_notice_text || "";
+      $("platformSettingsMessage").textContent = "تم تحميل إعدادات المنصة.";
+    } catch (error) {
+      $("platformSettingsMessage").textContent = error.message || "تعذر تحميل إعدادات المنصة.";
+    }
+  }
+
+  $("platformSettingsForm")?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('button[type="submit"]');
+    const message = $("platformSettingsMessage");
+    button.disabled = true;
+    message.textContent = "جاري حفظ إعدادات المنصة...";
+    try {
+      const settings = {
+        public_site_enabled:form.elements.public_site_enabled.checked,
+        allow_customer_creation:form.elements.allow_customer_creation.checked,
+        site_notice_enabled:form.elements.site_notice_enabled.checked,
+        site_notice_text:form.elements.site_notice_text.value.trim()
+      };
+      const data = await platformRequest("/api/platform/admin/settings", {
+        method:"PUT", body:JSON.stringify({settings})
+      });
+      form.elements.public_site_enabled.checked = Boolean(data.settings.public_site_enabled);
+      form.elements.allow_customer_creation.checked = Boolean(data.settings.allow_customer_creation);
+      form.elements.site_notice_enabled.checked = Boolean(data.settings.site_notice_enabled);
+      form.elements.site_notice_text.value = data.settings.site_notice_text || "";
+      message.textContent = "تم حفظ إعدادات المنصة.";
+    } catch (error) {
+      message.textContent = error.message || "تعذر حفظ إعدادات المنصة.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("refreshPlatformSettings")?.addEventListener("click", loadPlatformSettings);
+
   async function loadPlatformOperations() {
     const healthGrid = $("opsHealthGrid");
     const countsGrid = $("opsCountsGrid");
@@ -968,6 +1015,7 @@
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "website" && token) { loadExperienceStudio(); }
     if (target === "operations" && token) { loadPlatformOperations(); }
+    if (target === "settings" && token) { loadPlatformSettings(); }
     if (target === "ai-team" && token) { loadAISettings(); loadPlatformTeam(); }
     if (target === "customers" && token) {
       loadCustomers();
