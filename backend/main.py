@@ -22,7 +22,7 @@ from office_whatsapp import init_whatsapp_db, whatsapp_contacts, virtual_number,
 from brains import PROVIDER, BrainUnavailable, employee_reply
 from auth import issue_token, require_owner, verify_password, hash_password, hash_refresh_token
 from platform_admin_auth import issue_platform_token, require_platform_admin
-from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer)
+from platform_tenants import (init_platform_tenants_db, list_platform_customers, create_platform_customer, update_platform_customer, get_platform_customer)
 from tenant_migration_preflight import tenant_migration_preflight
 from platform_branding import init_platform_branding_db, get_site_logo, save_site_logo
 from vindora_client import VindoraUnavailable, employee_context
@@ -383,6 +383,15 @@ async def platform_admin_create_customer(body: PlatformCustomerCreateRequest,
                                         body.phone, body.plan_code, actor)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/platform/admin/customers/{customer_id}")
+async def platform_admin_customer_detail(customer_id: str,
+                                         _: str = Depends(require_platform_admin)):
+    result = get_platform_customer(customer_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="العميل غير موجود.")
+    return result
 
 
 @app.patch("/api/platform/admin/customers/{customer_id}")
