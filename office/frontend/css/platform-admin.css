@@ -23,3 +23,38 @@
 
 /* Keep buttons clean: no decorative arrow marks beside button labels. */
 button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after{content:none!important;display:none!important}
+
+/* Customer management workspace */
+.customer-management{margin-top:18px;scroll-margin-top:20px}
+.customer-management .panel-head{align-items:flex-start;gap:18px}
+.customer-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:20px 0}
+.customer-stats article{padding:14px;border:1px solid var(--line);border-radius:13px;background:#0e1629}
+.customer-stats span,.customer-stats strong{display:block}
+.customer-stats span{font-size:11px;color:var(--muted)}
+.customer-stats strong{font-size:23px;margin-top:7px}
+.customer-form{padding:20px;border:1px solid var(--line);border-radius:15px;background:#0e1629}
+.customer-form h3,.customer-list-head h3{margin:0 0 14px;font-size:15px}
+.customer-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.customer-fields label{display:grid;gap:6px;color:#cbd2e8;font-size:12px}
+.customer-fields input,.customer-fields select,.customer-filters input,.customer-filters select,.customer-actions select{width:100%;min-width:0;border:1px solid var(--line);border-radius:10px;background:#111b30;color:var(--ink);padding:11px;font:inherit;font-size:12px}
+.customer-form-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px}
+.customer-form-actions p{margin:0}
+.customer-form-actions button,.customer-actions button{border:0;border-radius:10px;background:var(--emerald);color:white;padding:10px 14px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.customer-form-actions button:disabled,.customer-actions button:disabled{opacity:.6}
+.customer-list-head{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:24px 0 12px}
+.customer-list-head h3{margin:0}
+.customer-filters{display:flex;gap:8px;min-width:min(100%,440px)}
+.customer-list{display:grid;gap:9px}
+.customer-row{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(150px,1fr) minmax(190px,.9fr);gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:13px;background:#10192c}
+.customer-primary strong,.customer-primary span,.customer-primary small{display:block;overflow-wrap:anywhere}
+.customer-primary strong{font-size:13px}
+.customer-primary span,.customer-primary small,.customer-meta span{font-size:11px;color:var(--muted);margin-top:4px}
+.customer-meta{display:grid;gap:2px}
+.customer-meta .status-label{width:max-content;padding:3px 8px;border-radius:20px;background:#ffffff0d;color:var(--gold)}
+.status-label.active{color:#61d9b7}.status-label.suspended{color:#ff9ca8}
+.customer-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.customer-actions button{grid-column:1/-1}
+.customer-note{font-size:11px;color:var(--muted);line-height:1.8;margin:16px 0 0}
+@media(max-width:850px){.customer-row{grid-template-columns:1fr 1fr}.customer-actions{grid-column:1/-1}}
+@media(max-width:560px){.customer-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-fields{grid-template-columns:1fr}.customer-list-head{align-items:stretch;flex-direction:column}.customer-filters{min-width:0;flex-direction:column}.customer-row{grid-template-columns:1fr}.customer-actions{grid-column:auto}.customer-form-actions{align-items:stretch;flex-direction:column}.customer-form-actions button{width:100%}}
+/* Buttons contain labels only; decorative arrows are not used. */
