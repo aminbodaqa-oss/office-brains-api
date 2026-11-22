@@ -1006,6 +1006,38 @@
   $("experienceWorkspaceId")?.addEventListener("change",loadExperienceStudio);
   $("loadExperienceBtn")?.addEventListener("click",loadExperienceStudio);
 
+
+  $("studioLogoFile")?.addEventListener("change",()=>{
+    const file=$("studioLogoFile").files?.[0],status=$("studioLogoStatus");
+    if(!file)return;
+    if(!["image/png","image/jpeg","image/webp"].includes(file.type)||file.size>2*1024*1024){
+      status.textContent="اختار صورة PNG أو JPG أو WEBP لا يتجاوز حجمها 2 ميجابايت.";
+      $("studioLogoFile").value="";
+      return;
+    }
+    const reader=new FileReader();
+    reader.onload=()=>{ $("studioLogoPreview").src=String(reader.result); status.textContent="معاينة الشعار الجديد. اضغط حفظ لتطبيقه."; };
+    reader.onerror=()=>{status.textContent="تعذرت قراءة الصورة.";};
+    reader.readAsDataURL(file);
+  });
+  $("uploadStudioLogo")?.addEventListener("click",async()=>{
+    const file=$("studioLogoFile")?.files?.[0],status=$("studioLogoStatus"),button=$("uploadStudioLogo");
+    if(!file){status.textContent="اختار ملف الشعار أولًا.";return;}
+    button.disabled=true;status.textContent="جاري حفظ الشعار...";
+    try{
+      const dataUrl=await new Promise((resolve,reject)=>{
+        const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));
+        reader.onerror=()=>reject(new Error("تعذرت قراءة ملف الشعار."));reader.readAsDataURL(file);
+      });
+      const result=await platformRequest("/api/platform/admin/branding/logo",{method:"POST",body:JSON.stringify({data_url:dataUrl})});
+      document.querySelectorAll("[data-brand-logo]").forEach(img=>{img.src=result.logo_data_url;});
+      document.querySelectorAll("[data-brand-icon]").forEach(icon=>{icon.href=result.logo_data_url;});
+      status.textContent="تم حفظ الشعار الموحد.";
+      $("studioLogoFile").value="";
+    }catch(error){status.textContent=error.message||"تعذر حفظ الشعار.";}
+    finally{button.disabled=false;}
+  });
+
   // Sidebar navigation: show one workspace section at a time.
   const pageLinks = Array.from(document.querySelectorAll("[data-page-link]"));
   const pages = Array.from(document.querySelectorAll("[data-page]"));
