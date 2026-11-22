@@ -28,6 +28,7 @@
 
     for (const path of [
       "js/config.js",
+      "js/branding.js",
       "js/app.js",
       "js/workspace.js",
       "js/whatsapp.js?v=1",

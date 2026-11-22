@@ -251,6 +251,22 @@
   });
 
   $("refreshTenantReadiness")?.addEventListener("click", loadTenantReadiness);
+  $("siteLogoForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget, file = $("siteLogoFile")?.files?.[0], message = $("siteLogoMessage");
+    if (!file) { message.textContent = "اختار ملف الشعار الأول."; return; }
+    if (!["image/png","image/jpeg","image/webp"].includes(file.type)) { message.textContent = "الصيغ المدعومة PNG وJPG وWEBP فقط."; return; }
+    if (file.size > 2 * 1024 * 1024) { message.textContent = "حجم الصورة أكبر من 2 ميجابايت."; return; }
+    const button = form.querySelector('button[type="submit"]'); button.disabled = true; message.textContent = "جاري حفظ الشعار...";
+    try {
+      const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = () => reject(new Error("تعذر قراءة ملف الصورة.")); reader.readAsDataURL(file); });
+      await platformRequest("/api/platform/admin/branding/logo", {method:"POST", body:JSON.stringify({data_url:dataUrl})});
+      document.querySelectorAll("[data-brand-logo]").forEach(img => { img.src = dataUrl; });
+      $("siteLogoPreview").src = dataUrl; message.textContent = "تم حفظ الشعار وتطبيقه على صفحات المنصة."; form.reset();
+    } catch (error) { message.textContent = error.message || "تعذر حفظ الشعار."; }
+    finally { button.disabled = false; }
+  });
+
 
 
   // Sidebar navigation: show one workspace section at a time.
