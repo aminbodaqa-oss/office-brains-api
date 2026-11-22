@@ -293,6 +293,41 @@
   const initialPage = pageLinks.find((link) => link.getAttribute("href") === location.hash)?.dataset.pageLink || "overview";
   activatePage(initialPage, false);
 
+  // Accessible, responsive sidebar: collapsible rail on desktop and drawer on mobile.
+  const sidebarToggle = $("sidebarToggle");
+  const sidebarBackdrop = $("sidebarBackdrop");
+  const isMobileSidebar = () => window.matchMedia("(max-width: 900px)").matches;
+  function closeSidebar() {
+    $("appView").classList.remove("sidebar-open");
+    $("appView").classList.add("sidebar-collapsed");
+    sidebarToggle?.setAttribute("aria-expanded", "false");
+    sidebarToggle?.setAttribute("aria-label", "فتح القائمة الجانبية");
+  }
+  function openSidebar() {
+    $("appView").classList.remove("sidebar-collapsed");
+    if (isMobileSidebar()) $("appView").classList.add("sidebar-open");
+    else $("appView").classList.remove("sidebar-open");
+    sidebarToggle?.setAttribute("aria-expanded", "true");
+    sidebarToggle?.setAttribute("aria-label", "إغلاق القائمة الجانبية");
+  }
+  sidebarToggle?.addEventListener("click", () => {
+    const opened = isMobileSidebar()
+      ? $("appView").classList.contains("sidebar-open")
+      : !$("appView").classList.contains("sidebar-collapsed");
+    if (opened) closeSidebar(); else openSidebar();
+  });
+  sidebarBackdrop?.addEventListener("click", closeSidebar);
+  window.addEventListener("resize", () => {
+    if (!isMobileSidebar()) {
+      $("appView").classList.remove("sidebar-open");
+      sidebarToggle?.setAttribute("aria-expanded", String(!$("appView").classList.contains("sidebar-collapsed")));
+    } else {
+      $("appView").classList.remove("sidebar-collapsed");
+      closeSidebar();
+    }
+  });
+
+  pageLinks.forEach((link) => link.addEventListener("click", () => { if (isMobileSidebar()) closeSidebar(); }));
   $("refreshBtn").addEventListener("click", loadOverview);
   // Restore the admin session after a page refresh in the same browser tab.
   if (token) {
