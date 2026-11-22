@@ -208,3 +208,12 @@ button::after, a.btn::after, .btn::after, .button::after, [role="button"]::after
 @media(max-width:1000px){.platform-team-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.platform-team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:420px){.platform-team-grid{grid-template-columns:1fr}.panel-head{align-items:flex-start;flex-direction:column}}
+
+.platform-team-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.platform-team-card{display:flex;flex-direction:column;gap:6px;min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:#0e172a}
+.platform-team-card strong{font-size:14px}
+.platform-team-card span{font-size:12px;color:var(--ink)}
+.platform-team-card small,.platform-team-card p{font-size:11px;color:var(--muted);line-height:1.8;overflow-wrap:anywhere}
+.platform-team-card p{margin:0}
+@media(max-width:900px){.platform-team-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.platform-team-grid{grid-template-columns:1fr}}
