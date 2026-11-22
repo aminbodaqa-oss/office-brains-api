@@ -38,7 +38,8 @@
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <section class="main">
     <header class="topbar"><button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="فتح القائمة الجانبية" aria-expanded="true">☰</button><div><p class="eyebrow">PLATFORM OVERVIEW</p><h1>صباح السيطرة على التفاصيل.</h1><p class="muted">نظرة تشغيلية آمنة على خدمة Office Brains.</p></div><button id="refreshBtn" class="ghost">تحديث البيانات</button></header>
-    <section class="admin-page active" data-page="overview">\n    <div id="loadError" class="error"></div>
+    <section class="admin-page active" data-page="overview">
+    <div id="loadError" class="error"></div>
     <section class="metrics">
       <article class="metric"><span>واجهة API</span><strong id="apiState">—</strong><small>حالة الخدمة</small></article>
       <article class="metric"><span>قاعدة البيانات</span><strong id="dbState">—</strong><small>فحص الاتصال</small></article>
@@ -71,7 +72,9 @@
       <div class="status-row"><span class="status-dot warn"></span><div><b>عزل الشركات ومساحات العمل</b><p>تأسيس هوية مستقلة وبيانات منفصلة لكل عميل.</p></div><strong class="pending">التالي</strong></div>
       <div class="status-row"><span class="status-dot warn"></span><div><b>العملاء والباقات والاشتراكات</b><p>إدارة الحسابات والخطط وحدود الاستخدام.</p></div><strong class="pending">قيد التخطيط</strong></div>
       <div class="status-row"><span class="status-dot warn"></span><div><b>Website Studio</b><p>إدارة الموقع العام والمحتوى من لوحة التحكم.</p></div><strong class="pending">قيد التخطيط</strong></div>
-    </section>\n    <section class="admin-page" data-page="customers">\n    <section id="customer-management" class="panel customer-management">
+    </section>
+    <section class="admin-page" data-page="customers">
+    <section id="customer-management" class="panel customer-management">
       <div class="panel-head"><div><p class="eyebrow">CUSTOMER MANAGEMENT</p><h2>العملاء ومساحات العمل</h2><p class="muted">إدارة حسابات الشركات ومساحاتها من مكان واحد.</p></div><button id="loadCustomersBtn" class="ghost" type="button">تحديث القائمة</button></div>
       <div class="customer-stats">
         <article><span>كل العملاء</span><strong id="customerTotal">0</strong></article>
@@ -108,7 +111,8 @@
       <p id="readinessSafety" class="customer-note">الفحص للقراءة فقط ولا يغيّر أي بيانات أو يفعّل دخول العملاء.</p>
     </section>
 
-    </section>\n    <section class="admin-page" data-page="subscriptions"><section class="panel coming-soon"><p class="eyebrow">BILLING & PLANS</p><h2>الباقات والاشتراكات</h2><p class="muted">إدارة الخطط والأسعار والفواتير وتجديد الاشتراكات وحدود الاستخدام.</p><span>القسم قيد التجهيز</span></section></section>
+    </section>
+    <section class="admin-page" data-page="subscriptions"><section class="panel coming-soon"><p class="eyebrow">BILLING & PLANS</p><h2>الباقات والاشتراكات</h2><p class="muted">إدارة الخطط والأسعار والفواتير وتجديد الاشتراكات وحدود الاستخدام.</p><span>القسم قيد التجهيز</span></section></section>
     <section class="admin-page" data-page="website"><section class="panel website-branding"><div class="panel-head"><div><p class="eyebrow">WEBSITE IDENTITY</p><h2>إعدادات هوية الموقع</h2><p class="muted">ارفع شعارًا موحدًا ليظهر في الموقع وصفحات الدخول ولوحة التحكم.</p></div></div><div class="brand-settings-grid"><div class="brand-preview"><img id="siteLogoPreview" data-brand-logo src="assets/office-brains-logo.svg" alt="معاينة شعار Office Brains"><span>معاينة الشعار الحالي</span></div><form id="siteLogoForm" class="brand-upload-form"><label for="siteLogoFile">اختيار ملف الشعار</label><input id="siteLogoFile" type="file" accept="image/png,image/jpeg,image/webp" required><p class="muted">الصيغ المدعومة PNG وJPG وWEBP، بحد أقصى 2 ميجابايت.</p><p id="siteLogoMessage" class="muted" role="status">الشعار الحالي مستخدم في صفحات المنصة.</p><button type="submit">حفظ الشعار وتطبيقه</button></form></div></section><section class="panel coming-soon website-studio-next"><h2>باقي أدوات Website Studio</h2><p class="muted">إدارة الصفحات والمحتوى والألوان والقوائم والمعاينة قبل النشر.</p><span>قيد التجهيز</span></section></section>
     <section class="admin-page" data-page="ai-team"><section class="panel coming-soon"><p class="eyebrow">AI & TEAM</p><h2>الذكاء والموظفون</h2><p class="muted">إدارة مزودي الذكاء الاصطناعي والنماذج والموظفين وحدود قدراتهم.</p><span>القسم قيد التجهيز</span></section></section>
     <section class="admin-page" data-page="operations"><section class="panel coming-soon"><p class="eyebrow">OPERATIONS</p><h2>العمليات والسجلات</h2><p class="muted">متابعة المهام والتنفيذ والإشعارات وسجل الأحداث والتدقيق.</p><span>القسم قيد التجهيز</span></section></section>
